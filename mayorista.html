@@ -1,0 +1,589 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Urban Riders | Mayorista</title>
+<link rel="icon" type="image/png" href="img/logo-ur.png">
+<link rel="apple-touch-icon" href="img/logo-ur.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .hero-bg {
+            background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.5)), url('img/portada.jpg') center/cover;
+            min-height: 80vh;
+        }
+        .cart-modal { transform: translateX(100%); transition: transform 0.3s ease-in-out; }
+        .cart-modal.active { transform: translateX(0); }
+        .login-overlay { display: none; }
+        .login-overlay.active { display: flex; }
+        html { scroll-behavior: smooth; }
+        .product-img { width: 100%; height: 100%; object-fit: contain; background-color: #000; cursor: zoom-in; transition: transform 0.3s; }
+        .product-img:hover { transform: scale(1.05); }
+        .category-btn.active { background-color: #eab308; color: black; border-color: #eab308; }
+
+        /* MODAL ZOOM ESTILO MINORISTA */
+        #zoom-modal { display: none; background: rgba(0,0,0,0.95); }
+        #zoom-modal.active { display: flex; animation: fadeIn 0.2s ease-out; }
+        .cursor-zoom-out { cursor: zoom-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gray-950 text-white font-sans overflow-x-hidden">
+
+    <div id="zoom-modal" class="fixed inset-0 z-[200] items-center justify-center p-4 cursor-zoom-out" onclick="closeZoom()">
+        <img id="zoom-img" src="" class="max-w-[90%] max-h-[90vh] rounded-lg shadow-2xl border border-white/10 object-contain">
+    </div>
+
+    <div id="login-modal" class="login-overlay fixed inset-0 bg-black/80 z-[60] items-center justify-center p-4">
+        <div class="bg-gray-900 p-8 rounded-2xl border border-gray-800 w-full max-w-md text-center shadow-2xl">
+            <h2 class="text-3xl font-black italic mb-6 text-yellow-500 uppercase">Acceso</h2>
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="mb-4">
+                    <label class="block text-left text-[10px] font-bold text-gray-500 uppercase ml-1 mb-1">Correo Electrónico</label>
+                    <input type="email" id="user-email" placeholder="ejemplo@correo.com" class="w-full p-4 rounded-lg bg-black border border-gray-800 outline-none focus:border-yellow-500 text-white transition" required>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-left text-[10px] font-bold text-gray-500 uppercase ml-1 mb-1">Contraseña</label>
+                    <input type="password" id="user-pass" placeholder="••••••••" class="w-full p-4 rounded-lg bg-black border border-gray-800 outline-none focus:border-yellow-500 text-white transition" required>
+                </div>
+                <button type="submit" id="btn-login-submit" class="w-full bg-yellow-500 text-black py-4 rounded-lg font-black uppercase hover:bg-yellow-400 transition-all transform active:scale-95 shadow-lg">Entrar al Sistema</button>
+            </form>
+            <button onclick="toggleLoginModal()" class="w-full text-gray-500 text-xs mt-6 uppercase tracking-widest hover:text-white transition">Cancelar</button>
+        </div>
+    </div>
+
+    <nav class="sticky top-0 z-50 bg-black/95 border-b border-gray-800 backdrop-blur-md">
+        <div class="flex justify-between items-center p-4 md:px-8">
+            <div class="flex items-center gap-2">
+                <div class="bg-yellow-500 text-black p-1.5 rounded-lg font-black text-lg italic">UR</div>
+                <span class="text-xl md:text-2xl font-black italic uppercase">Urban<span class="text-yellow-500">Riders</span></span>
+            </div>
+            <div class="flex items-center gap-3">
+                <div id="auth-buttons" class="flex gap-2"></div>
+                <button onclick="toggleCart()" class="relative bg-white/10 p-2.5 rounded-full hover:bg-yellow-500 transition">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span id="cart-count" class="absolute -top-1 -right-1 bg-yellow-500 text-black text-[9px] font-bold px-1.5 rounded-full">0</span>
+                </button>
+            </div>
+        </div>
+        <div class="flex justify-center md:justify-start md:px-8 pb-3 space-x-6 text-[10px] font-black uppercase tracking-widest pt-2">
+            <a href="#inicio" class="hover:text-yellow-500">Inicio</a>
+            <a href="#catalogo" class="hover:text-yellow-500">Catálogo</a>
+            <a href="#contacto" class="hover:text-yellow-500">Contacto</a>
+        </div>
+    </nav>
+
+    <header id="inicio" class="hero-bg flex items-center justify-center px-4">
+        <div class="max-w-4xl text-center">
+            <h1 class="text-5xl md:text-8xl font-black italic uppercase mb-6 leading-none tracking-tighter">
+                Equipamiento <br><span class="text-yellow-500">Sin Límites</span>
+            </h1>
+            <p class="text-base md:text-2xl font-bold italic uppercase tracking-widest mb-10">Distribuidora Mayorista Oficial</p>
+            <a href="#catalogo" class="bg-yellow-500 text-black px-10 py-4 rounded-full font-black uppercase hover:bg-white transition-all transform hover:scale-105 inline-block shadow-2xl">Ver Catálogo</a>
+        </div>
+    </header>
+
+    <section id="catalogo" class="py-16 px-4 max-w-[95%] mx-auto">
+        <h2 class="text-4xl font-black italic uppercase mb-12 text-center underline decoration-yellow-500 decoration-4 underline-offset-8">Catálogo Oficial</h2>
+        
+        <div class="mb-12 flex flex-col md:flex-row gap-6 items-center justify-between bg-gray-900/50 p-6 rounded-2xl border border-gray-800">
+            <div class="relative w-full md:w-96">
+                <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                <input type="text" id="search-input" oninput="filterProducts()" placeholder="Buscar producto..." class="w-full bg-black border border-gray-800 py-3 pl-12 pr-4 rounded-xl focus:border-yellow-500 outline-none text-sm transition">
+            </div>
+            <div class="flex flex-wrap justify-center gap-2" id="category-filters">
+                <button onclick="filterByCategory('TODOS', this)" class="category-btn active px-4 py-2 rounded-full border border-gray-700 text-[10px] font-black uppercase italic transition">Todos</button>
+                <button onclick="filterByCategory('CICLISMO', this)" class="category-btn px-4 py-2 rounded-full border border-gray-700 text-[10px] font-black uppercase italic transition">Ciclismo</button>
+                <button onclick="filterByCategory('CASCOS', this)" class="category-btn px-4 py-2 rounded-full border border-gray-700 text-[10px] font-black uppercase italic transition">Cascos</button>
+                <button onclick="filterByCategory('INDUMENTARIA', this)" class="category-btn px-4 py-2 rounded-full border border-gray-700 text-[10px] font-black uppercase italic transition">Indumentaria</button>
+                <button onclick="filterByCategory('ACCESORIOS', this)" class="category-btn px-4 py-2 rounded-full border border-gray-700 text-[10px] font-black uppercase italic transition">Accesorios</button>
+                <button onclick="filterByCategory('REPUESTOS', this)" class="category-btn px-4 py-2 rounded-full border border-gray-700 text-[10px] font-black uppercase italic transition">Repuestos</button>
+            </div>
+        </div>
+
+        <div id="grid-productos" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
+        <div id="load-more-container" class="mt-12 text-center hidden">
+            <button onclick="loadMore()" class="bg-gray-800 hover:bg-yellow-500 hover:text-black text-white px-8 py-3 rounded-full font-black uppercase italic transition border border-gray-700">Ver más</button>
+        </div>
+        <div id="no-results" class="hidden text-center py-20">
+            <p class="text-gray-500 font-bold italic uppercase">No se encontraron productos.</p>
+        </div>
+    </section>
+
+    <section id="contacto" class="py-20 bg-yellow-500 text-black px-4">
+        <div class="max-w-4xl mx-auto text-center">
+            <h2 class="text-3xl md:text-5xl font-black italic uppercase mb-4">¿Querés ser revendedor?</h2>
+            <p class="mb-10 font-bold uppercase tracking-widest text-sm md:text-base">Completá el formulario para solicitar tu cuenta mayorista</p>
+            
+            <form id="form-alta" onsubmit="handleAlta(event)" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-black uppercase mb-1 ml-1">Nombre del Comercio</label>
+                    <input type="text" id="input-comercio" placeholder="Nombre del local" class="p-4 rounded-xl bg-black text-white outline-none focus:ring-4 ring-black/10 transition" required>
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-black uppercase mb-1 ml-1">WhatsApp (Código de país + área)</label>
+                    <input type="tel" id="input-telefono" placeholder="Ej: 5491122334455" pattern="[0-9]+" title="Solo números, sin espacios ni guiones" class="p-4 rounded-xl bg-black text-white outline-none focus:ring-4 ring-black/10 transition" required>
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-black uppercase mb-1 ml-1">Localidad</label>
+                    <input type="text" id="input-localidad" placeholder="Ciudad / Provincia" class="p-4 rounded-xl bg-black text-white outline-none focus:ring-4 ring-black/10 transition" required>
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-black uppercase mb-1 ml-1">Email de Contacto</label>
+                    <input type="email" id="input-email" placeholder="email@ejemplo.com" class="p-4 rounded-xl bg-black text-white outline-none focus:ring-4 ring-black/10 transition" required>
+                </div>
+                <button type="submit" id="btn-envio-alta" class="md:col-span-2 bg-black text-white py-5 rounded-xl font-black uppercase italic hover:bg-gray-900 transition-all shadow-2xl flex items-center justify-center gap-3 mt-4">
+                    <span>Enviar Solicitud de Alta</span>
+                    <i class="fas fa-paper-plane text-yellow-500"></i>
+                </button>
+            </form>
+
+            <div id="mensaje-exito" class="hidden mt-6 p-6 bg-black text-white rounded-2xl border-2 border-dashed border-yellow-500 animate-bounce">
+                <i class="fas fa-check-circle text-yellow-500 text-3xl mb-2"></i>
+                <p class="font-black uppercase italic">¡Solicitud Enviada!</p>
+                <p class="text-xs mt-1 text-gray-400">Te contactaremos pronto por WhatsApp.</p>
+            </div>
+        </div>
+    </section>
+
+    <div id="cart-modal" class="fixed top-0 right-0 w-full md:w-96 h-full bg-gray-900 z-[100] cart-modal shadow-2xl border-l border-gray-800 p-6 flex flex-col">
+        <div class="flex justify-between items-center mb-8">
+            <h2 class="text-2xl font-black italic text-yellow-500 uppercase">Tu Pedido</h2>
+            <button onclick="toggleCart()" class="text-3xl text-gray-400 hover:text-white">&times;</button>
+        </div>
+        
+        <div id="cart-items" class="flex-grow overflow-y-auto space-y-4"></div>
+        
+        <div class="border-t border-gray-800 pt-6 mt-6">
+            <div id="cart-total" class="mb-4 text-xl font-bold text-white text-right italic"></div>
+            
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="clearCart()" class="bg-gray-800 text-gray-400 py-4 rounded-lg font-black uppercase text-[10px] hover:bg-red-600 hover:text-white transition">
+                    Vaciar Carrito
+                </button>
+                <button onclick="sendOrder()" class="bg-yellow-500 text-black py-4 rounded-lg font-black uppercase text-[10px] hover:bg-yellow-400 transition">
+                    Pedir por WhatsApp
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://dsexvmstfjadjdbptmzn.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzZXh2bXN0ZmphZGpkYnB0bXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2OTc3MzUsImV4cCI6MjA4MjI3MzczNX0.L0Wz3hwZOarNLqkYH5-RAzz2Y6iwI4uaE_rlkcKkgyg';
+        
+        const _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+            auth: { persistSession: true, autoRefreshToken: true }
+        });
+
+        const MI_EMAIL_ADMIN = 'kotur39@gmail.com'; 
+
+        let _productos = [];
+        let _filteredProducts = [];
+        let _cart = [];
+        let _isLoggedIn = false;
+        let _userEmail = null;
+        let _currentCategory = 'TODOS';
+        let _itemsShown = 12;
+_client.auth.onAuthStateChange((event, session) => {
+    console.log("Cambio de sesión en Mayorista:", event);
+
+    if (session) {
+        _isLoggedIn = true;
+        _userEmail = session.user.email;
+    } else {
+        _isLoggedIn = false;
+        _userEmail = null;
+    }
+
+    if (typeof updateAuthUI === "function") {
+        updateAuthUI();
+    }
+
+    // IMPORTANTE: Quitamos el redirect a index.html para que el 
+    // usuario se quede aquí y pueda volver a loguearse si quiere.
+
+    if (typeof init === "function") {
+        init(); // <--- ESTO ES LO QUE ESTABA VACÍO Y RECARGA LOS PRODUCTOS
+    }
+});
+
+        async function init() {
+            const { data: { session } } = await _client.auth.getSession();
+            
+            if (session) {
+                _isLoggedIn = true;
+                _userEmail = session.user.email;
+            }
+
+            updateAuthUI();
+
+            try {
+                const { data, error } = await _client.from('productos_publicos').select('*').order('nombre');
+                if (error) throw error;
+                _productos = data || [];
+                _filteredProducts = [..._productos];
+                render();
+            } catch (err) {
+                console.error("Error:", err.message);
+            }
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            const email = document.getElementById('user-email').value.trim();
+            const pass = document.getElementById('user-pass').value.trim();
+            const btn = document.getElementById('btn-login-submit');
+
+            btn.disabled = true;
+            btn.innerText = "ACCEDIENDO...";
+
+            try {
+                const { data, error } = await _client.auth.signInWithPassword({
+                    email: email,
+                    password: pass
+                });
+
+                if (error) throw error;
+                
+                localStorage.setItem('isLoggedIn', 'true');
+
+                if (email.toLowerCase() === MI_EMAIL_ADMIN.toLowerCase()) {
+                    window.location.href = 'admin.html';
+                } else {
+                    window.location.reload();
+                }
+
+            } catch (error) {
+                alert("Error: Credenciales no válidas.");
+                btn.disabled = false;
+                btn.innerText = "ENTRAR AL SISTEMA";
+            }
+        }
+
+        async function handleLogout() {
+    if (confirm("¿Cerrar sesión?")) {
+        await _client.auth.signOut();
+        // Borramos el localStorage si lo usás
+        localStorage.removeItem('isLoggedIn'); 
+        
+        // BORRAMOS la línea de window.location.href
+        // Al no haber redirección, el "Vigilante" (onAuthStateChange)
+        // se activará solo y ejecutará init() para mostrar los precios públicos.
+    }
+}
+
+        function updateAuthUI() {
+            const container = document.getElementById('auth-buttons');
+            if (_isLoggedIn) {
+                let html = '';
+                if (_userEmail.toLowerCase() === MI_EMAIL_ADMIN.toLowerCase()) {
+                    html += `<a href="admin.html" class="bg-yellow-500 text-black text-[10px] px-4 py-2 rounded-lg font-black uppercase hover:bg-white transition mr-2 tracking-tighter">Panel</a>`;
+                }
+                html += `<button onclick="handleLogout()" class="text-[10px] border border-red-500 text-red-500 px-4 py-2 rounded-lg font-black uppercase hover:bg-red-500 hover:text-white transition">Salir</button>`;
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = `<button onclick="toggleLoginModal()" class="bg-yellow-500 text-black text-[10px] px-6 py-2 rounded-lg font-black uppercase hover:bg-white transition shadow-lg">Acceso</button>`;
+            }
+        }
+
+        function toggleLoginModal() { document.getElementById('login-modal').classList.toggle('active'); }
+
+        function openZoom(url) {
+            const modal = document.getElementById('zoom-modal');
+            const img = document.getElementById('zoom-img');
+            img.src = url;
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden'; 
+        }
+
+        function closeZoom() {
+            document.getElementById('zoom-modal').classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
+
+        async function handleAlta(event) {
+            event.preventDefault();
+            const btn = document.getElementById('btn-envio-alta');
+            const form = document.getElementById('form-alta');
+            const mensaje = document.getElementById('mensaje-exito');
+            
+            let telRaw = document.getElementById('input-telefono').value.replace(/\D/g, ''); 
+            if (telRaw.length > 0 && !telRaw.startsWith('54')) {
+                telRaw = '54' + telRaw;
+            }
+
+            const datos = {
+                Comercio: document.getElementById('input-comercio').value.trim().toUpperCase(),
+                Telefono: telRaw,
+                Localidad: document.getElementById('input-localidad').value.trim().toUpperCase(),
+                Email: document.getElementById('input-email').value.trim().toLowerCase()
+            };
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner animate-spin"></i> ENVIANDO...';
+
+            try {
+                const { error } = await _client.from('solicitudes_alta').insert([datos]);
+                if (error) throw error;
+                form.classList.add('hidden');
+                mensaje.classList.remove('hidden');
+                setTimeout(() => {
+                    form.reset();
+                    form.classList.remove('hidden');
+                    mensaje.classList.add('hidden');
+                    btn.disabled = false;
+                    btn.innerHTML = '<span>Enviar Solicitud de Alta</span> <i class="fas fa-paper-plane text-yellow-500"></i>';
+                }, 5000);
+            } catch (err) {
+                alert("Error al enviar la solicitud: " + err.message);
+                btn.disabled = false;
+                btn.innerHTML = '<span>Enviar Solicitud de Alta</span> <i class="fas fa-paper-plane text-yellow-500"></i>';
+            }
+        }
+
+        function filterProducts() {
+            const term = document.getElementById('search-input').value.toLowerCase().trim();
+            _filteredProducts = _productos.filter(p => {
+                const matchName = (p.nombre || "").toLowerCase().includes(term) || (p.codigo || "").toLowerCase().includes(term);
+                const matchCat = _currentCategory === 'TODOS' || p.categoria === _currentCategory;
+                return matchName && matchCat;
+            });
+            _itemsShown = 12;
+            render();
+        }
+
+        function filterByCategory(cat, btn) {
+            _currentCategory = cat;
+            document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            filterProducts();
+        }
+
+        function render() {
+            const grid = document.getElementById('grid-productos');
+            const toShow = _filteredProducts.slice(0, _itemsShown);
+            grid.innerHTML = toShow.map(p => {
+                const hasStock = p.stock > 0;
+                const precio = _isLoggedIn ? `$${Number(p.precio).toLocaleString()}` : "CONSULTAR";
+                const productData = btoa(unescape(encodeURIComponent(JSON.stringify(p)))); 
+                
+                return `
+                <div class="bg-gray-900 rounded-xl overflow-hidden border ${hasStock ? 'border-gray-800' : 'border-red-900/30'} p-3 flex flex-col hover:border-yellow-500 transition">
+                    <div class="relative h-32 -mx-3 -mt-3 mb-3 bg-black flex items-center justify-center overflow-hidden">
+                        <img src="${p.imagen_url}" class="product-img" onclick="openZoom('${p.imagen_url}')" onerror="this.src='https://via.placeholder.com/150?text=UR'">
+                        ${!hasStock ? '<div class="absolute inset-0 bg-black/70 flex items-center justify-center text-red-500 font-black italic text-xs">SIN STOCK</div>' : ''}
+                    </div>
+                    <div class="flex justify-between text-[8px] font-bold uppercase mb-1">
+                        <span class="text-gray-500">${p.categoria}</span>
+                        <span class="text-yellow-600">${p.codigo}</span>
+                    </div>
+                    <h3 class="text-[11px] font-black uppercase italic mb-3 h-8 overflow-hidden">${p.nombre}</h3>
+                    <div class="mt-auto">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-bold ${_isLoggedIn ? 'text-white' : 'text-gray-600 text-[9px]'}">${precio}</span>
+                            <span class="text-[9px] ${hasStock ? 'text-green-500' : 'text-red-500'} font-bold">${hasStock ? p.stock + 'u' : 'Agotado'}</span>
+                        </div>
+                        <button onclick="addToCart('${productData}')" ${!hasStock ? 'disabled' : ''} class="w-full py-2 rounded-lg font-black uppercase italic text-[10px] border ${hasStock ? 'border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-black' : 'border-gray-800 text-gray-700'} transition">
+                            ${hasStock ? 'Añadir' : 'Agotado'}
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+            document.getElementById('load-more-container').classList.toggle('hidden', _filteredProducts.length <= _itemsShown);
+            document.getElementById('no-results').classList.toggle('hidden', _filteredProducts.length > 0);
+        }
+
+        function loadMore() { _itemsShown += 12; render(); }
+
+        function addToCart(encodedData) {
+            const item = JSON.parse(decodeURIComponent(escape(atob(encodedData))));
+            const found = _cart.find(i => i.id === item.id);
+            if (found) {
+                if (found.cantidad < item.stock) found.cantidad++;
+                else return alert("Sin más stock disponible");
+            } else {
+                _cart.push({ ...item, cantidad: 1 });
+            }
+            updateCartUI();
+            if (!document.getElementById('cart-modal').classList.contains('active')) toggleCart();
+        }
+
+        // FUNCION PARA VACIAR CARRITO
+        function clearCart() {
+            if (_cart.length === 0) return;
+            if (confirm("¿Estás seguro de que quieres vaciar el pedido?")) {
+                _cart = [];
+                updateCartUI();
+            }
+        }
+
+        function updateCartUI() {
+            const container = document.getElementById('cart-items');
+            document.getElementById('cart-count').innerText = _cart.reduce((s, i) => s + i.cantidad, 0);
+            
+            if (_cart.length === 0) {
+                container.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-600 italic uppercase font-black text-xs"><i class="fas fa-shopping-basket text-4xl mb-4 opacity-20"></i>Carrito Vacío</div>';
+            } else {
+                container.innerHTML = _cart.map((item, idx) => `
+                    <div class="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
+                        <img src="${item.imagen_url}" class="w-10 h-10 object-cover rounded cursor-zoom-in" onclick="openZoom('${item.imagen_url}')">
+                        <div class="flex-grow">
+                            <p class="font-bold text-[10px] uppercase text-white truncate w-32">${item.nombre}</p>
+                            <div class="flex justify-between items-center mt-1">
+                                <div class="flex items-center bg-black border border-gray-700 rounded-md">
+                                    <button onclick="changeQty(${idx}, -1)" class="px-2 py-1 text-yellow-500">-</button>
+                                    <span class="px-2 text-[10px] font-bold">${item.cantidad}</span>
+                                    <button onclick="changeQty(${idx}, 1)" class="px-2 py-1 text-yellow-500">+</button>
+                                </div>
+                                <p class="text-yellow-500 text-[10px] font-bold">${_isLoggedIn ? '$' + (item.precio * item.cantidad).toLocaleString() : 'MAYORISTA'}</p>
+                            </div>
+                        </div>
+                    </div>`).join('');
+            }
+
+            const total = _cart.reduce((s, i) => s + (i.precio * i.cantidad || 0), 0);
+            document.getElementById('cart-total').innerText = _isLoggedIn ? `TOTAL: $${total.toLocaleString()}` : 'TOTAL: CONSULTAR';
+        }
+
+        function changeQty(idx, delta) {
+            const item = _cart[idx];
+            if (delta > 0 && item.cantidad >= item.stock) return alert("Máximo stock alcanzado");
+            item.cantidad += delta;
+            if (item.cantidad <= 0) _cart.splice(idx, 1);
+            updateCartUI();
+        }
+
+        function toggleCart() { document.getElementById('cart-modal').classList.toggle('active'); }
+
+        async function sendOrder() {
+            if (_cart.length === 0) return alert("Carrito vacío");
+
+            try {
+                const totalPedido = _cart.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
+
+                if (_isLoggedIn && _userEmail) {
+                    // 1. Buscamos al cliente por email trayendo ID y Saldo actual
+                    const { data: cliente, error: errorUser } = await _client
+                        .from('clientes')
+                        .select('id, saldo') 
+                        .eq('email', _userEmail)
+                        .single();
+
+                    if (!errorUser && cliente) {
+                        const nuevoSaldo = (cliente.saldo || 0) - totalPedido;
+                        
+                        // 2. Actualizamos la columna 'saldo' en la tabla 'clientes'
+                        await _client
+                            .from('clientes')
+                            .update({ saldo: nuevoSaldo })
+                            .eq('email', _userEmail);
+
+                        // 3. REGISTRO DE MOVIMIENTOS, HISTORIAL Y STOCK
+                        // A. Actualizar Saldo del Cliente
+                        await _client
+                            .from('clientes')
+                            .update({ saldo: nuevoSaldo })
+                            .eq('id', cliente.id);
+
+                        // B. Registrar Movimiento en Cuenta Corriente
+                        await _client
+                            .from('movimientos_cuenta')
+                            .insert([{
+                                cliente_id: cliente.id,
+                                tipo: 'COMPRA',
+                                monto: -totalPedido,
+                                descripcion: `Pedido Web (${_cart.length} productos)`,
+                                saldo_resultante: nuevoSaldo
+                            }]);
+
+                        // C. REGISTRO DE PRODUCTOS EN HISTORIAL Y DESCUENTO DE STOCK
+                        for (const item of _cart) {
+                            // 1. Insertar en historial_ventas (lo que lee la LUPA)
+                            await _client.from('historial_ventas').insert([{
+                                cliente_id: cliente.id,
+                                producto_nombre: item.nombre,
+                                cantidad: item.cantidad,
+                                precio_unitario: item.precio,
+                                codigo: item.codigo || 'S/N',
+                                fecha: new Date().toISOString()
+                            }]);
+
+                            // 2. Descontar Stock real de la tabla productos
+                            const { data: prodDB } = await _client
+                                .from('productos')
+                                .select('stock')
+                                .eq('id', item.id)
+                                .single();
+
+                            if (prodDB) {
+                                await _client
+                                    .from('productos')
+                                    .update({ stock: (prodDB.stock || 0) - item.cantidad })
+                                    .eq('id', item.id);
+                            }
+                        }
+                    }
+                }
+
+                // 4. ENVÍO A WHATSAPP
+                const items = _cart.map(i => `- (${i.cantidad}u) ${i.nombre}`).join("%0A");
+                const totalStr = _isLoggedIn ? `%0A%0ATotal: $${totalPedido.toLocaleString()}` : "";
+                const userText = _isLoggedIn ? `Cliente: ${_userEmail}%0A` : "";
+
+                window.open(`https://wa.me/5493446645264?text=Pedido Urban Riders:%0A${userText}${items}${totalStr}`, '_blank');
+                
+                // 5. LIMPIEZA
+                _cart = [];
+                updateCartUI();
+                toggleCart();
+                if (typeof init === "function") await init();
+
+            } catch (err) {
+                console.error("Error completo:", err);
+                alert("Error al registrar deuda en cuenta corriente: " + err.message);
+            }
+        }
+        init();
+    </script>
+<script>
+    function scrollAContacto() {
+        if (window.location.hash === '#contacto') {
+            const seccion = document.getElementById('contacto');
+            if (seccion) {
+                seccion.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    }
+
+    // 1. Intento inmediato
+    scrollAContacto();
+
+    // 2. Vigilante de cambios (MutationObserver)
+    // Esto detecta cuando Supabase termina de meter los productos en el HTML
+    const observer = new MutationObserver((mutations, obs) => {
+        const seccion = document.getElementById('contacto');
+        if (seccion) {
+            scrollAContacto();
+            // Una vez que la página parece estar estable, podemos desconectarlo tras unos segundos
+        }
+    });
+
+    // Empezamos a vigilar todo el cuerpo de la página
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+
+    // 3. Por seguridad, detenemos al vigilante después de 5 segundos para no consumir recursos
+    setTimeout(() => {
+        observer.disconnect();
+    }, 5000);
+
+    // 4. Intento final cuando todo (fotos incluidas) terminó
+    window.addEventListener('load', scrollAContacto);
+</script>
+</body>
+</html>

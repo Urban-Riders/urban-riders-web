@@ -1,0 +1,101 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Urban Riders | Enlaces Oficiales</title>
+<link rel="icon" type="image/png" href="img/logo-ur.png">
+<link rel="apple-touch-icon" href="img/logo-ur.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #0a0a0a;
+            background-image: radial-gradient(circle at top, #1a1a1a 0%, #0a0a0a 100%);
+        }
+        .link-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .link-card:hover {
+            transform: translateY(-3px);
+            border-color: #eab308;
+            box-shadow: 0 10px 20px -10px rgba(234, 179, 8, 0.3);
+        }
+        .glow-text {
+            text-shadow: 0 0 15px rgba(234, 179, 8, 0.3);
+        }
+    </style>
+</head>
+<body class="text-white font-sans min-h-screen flex flex-col items-center px-6 py-12">
+
+    <div class="text-center mb-10">
+        <div class="inline-block bg-yellow-500 text-black p-4 rounded-2xl font-black text-3xl italic mb-4 shadow-xl shadow-yellow-500/20">
+            UR
+        </div>
+        <h1 class="text-2xl font-black italic uppercase tracking-tighter glow-text">
+            Urban<span class="text-yellow-500">Riders</span>
+        </h1>
+        <p class="text-gray-500 text-[10px] font-bold uppercase tracking-[0.3em] mt-2">Equipamiento Sin Límites</p>
+    </div>
+
+    <div class="w-full max-w-md space-y-4">
+        
+        <a href="index.html" class="link-card block bg-white/5 p-5 rounded-2xl flex items-center group">
+            <div class="w-12 h-12 bg-yellow-500 text-black rounded-xl flex items-center justify-center text-xl shadow-lg">
+                <i class="fas fa-shopping-cart"></i>
+            </div>
+            <div class="ml-4 flex-grow">
+                <h2 class="font-black italic uppercase text-sm group-hover:text-yellow-500 transition">Tienda Online</h2>
+                <p class="text-gray-500 text-[10px] uppercase font-bold">Compra minorista con envío a todo el país</p>
+            </div>
+            <i class="fas fa-chevron-right text-gray-700 group-hover:text-yellow-500"></i>
+        </a>
+
+        <a href="mayorista.html" class="link-card block bg-white/5 p-5 rounded-2xl flex items-center group">
+            <div class="w-12 h-12 bg-gray-800 text-yellow-500 rounded-xl flex items-center justify-center text-xl shadow-lg">
+                <i class="fas fa-boxes-stacked"></i>
+            </div>
+            <div class="ml-4 flex-grow">
+                <h2 class="font-black italic uppercase text-sm group-hover:text-yellow-500 transition">Catálogo Mayorista</h2>
+                <p class="text-gray-500 text-[10px] uppercase font-bold">Exclusivo para locales y revendedores</p>
+            </div>
+            <i class="fas fa-chevron-right text-gray-700 group-hover:text-yellow-500"></i>
+        </a>
+
+        <a href="mayorista.html#contacto" class="link-card block bg-white/5 p-5 rounded-2xl flex items-center group">
+            <div class="w-12 h-12 bg-gray-800 text-white rounded-xl flex items-center justify-center text-xl shadow-lg">
+                <i class="fas fa-user-plus"></i>
+            </div>
+            <div class="ml-4 flex-grow">
+                <h2 class="font-black italic uppercase text-sm group-hover:text-yellow-500 transition">Ser Revendedor</h2>
+                <p class="text-gray-500 text-[10px] uppercase font-bold">Registrá tu comercio aquí</p>
+            </div>
+            <i class="fas fa-chevron-right text-gray-700 group-hover:text-yellow-500"></i>
+        </a>
+
+        <a href="https://wa.me/5493446645264" target="_blank" class="link-card block bg-green-500/10 border-green-500/20 p-5 rounded-2xl flex items-center group">
+            <div class="w-12 h-12 bg-green-600 text-white rounded-xl flex items-center justify-center text-xl shadow-lg">
+                <i class="fab fa-whatsapp"></i>
+            </div>
+            <div class="ml-4 flex-grow">
+                <h2 class="font-black italic uppercase text-sm text-green-500">Ventas WhatsApp</h2>
+                <p class="text-green-500/60 text-[10px] uppercase font-bold">Atención personalizada inmediata</p>
+            </div>
+            <i class="fas fa-external-link-alt text-green-900"></i>
+        </a>
+
+    </div>
+
+    <div class="flex gap-6 mt-12">
+        <a href="#" class="text-gray-600 hover:text-yellow-500 transition text-xl"><i class="fab fa-instagram"></i></a>
+        <a href="#" class="text-gray-600 hover:text-yellow-500 transition text-xl"><i class="fab fa-facebook"></i></a>
+        <a href="#" class="text-gray-600 hover:text-yellow-500 transition text-xl"><i class="fas fa-envelope"></i></a>
+    </div>
+
+    <footer class="mt-auto pt-12">
+        <p class="text-[9px] text-gray-700 font-black uppercase tracking-widest">Urban Riders Official © 2026</p>
+    </footer>
+
+</body>
+</html>

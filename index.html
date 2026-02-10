@@ -1,0 +1,612 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tienda Oficial | Urban Riders</title>
+<link rel="icon" type="image/png" href="img/logo-ur.png">
+<link rel="apple-touch-icon" href="img/logo-ur.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .grid-products { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
+    gap: 1rem; 
+}
+        .product-card { transition: transform 0.2s; }
+        .product-card:hover { transform: translateY(-5px); }
+        #cart-panel, #checkout-modal { transition: transform 0.3s ease-in-out; }
+        #modal-zoom { display: none; background: rgba(0,0,0,0.9); }
+        .img-zoom-content { max-width: 90%; max-height: 90vh; object-fit: contain; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        body {
+            background: linear-gradient(180deg, #1f2937 0%, #4b5563 100%);
+            background-attachment: fixed;
+            position: relative;
+        }
+
+        body::before {
+            content: "";
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.05; pointer-events: none; z-index: 0;
+        }
+
+        header, main, div, section, footer { position: relative; z-index: 1; }
+        input:focus { border-color: #eab308 !important; }
+    </style>
+</head>
+<body class="font-sans min-h-screen">
+
+    <div id="modal-zoom" class="fixed inset-0 z-[100] flex items-center justify-center p-4 cursor-zoom-out" onclick="closeZoom()">
+        <img id="img-ampliada" src="" class="img-zoom-content rounded-lg shadow-2xl">
+    </div>
+
+    <div id="checkout-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+    
+    <div class="bg-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-white/10">
+        
+        <div class="bg-slate-900 p-4 flex justify-between items-center text-white border-b border-white/10">
+            <h3 class="font-black italic uppercase tracking-tighter text-lg">Envío y Facturación</h3>
+            <button onclick="toggleCheckoutModal()" class="hover:text-yellow-500 transition text-white/70">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+            <form id="form-datos-cliente" class="p-6 space-y-4 bg-slate-800">
+    <div class="grid grid-cols-2 gap-4">
+        <div>
+            <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Nombre Completo</label>
+            <input type="text" id="cust-name" required class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+        </div>
+        <div>
+            <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">DNI / CUIT</label>
+            <input type="text" id="cust-dni" required class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+        </div>
+    </div>
+    <div>
+        <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Email (Para el comprobante)</label>
+        <input type="email" id="cust-email" required class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+    </div>
+    <div>
+        <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">WhatsApp / Teléfono</label>
+        <input type="tel" id="cust-phone" required class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+    </div>
+    <div>
+        <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Dirección de Entrega</label>
+        <input type="text" id="cust-address" required placeholder="Calle, Número, Depto" class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:border-yellow-500 transition">
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+        <div>
+            <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Ciudad</label>
+            <input type="text" id="cust-city" required class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+        </div>
+        <div>
+            <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Código Postal</label>
+            <input type="text" id="cust-zip" required class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+        </div>
+    </div>
+                
+                <button type="submit" id="btn-confirmar-pago" class="w-full bg-yellow-500 text-black font-black uppercase py-4 rounded-xl shadow-lg hover:bg-yellow-400 transition flex items-center justify-center gap-2">
+                    Ir a pagar $ <span id="checkout-total-btn">0</span>
+                </button>
+            </form>
+        </div>
+    </div>
+<div id="contact-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+    <div class="bg-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-white/10">
+        <div class="bg-slate-900 p-4 flex justify-between items-center text-white border-b border-white/10">
+            <h3 class="font-black italic uppercase tracking-tighter text-lg text-yellow-500">Enviar Consulta</h3>
+            <button onclick="toggleContactModal()" class="hover:text-yellow-500 transition text-white/70">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <form id="form-contacto-email" action="https://formspree.io/f/xwvnkwbn" method="POST" class="p-6 space-y-4 bg-slate-800">
+            <div>
+                <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Nombre Completo</label>
+                <input type="text" name="nombre" required class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+            </div>
+            <div>
+                <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Tu Correo Electrónico</label>
+                <input type="email" name="_replyto" required class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+            </div>
+            <div>
+                <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Mensaje</label>
+                <textarea name="mensaje" rows="4" required class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition resize-none"></textarea>
+            </div>
+            <button type="submit" id="btn-envio-contacto" class="w-full bg-yellow-500 text-black font-black uppercase py-4 rounded-xl shadow-lg hover:bg-yellow-400 transition flex items-center justify-center gap-2">
+                <i class="fas fa-paper-plane text-lg"></i> Enviar Mensaje
+            </button>
+        </form>
+    </div>
+</div>
+
+    <div class="bg-yellow-500 text-black text-[10px] font-bold uppercase py-1 text-center tracking-widest">
+        <i class="fas fa-shield-alt mr-2"></i> Compra Protegida con Mercado Pago | Envíos a todo el país
+    </div>
+
+    <header class="bg-black text-white p-4 sticky top-0 z-40 shadow-xl border-b border-yellow-500/20">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-yellow-500 text-black w-10 h-10 flex items-center justify-center rounded-lg font-black text-xl italic tracking-tighter shadow-[0_0_15px_rgba(234,179,8,0.3)]">UR</div>
+                <h1 class="text-2xl font-black italic uppercase tracking-tighter">URBAN <span class="text-yellow-500">RIDERS</span></h1>
+            </div>
+            <div class="flex items-center gap-6">
+                <button onclick="toggleCart()" class="relative hover:text-yellow-500 transition">
+                    <i class="fas fa-shopping-cart text-xl"></i>
+                    <span id="cart-count" class="absolute -top-2 -right-2 bg-yellow-500 text-black text-[10px] font-bold px-1.5 rounded-full">0</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-6 min-h-screen">
+        <section class="mb-8 bg-white/90 backdrop-blur-md p-6 rounded-2xl border-l-4 border-yellow-500 shadow-md">
+            <p class="text-gray-700 leading-relaxed text-sm md:text-base">
+                En <strong>Urban Riders</strong> nos especializamos en lo que tu moto necesita para estar al 100%. Repuestos, accesorios y cascos de alta resistencia.
+                <span class="text-gray-400 block mt-1 text-xs italic">(También contamos con una selección de artículos para ciclismo).</span>
+            </p>
+        </section>
+
+        <div class="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+            <h2 class="text-xl font-bold uppercase italic text-slate-200">Nuestro Catálogo</h2>
+            <div class="relative w-full md:w-96">
+                <input type="text" id="search-input" placeholder="¿Qué estás buscando?" 
+       class="w-full pl-10 pr-4 py-2 border border-white/20 rounded-full outline-none bg-slate-500/30 text-white placeholder-slate-300 focus:border-yellow-500 transition-all">
+                <i class="fas fa-search absolute left-4 top-3 text-gray-400"></i>
+            </div>
+        </div>
+
+        <div id="categories-container" class="flex gap-2 overflow-x-auto pb-6 no-scrollbar"></div>
+        <div id="grid-productos" class="grid-products"></div>
+<div id="load-more-container" class="mt-12 text-center hidden">
+            <button onclick="loadMore()" class="bg-black hover:bg-yellow-500 hover:text-black text-white px-8 py-3 rounded-full font-black uppercase italic transition border border-gray-700 shadow-lg">
+                Ver más productos
+            </button>
+        </div>
+    </main>
+
+    <footer class="bg-black text-white mt-20 border-t-4 border-yellow-500">
+        <div class="max-w-7xl mx-auto px-6 py-12 border-b border-gray-800">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-8">
+                <div class="text-center md:text-left">
+                    <h3 class="text-2xl font-black italic uppercase">Unite al <span class="text-yellow-500">Club</span></h3>
+                    <p class="text-gray-400 text-xs uppercase font-bold tracking-widest mt-1">Recibí ofertas exclusivas y nuevos ingresos</p>
+                </div>
+                <form id="newsletter-form" class="flex w-full md:w-auto gap-2">
+                    <input type="email" id="newsletter-email" placeholder="TU@EMAIL.COM" required class="bg-gray-900 border border-gray-700 px-4 py-3 rounded-lg text-sm focus:outline-none focus:border-yellow-500 w-full md:w-64 font-bold">
+                    <button type="submit" class="bg-yellow-500 text-black px-6 py-3 rounded-lg font-black uppercase text-sm hover:bg-yellow-400 transition">Unirse</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="max-w-7xl mx-auto px-6 py-16 grid grid-cols-1 md:grid-cols-4 gap-12">
+            <div class="space-y-4">
+                <div class="flex items-center gap-2">
+                    <div class="bg-yellow-500 text-black p-1.5 rounded font-black italic">UR</div>
+                    <span class="text-lg font-black italic uppercase">Urban Riders</span>
+                </div>
+                <p class="text-gray-500 text-[10px] leading-relaxed uppercase font-bold tracking-tighter">
+                    Equipamiento premium para motociclistas y ciclistas. Seguridad y estilo en cada rodada.
+                </p>
+            </div>
+
+            <div>
+                <h4 class="text-xs font-black uppercase italic mb-6 border-l-2 border-yellow-500 pl-2">Navegación</h4>
+                <ul class="space-y-3 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                    <li><a href="#" class="hover:text-yellow-500 transition">Inicio</a></li>
+                    <li><a href="mayorista.html" class="hover:text-yellow-500 transition">Venta Mayorista</a></li>
+                    <li><a href="links.html" class="hover:text-yellow-500 transition">Nuestras Redes</a></li>
+                    <li><a href="javascript:void(0)" onclick="toggleContactModal()" class="hover:text-yellow-500 transition">Contacto</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <h4 class="text-xs font-black uppercase italic mb-6 border-l-2 border-yellow-500 pl-2">Seguinos</h4>
+                <div class="flex gap-4">
+                    <a href="#" class="w-10 h-10 bg-gray-900 rounded-lg flex items-center justify-center text-gray-400 hover:bg-yellow-500 hover:text-black transition">
+                        <i class="fab fa-instagram"></i>
+                    </a>
+                    <a href="#" class="w-10 h-10 bg-gray-900 rounded-lg flex items-center justify-center text-gray-400 hover:bg-blue-600 hover:text-white transition">
+                        <i class="fab fa-facebook-f"></i>
+                    </a>
+                    <a href="https://wa.me/5491112345678" target="_blank" class="w-10 h-10 bg-gray-900 rounded-lg flex items-center justify-center text-gray-400 hover:bg-green-600 hover:text-white transition">
+                        <i class="fab fa-whatsapp text-lg"></i>
+                    </a>
+                </div>
+            </div>
+
+            <div>
+                <h4 class="text-xs font-black uppercase italic mb-6 border-l-2 border-yellow-500 pl-2">Pagos Seguros</h4>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-zinc-900 p-2 rounded flex items-center justify-center grayscale hover:grayscale-0 transition-all duration-300 border border-gray-800">
+                        <i class="fab fa-cc-visa text-2xl text-[#1a1f71]"></i>
+                    </div>
+                    <div class="bg-zinc-900 p-2 rounded flex items-center justify-center grayscale hover:grayscale-0 transition-all duration-300 border border-gray-800">
+                        <i class="fab fa-cc-mastercard text-2xl text-[#eb001b]"></i>
+                    </div>
+                    <div class="bg-zinc-900 p-2 rounded flex items-center justify-center grayscale hover:grayscale-0 transition-all duration-300 border border-gray-800 gap-1 text-[#009ee3]">
+                        <i class="fas fa-handshake text-sm"></i>
+                        <span class="text-[7px] font-black leading-none uppercase">Mercado<br>Pago</span>
+                    </div>
+                    <div class="bg-zinc-900 p-2 rounded flex items-center justify-center grayscale hover:grayscale-0 transition-all duration-300 border border-gray-800">
+                        <i class="fab fa-cc-paypal text-2xl text-[#003087]"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-zinc-950 py-6 text-center">
+            <p class="text-[9px] text-gray-700 font-black uppercase tracking-[0.3em]">© 2026 URBAN RIDERS - OFFICIAL STORE</p>
+        </div>
+    </footer>
+
+    <div id="cart-panel" class="fixed inset-y-0 right-0 w-full md:w-96 bg-slate-900 shadow-2xl z-50 transform translate-x-full border-l border-white/10">
+        <div class="p-6 h-full flex flex-col">
+            <div class="flex justify-between items-center mb-6">
+                <div class="flex items-center gap-4">
+                    <h3 class="text-xl font-black uppercase italic text-white">Mi Carrito</h3>
+                    <button onclick="clearCart()" class="text-xs text-red-500 hover:text-red-700 font-bold uppercase flex items-center gap-1 transition"><i class="fas fa-trash-alt"></i> Vaciar</button>
+                </div>
+                <button onclick="toggleCart()" class="text-white/70 hover:text-white transition-colors">
+    <i class="fas fa-times text-xl"></i>
+</button>
+            </div>
+            <div id="cart-items" class="flex-1 overflow-y-auto space-y-4"></div>
+            <div class="border-t pt-6 mt-6">
+                <div class="flex justify-between text-xl font-black uppercase mb-4 text-white">
+                    <span>Total</span>
+                    <span id="cart-total">$0</span>
+                </div>
+                <button onclick="preCheckout()" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold uppercase hover:bg-blue-700 transition flex items-center justify-center gap-2 mb-2 shadow-lg shadow-blue-500/20">
+                    <i class="fas fa-credit-card"></i> Pagar con Mercado Pago
+                </button>
+                <button onclick="checkoutWA()" class="w-full border-2 border-green-600 text-green-600 py-2 rounded-xl font-bold uppercase hover:bg-green-50 transition flex items-center justify-center gap-2">
+                    <i class="fab fa-whatsapp"></i> Consultar por WhatsApp
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://dsexvmstfjadjdbptmzn.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzZXh2bXN0ZmphZGpkYnB0bXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2OTc3MzUsImV4cCI6MjA4MjI3MzczNX0.L0Wz3hwZOarNLqkYH5-RAzz2Y6iwI4uaE_rlkcKkgyg';
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const MP_ACCESS_TOKEN = 'TU_ACCESS_TOKEN_AQUÍ'; 
+// Este vigilante detecta cambios de sesión en TIEMPO REAL
+_supabase.auth.onAuthStateChange((event, session) => {
+    console.log("Evento de seguridad detectado:", event);
+
+    // No importa si entra o sale, en el index siempre queremos 
+    // refrescar el catálogo público para asegurar que se vea bien.
+    if (typeof loadProducts === 'function') {
+        loadProducts();
+    }
+
+    // Si el evento es un cierre de sesión, podemos limpiar el carrito
+    if (event === 'SIGNED_OUT') {
+        cart = []; 
+        if (typeof updateCart === 'function') updateCart();
+    }
+});
+
+        let products = [];
+        let cart = [];
+        let productosLimite = 15;
+        let currentCategory = 'TODOS';
+        const CATEGORIAS_LIST = ['TODOS', 'CICLISMO', 'CASCOS', 'INDUMENTARIA', 'ACCESORIOS', 'REPUESTOS'];
+
+        async function loadProducts() {
+            try {
+                // 1. Obtenemos el conteo total de productos con stock
+                const { count, error: countError } = await _supabase
+                    .from('productos_publicos')
+                    .select('*', { count: 'exact', head: true })
+                    .gt('stock', 0);
+
+                if (countError) throw countError;
+
+                // 2. Traemos los productos según el límite actual
+                const { data, error } = await _supabase
+                    .from('productos_publicos')
+                    .select('*')
+                    .gt('stock', 0)
+                    .order('nombre', { ascending: true })
+                    .range(0, productosLimite - 1);
+
+                if (error) throw error;
+
+                // 3. Actualizamos la lista global y dibujamos
+                products = data; 
+                renderCategories(); 
+                renderProducts(products);
+
+                // 4. Lógica del botón "Ver más"
+                const btnContainer = document.getElementById('load-more-container');
+                if (count > productosLimite) {
+                    btnContainer.classList.remove('hidden');
+                } else {
+                    btnContainer.classList.add('hidden');
+                }
+            } catch (err) {
+                console.error("Error cargando catálogo:", err);
+            }
+        }
+
+        function addToCart(id) {
+            const p = products.find(p => p.id === id);
+            const item = cart.find(i => i.id === id);
+            if (item) item.quantity++; else cart.push({...p, quantity: 1});
+            updateCart();
+            if(cart.length === 1) toggleCart();
+        }
+
+        function updateCart() {
+    const container = document.getElementById('cart-items');
+    const total = document.getElementById('cart-total');
+    let sum = 0, items = 0;
+    container.innerHTML = cart.map(i => {
+        const price = i.precio_minorista || 0;
+        sum += price * i.quantity; items += i.quantity;
+        return `
+            <div class="flex gap-4 border-b border-white/10 pb-4">
+                <img src="${i.imagen_url}" class="w-16 h-16 object-cover rounded cursor-zoom-in" onclick="openZoom('${i.imagen_url}')">
+                <div class="flex-1">
+                    <h4 class="font-bold text-xs uppercase text-slate-100">${i.nombre}</h4>
+                    <div class="flex justify-between items-center mt-2">
+                        <div class="text-sm font-bold text-white">$${Number(price).toLocaleString()}</div>
+                        <div class="flex items-center gap-3 bg-slate-800 text-white rounded-lg px-2">
+                            <button onclick="changeQty(${i.id}, -1)">-</button>
+                            <span class="text-xs font-bold">${i.quantity}</span>
+                            <button onclick="changeQty(${i.id}, 1)">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+    }).join('');
+    document.getElementById('cart-count').innerText = items;
+    total.innerText = `$${sum.toLocaleString()}`;
+    document.getElementById('checkout-total-btn').innerText = sum.toLocaleString();
+}
+
+function toggleCart() { document.getElementById('cart-panel').classList.toggle('translate-x-full'); }
+function toggleCheckoutModal() { document.getElementById('checkout-modal').classList.toggle('hidden'); }
+function preCheckout() { if (cart.length > 0) { toggleCart(); toggleCheckoutModal(); } else alert("Carrito vacío"); }
+
+document.getElementById('form-datos-cliente').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const customer = {
+        name: document.getElementById('cust-name').value,
+        dni: document.getElementById('cust-dni').value,
+        email: document.getElementById('cust-email').value,
+        phone: document.getElementById('cust-phone').value,
+        address: document.getElementById('cust-address').value,
+        city: document.getElementById('cust-city').value,
+        zip: document.getElementById('cust-zip').value
+    };
+    await checkoutMP(customer);
+});
+
+        async function checkoutMP(customer) {
+            const btn = document.getElementById('btn-confirmar-pago');
+            btn.innerText = "Procesando..."; btn.disabled = true;
+            const itemsMP = cart.map(i => ({ title: i.nombre, unit_price: Number(i.precio_minorista), quantity: i.quantity, currency_id: 'ARS', picture_url: i.imagen_url }));
+
+            try {
+                const res = await fetch('https://api.mercadopago.com/checkout/preferences', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        items: itemsMP,
+                        payer: { name: customer.name, email: customer.email, phone: { number: customer.phone }, identification: { type: "DNI", number: customer.dni }, address: { street_name: customer.address, zip_code: customer.zip } },
+                        back_urls: { success: window.location.href, pending: window.location.href, failure: window.location.href },
+                        auto_return: 'approved'
+                    })
+                });
+                const data = await res.json();
+                window.location.href = data.init_point;
+            } catch (err) { alert("Error al conectar."); btn.innerText = "Ir a pagar"; btn.disabled = false; }
+        }
+
+        function renderCategories() {
+    const container = document.getElementById('categories-container');
+    container.innerHTML = CATEGORIAS_LIST.map(cat => `
+        <button onclick="filterByCategory('${cat}')" 
+            class="px-6 py-2 rounded-full border transition whitespace-nowrap text-xs font-bold
+            ${currentCategory === cat 
+                ? 'bg-yellow-500 text-black border-yellow-500 shadow-md' 
+                : 'bg-slate-500/30 text-slate-200 border-white/10 hover:bg-slate-500/50'}">
+            ${cat}
+        </button>`).join('');
+}
+
+        async function filterByCategory(cat) {
+            currentCategory = cat;
+            renderCategories(); // Actualiza visualmente los botones
+
+            const btnContainer = document.getElementById('load-more-container');
+
+            try {
+                // Iniciamos la consulta base a la tabla 'productos'
+                let query = _supabase
+                    .from('productos_publicos')
+                    .select('*')
+                    .gt('stock', 0); // Solo productos con stock [cite: 167, 168]
+
+                // Si la categoría no es 'TODOS', aplicamos el filtro específico
+                if (cat !== 'TODOS') {
+                    query = query.eq('categoria', cat);
+                }
+
+                const { data, error } = await query.order('nombre', { ascending: true });
+
+                if (error) throw error;
+
+                // Renderizamos los productos de esa categoría
+                renderProducts(data);
+
+                // Ocultamos el botón "Ver más" cuando se filtra por categoría
+                // para evitar conflictos con la paginación inicial
+                if (btnContainer) {
+                    if (cat === 'TODOS' && data.length > productosLimite) {
+                        btnContainer.classList.remove('hidden');
+                    } else {
+                        btnContainer.classList.add('hidden');
+                    }
+                }
+
+            } catch (err) {
+                console.error("Error al filtrar por categoría:", err);
+            }
+        }
+// Lógica de búsqueda global en toda la base de datos de Supabase
+        document.getElementById('search-input').addEventListener('input', async (e) => {
+            const term = e.target.value.trim();
+            const btnContainer = document.getElementById('load-more-container');
+
+            // Si el buscador está vacío, restauramos la vista inicial de 12 productos
+            if (term === "") {
+                loadProducts();
+                return;
+            }
+
+            try {
+                // Buscamos en toda la tabla 'productos' por coincidencia de nombre
+                const { data, error } = await _supabase
+                    .from('productos_publicos')
+                    .select('*')
+                    .gt('stock', 0)
+                    .ilike('nombre', `%${term}%`) // No distingue mayúsculas/minúsculas
+                    .order('nombre', { ascending: true });
+
+                if (error) throw error;
+
+                // Actualizamos la variable global y renderizamos los resultados
+                products = data;
+                renderProducts(products);
+                
+                // Ocultamos el botón "Ver más" durante la búsqueda
+                if (btnContainer) btnContainer.classList.add('hidden');
+
+            } catch (err) {
+                console.error("Error en búsqueda global:", err);
+            }
+        });
+        
+        function renderProducts(list) {
+            const container = document.getElementById('grid-productos');
+            container.innerHTML = list.map(p => `
+                <div class="product-card bg-slate-500/50 backdrop-blur-sm rounded-2xl overflow-hidden shadow-xl border border-white/10 p-3">
+                    <div class="relative mb-2 cursor-zoom-in flex justify-center" onclick="openZoom('${p.imagen_url}')">
+                        <img src="${p.imagen_url}" class="w-full h-32 object-contain">
+                    </div>
+                    <div class="text-[9px] text-yellow-600 font-bold uppercase mb-1">${p.categoria}</div>
+                    <h3 class="font-bold text-white leading-tight h-8 mb-2 uppercase text-[12px] line-clamp-2">${p.nombre}</h3>
+                    <div class="flex items-end justify-between">
+                        <div class="text-lg font-black text-white">$${Number(p.precio_minorista).toLocaleString()}</div>
+                        <button onclick="addToCart(${p.id})" class="bg-black text-white w-8 h-8 rounded-full hover:bg-yellow-500 hover:text-black transition">
+                            <i class="fas fa-plus text-xs"></i>
+                        </button>
+                    </div>
+                </div>`).join('');
+        }
+        function changeQty(id, delta) {
+            const item = cart.find(i => i.id === id);
+            item.quantity += delta;
+            if (item.quantity <= 0) cart = cart.filter(i => i.id !== id);
+            updateCart();
+        }
+        function clearCart() { if (confirm("¿Vaciar?")) { cart = []; updateCart(); toggleCart(); } }
+        function openZoom(url) { document.getElementById('img-ampliada').src = url; document.getElementById('modal-zoom').style.display = 'flex'; }
+        function closeZoom() { document.getElementById('modal-zoom').style.display = 'none'; }
+        function checkoutWA() {
+            if (cart.length === 0) return alert("Carrito vacío");
+            let msg = `¡Hola Urban Riders! 👋 Me interesa esta compra:\n\n`;
+            cart.forEach(item => { msg += `• ${item.nombre} (Cant: ${item.quantity})\n`; });
+            msg += `\n*TOTAL: ${document.getElementById('cart-total').innerText}*`;
+            window.open(`https://wa.me/5491112345678?text=${encodeURIComponent(msg)}`, '_blank');
+        }
+function loadMore() {
+            productosLimite += 12; // Aumentamos la cantidad a mostrar
+            loadProducts();        // Recargamos el catálogo
+        }
+function toggleContactModal() {
+            document.getElementById('contact-modal').classList.toggle('hidden');
+        }
+
+        document.getElementById('form-contacto-email')?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const form = e.target;
+            const btn = document.getElementById('btn-envio-contacto');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+
+            try {
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: new FormData(form),
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (response.ok) {
+                    alert("¡Consulta enviada con éxito! Te responderemos a la brevedad.");
+                    form.reset();
+                    toggleContactModal();
+                } else {
+                    alert("Hubo un error al enviar el mensaje.");
+                }
+            } catch (error) {
+                alert("Error de conexión con el servidor.");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-paper-plane text-lg"></i> Enviar Mensaje';
+            }
+        });
+
+        window.onload = loadProducts;
+// Lógica para el formulario del Club (Newsletter)
+document.getElementById('newsletter-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const emailInput = document.getElementById('newsletter-email');
+    const btn = e.target.querySelector('button');
+    
+    // Feedback visual para el usuario
+    btn.disabled = true;
+    const originalText = btn.innerText;
+    btn.innerText = "UNIENDO...";
+
+    try {
+        const { error } = await _supabase
+            .from('suscriptores') // Apuntamos a la tabla que me indicaste
+            .insert([{ 
+                email: emailInput.value 
+                // La fecha_registro se genera sola por el 'default now()' de tu SQL
+            }]);
+
+        if (error) {
+            // Si el email ya existe, Supabase devolverá un error por el constraint 'unique'
+            if (error.code === '23505') {
+                alert("Este correo ya forma parte del Club Urban Riders.");
+            } else {
+                throw error;
+            }
+        } else {
+            alert("¡Te uniste al Club con éxito! Pronto recibirás novedades.");
+            emailInput.value = ""; // Limpiamos el campo
+        }
+    } catch (err) {
+        console.error("Error al suscribirse:", err);
+        alert("Hubo un problema. Por favor, intenta más tarde.");
+    } finally {
+        btn.disabled = false;
+        btn.innerText = originalText;
+    }
+});
+    </script>
+</body>
+</html>

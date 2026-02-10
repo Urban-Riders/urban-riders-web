@@ -1,0 +1,102 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Urban Riders Admin</title>
+<link rel="icon" type="image/png" href="img/logo-ur.png">
+<link rel="apple-touch-icon" href="img/logo-ur.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-zinc-950 flex items-center justify-center h-screen p-4">
+
+    <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md border-t-4 border-yellow-500">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-black italic uppercase tracking-tighter text-black">
+                URBAN <span class="text-yellow-500">RIDERS</span>
+            </h1>
+            <p class="text-gray-400 text-xs font-bold uppercase mt-2 tracking-widest">Panel de Control</p>
+        </div>
+
+        <form id="form-login" class="space-y-5">
+            <div>
+                <label class="text-[10px] font-black uppercase text-gray-400 ml-1">Email de Administrador</label>
+                <input type="email" id="email" placeholder="usuario@urbanriders.com" 
+                    class="w-full p-4 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:border-yellow-500 transition-all" required>
+            </div>
+            <div>
+                <label class="text-[10px] font-black uppercase text-gray-400 ml-1">Contraseña</label>
+                <input type="password" id="password" placeholder="••••••••" 
+                    class="w-full p-4 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:border-yellow-500 transition-all" required>
+            </div>
+            
+            <button type="submit" id="btn-entrar" 
+                class="w-full bg-black text-white py-4 rounded-xl font-bold uppercase hover:bg-yellow-500 hover:text-black transition-all shadow-lg active:scale-95">
+                Iniciar Sesión
+            </button>
+        </form>
+
+        <div id="mensaje-error" class="mt-6 p-3 bg-red-50 text-red-600 text-xs font-bold rounded-lg text-center hidden"></div>
+        
+        <div class="mt-8 text-center">
+            <a href="index.html" class="text-[10px] font-bold text-gray-400 uppercase hover:text-black transition">← Volver al sitio público</a>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://dsexvmstfjadjdbptmzn.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzZXh2bXN0ZmphZGpkYnB0bXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2OTc3MzUsImV4cCI6MjA4MjI3MzczNX0.L0Wz3hwZOarNLqkYH5-RAzz2Y6iwI4uaE_rlkcKkgyg';
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const loginForm = document.getElementById('form-login');
+        const errorDiv = document.getElementById('mensaje-error');
+        const btnEntrar = document.getElementById('btn-entrar');
+
+        loginForm.onsubmit = async (e) => {
+            e.preventDefault();
+            errorDiv.classList.add('hidden');
+            btnEntrar.innerText = "VERIFICANDO...";
+            btnEntrar.disabled = true;
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            // Intentar inicio de sesión con Supabase Auth
+            const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+
+           // ... (dentro de loginForm.onsubmit, después del login) ...
+            if (error) {
+                errorDiv.innerText = "ERROR: " + error.message;
+                errorDiv.classList.remove('hidden');
+                btnEntrar.innerText = "INICIAR SESIÓN";
+                btnEntrar.disabled = false;
+            } else {
+                // ÉXITO: Identificamos quién entró
+                const userEmail = data.user.email;
+                
+                // Definimos los correos de rol
+                const adminEmail = 'kotur39@gmail.com'; // TU MAIL
+                const vendedorEmail = 'vendedor@urbanriders.com'; // MAIL DE ROL
+
+                if (userEmail === adminEmail) {
+                    // Es el administrador
+                    localStorage.setItem('isLoggedIn', 'true');
+                    window.location.replace("admin.html");
+                } 
+                else if (userEmail === vendedorEmail) {
+                    // Es el vendedor
+                    // No hace falta el localStorage de admin para no mezclar sesiones
+                    window.location.replace("vendedor.html");
+                } 
+                else {
+                    // Es un cliente que intentó entrar por aquí
+                    alert("Acceso restringido a personal.");
+                    await _supabase.auth.signOut();
+                    window.location.replace("mayorista.html");
+                }
+            }
+      };
+    </script>
+</body>
+</html>
