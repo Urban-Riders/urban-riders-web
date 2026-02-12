@@ -87,15 +87,100 @@
 
     </div>
 
-    <div class="flex gap-6 mt-12">
-        <a href="#" class="text-gray-600 hover:text-yellow-500 transition text-xl"><i class="fab fa-instagram"></i></a>
-        <a href="#" class="text-gray-600 hover:text-yellow-500 transition text-xl"><i class="fab fa-facebook"></i></a>
-        <a href="#" class="text-gray-600 hover:text-yellow-500 transition text-xl"><i class="fas fa-envelope"></i></a>
-    </div>
+            <div class="flex gap-6 mt-12 mb-12">
+    <a href="#" class="text-gray-600 hover:text-yellow-500 transition text-xl"><i class="fab fa-instagram"></i></a>
+    <a href="#" class="text-gray-600 hover:text-yellow-500 transition text-xl"><i class="fab fa-facebook"></i></a>
+    <a href="javascript:void(0)" onclick="openContactModal()" class="text-gray-600 hover:text-yellow-500 transition text-xl">
+        <i class="fas fa-envelope"></i>
+    </a>
+</div>
 
     <footer class="mt-auto pt-12">
         <p class="text-[9px] text-gray-700 font-black uppercase tracking-widest">Urban Riders Official © 2026</p>
     </footer>
+<div id="contact-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+    <div class="bg-[#111] border border-white/10 w-full max-w-md rounded-3xl p-8 relative shadow-2xl">
+        <button onclick="closeContactModal()" class="absolute top-5 right-5 text-gray-500 hover:text-white transition">
+            <i class="fas fa-times text-xl"></i>
+        </button>
+        
+        <div class="text-center mb-8">
+            <h3 class="text-yellow-500 font-black italic uppercase text-2xl tracking-tighter">Contacto</h3>
+            <p class="text-gray-500 text-[10px] uppercase tracking-widest mt-1">Urban Riders Official</p>
+        </div>
+        
+        <form id="contact-form" action="https://formspree.io/f/xwvnkwbn" method="POST" class="space-y-5">
+            <div>
+                <label class="text-[10px] uppercase text-yellow-500/50 font-black ml-1 tracking-widest">Tu Email</label>
+                <input type="email" name="email" required 
+                    class="w-full bg-black/50 border border-white/10 rounded-2xl p-4 text-white focus:border-yellow-500 outline-none transition-all placeholder:text-gray-700 text-sm" 
+                    placeholder="correo@ejemplo.com">
+            </div>
+            <div>
+                <label class="text-[10px] uppercase text-yellow-500/50 font-black ml-1 tracking-widest">Mensaje</label>
+                <textarea name="mensaje" required rows="4"
+                    class="w-full bg-black/50 border border-white/10 rounded-2xl p-4 text-white focus:border-yellow-500 outline-none transition-all placeholder:text-gray-700 resize-none text-sm" 
+                    placeholder="Escribí tu consulta aquí..."></textarea>
+            </div>
+            <button type="submit" 
+                class="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl transition-all uppercase text-xs tracking-widest shadow-xl shadow-yellow-500/10 active:scale-95">
+                Enviar Mensaje
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    const contactModal = document.getElementById('contact-modal');
+    const contactForm = document.getElementById('contact-form');
+
+    function openContactModal() {
+        contactModal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeContactModal() {
+        contactModal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    // ENVÍO SILENCIOSO (EVITA REDIRECCIÓN DE FORMSPREE)
+    contactForm.addEventListener("submit", async function(event) {
+        event.preventDefault();
+        
+        const btn = event.target.querySelector('button');
+        const data = new FormData(event.target);
+        
+        btn.disabled = true;
+        btn.innerText = "ENVIANDO...";
+
+        try {
+            const response = await fetch(event.target.action, {
+                method: 'POST',
+                body: data,
+                headers: { 'Accept': 'application/json' }
+            });
+
+            if (response.ok) {
+                alert("¡Mensaje enviado con éxito! Nos contactaremos pronto.");
+                contactForm.reset();
+                closeContactModal();
+            } else {
+                alert("Hubo un problema al enviar. Por favor, reintentá.");
+            }
+        } catch (error) {
+            alert("Error de conexión. Verificá tu internet.");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "ENVIAR MENSAJE";
+        }
+    });
+
+    // Cerrar si hace click fuera del modal
+    window.addEventListener('click', (e) => {
+        if (e.target === contactModal) closeContactModal();
+    });
+</script>
 
 </body>
 </html>
