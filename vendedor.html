@@ -61,6 +61,9 @@
     <h2 class="text-2xl font-black mb-4 uppercase italic">Seleccionar Cliente</h2>
     <input type="text" id="search-cliente" oninput="filtrarClientes()" placeholder="Buscar cliente..." 
         class="w-full p-5 mb-4 rounded-xl bg-gray-100 border-2 border-transparent focus:border-black outline-none font-bold text-lg">
+<button onclick="openClientModal()" class="w-full mt-2 bg-yellow-500 text-black font-black py-3 rounded-xl uppercase text-sm shadow-lg">
+    <i class="fas fa-user-plus mr-2"></i> Nuevo Cliente
+</button>
     <div id="lista-clientes" class="space-y-3"></div>
 </section>
 
@@ -320,6 +323,46 @@
             const t = document.getElementById('search-producto').value.toLowerCase();
             renderProductos(productos.filter(p => p.nombre.toLowerCase().includes(t) || p.codigo?.toLowerCase().includes(t)));
         }
+function openClientModal() {
+    document.getElementById('client-modal').classList.remove('hidden');
+}
+
+function closeClientModal() {
+    document.getElementById('client-modal').classList.add('hidden');
+    document.getElementById('form-nuevo-cliente').reset();
+}
+
+document.getElementById('form-nuevo-cliente').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btn-guardar-cliente');
+    btn.disabled = true;
+    btn.innerText = "GUARDANDO...";
+
+    const formData = new FormData(e.target);
+    const nuevoCliente = {
+        nombre: formData.get('nombre'),
+        telefono: formData.get('telefono'),
+        email: formData.get('email'),
+        saldo: 0,
+        limite_credito: 0
+    };
+
+    try {
+        const { error } = await _supabase.from('clientes').insert([nuevoCliente]);
+        if (error) throw error;
+
+        alert("✅ CLIENTE AGREGADO CON ÉXITO");
+        closeClientModal();
+        
+        // Recargamos los datos para que aparezca en la lista del vendedor
+        await fetchInitialData(); 
+    } catch (err) {
+        alert("Error al guardar: " + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "GUARDAR CLIENTE";
+    }
+});
 async function logoutVendedor() {
             if (confirm("¿Cerrar sesión de vendedor?")) {
                 await _supabase.auth.signOut();
@@ -328,5 +371,32 @@ async function logoutVendedor() {
         }
 
     </script>
+<div id="client-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl">
+        <div class="bg-black p-6 text-white flex justify-between items-center">
+            <h3 class="font-black uppercase tracking-tighter">Registrar Cliente</h3>
+            <button onclick="closeClientModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="form-nuevo-cliente" class="p-6 space-y-4">
+            <div>
+                <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Nombre Completo</label>
+                <input type="text" name="nombre" required class="w-full border-2 border-gray-100 rounded-xl p-3 focus:border-yellow-500 outline-none transition-all">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Teléfono</label>
+                    <input type="text" name="telefono" class="w-full border-2 border-gray-100 rounded-xl p-3 focus:border-yellow-500 outline-none transition-all">
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Email (Opcional)</label>
+                    <input type="email" name="email" class="w-full border-2 border-gray-100 rounded-xl p-3 focus:border-yellow-500 outline-none transition-all">
+                </div>
+            </div>
+            <button type="submit" id="btn-guardar-cliente" class="w-full bg-black text-white font-black py-4 rounded-2xl uppercase tracking-widest hover:bg-yellow-500 hover:text-black transition-all">
+                Guardar Cliente
+            </button>
+        </form>
+    </div>
+</div>
 </body>
 </html>
