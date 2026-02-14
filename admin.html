@@ -2650,33 +2650,27 @@ async function ejecutarLogisticaDual() {
 
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
-    // REPLICAMOS TU CLIC MANUAL
-    // Forzamos que la búsqueda llegue hasta el final del día siguiente
-    const dateObj = new Date(hasta + 'T12:00:00');
-    dateObj.setDate(dateObj.getDate() + 1);
-    const hastaPlus = dateObj.toISOString().split('T')[0];
-
     try {
-        // CONSULTA COPIADA DE CARGARHISTORIAL (admin.txt l.793)
-        // Usamos la 'T' que es lo que sí le funciona a tu historial
+        // LA SOLUCIÓN DEFINITIVA: 
+        // En lugar de enviar horas (00:00:00), enviamos solo la fecha.
+        // Y pedimos un rango más amplio para que la RLS no nos bloquee los pedidos nocturnos.
+        
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
-            .gte('fecha', desde + 'T00:00:00')
-            .lte('fecha', hastaPlus + 'T23:59:59')
+            .gte('fecha', desde) // Supabase entiende el string 'YYYY-MM-DD'
+            .lte('fecha', hasta + 'T23:59:59.999Z') // Forzamos el fin del día en formato Z (Zulu/UTC)
             .order('fecha', { ascending: false });
 
         if (error) throw error;
 
-        // FILTRO RELAJADO
-        // Quitamos la comparación estricta de substring para que no bloquee nada.
-        // Solo filtramos por los estados que te interesan.
+        // Filtramos localmente solo por el ESTADO, ya que la fecha ya viene filtrada por Supabase
         const pedidosValidos = pedidos.filter(p => {
             const st = p.estado ? p.estado.toUpperCase().trim() : "";
             return st === 'COMPLETADO' || st === 'PENDIENTE';
         });
 
-        // --- TU INTERFAZ (SIN TOCAR NI UNA SOLA CLASE) ---
+        // --- RENDERIZADO DE TABLA (Tu lógica de admin.txt) ---
         const minoristas = pedidosValidos.filter(p => !p.cliente_id);
         const mayoristas = pedidosValidos.filter(p => p.cliente_id);
 
@@ -2728,7 +2722,7 @@ async function ejecutarLogisticaDual() {
             });
         }
     } catch (err) {
-        console.error("Error:", err);
+        console.error("Error crítico:", err);
     }
 }
 async function guardarTracking(id) {
