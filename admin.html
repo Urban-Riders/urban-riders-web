@@ -2651,29 +2651,33 @@ async function ejecutarLogisticaDual() {
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
     try {
-        // 1. Ampliamos el rango de búsqueda en la DB (2 días extra para seguridad absoluta)
-        const fechaHastaObj = new Date(hasta + 'T12:00:00');
-        fechaHastaObj.setDate(fechaHastaObj.getDate() + 2);
-        const hastaMargen = fechaHastaObj.toISOString().split('T')[0];
+        // 1. Buscamos con un margen de +1 día para asegurar que Supabase traiga todo
+        const fechaFin = new Date(hasta + 'T23:59:59');
+        fechaFin.setDate(fechaFin.getDate() + 1);
+        const hastaMargen = fechaFin.toISOString().split('T')[0];
 
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
-            .gte('fecha', desde + ' 00:00:00') 
+            .gte('fecha', desde)
             .lte('fecha', hastaMargen + ' 23:59:59')
             .order('fecha', { ascending: false });
 
         if (error) throw error;
 
-        // 2. FILTRO FLEXIBLE: Convertimos la fecha de la DB a objeto Date
-        // para que JavaScript maneje la zona horaria de Argentina (-3) automáticamente.
+        // 2. FILTRO DE PRECISIÓN: Normalizamos el desfasaje horario
         const pedidosValidos = pedidos.filter(p => {
-            const fechaPedido = new Date(p.fecha);
-            const inicio = new Date(desde + 'T00:00:00');
-            const fin = new Date(hasta + 'T23:59:59');
-
-            // Verificamos si la fecha del pedido cae dentro del rango real de tiempo
-            const enRango = fechaPedido >= inicio && fechaPedido <= fin;
+            // Convertimos la fecha de la DB a un objeto de fecha real
+            // Esto ajusta automáticamente las -3 horas de Argentina
+            const d = new Date(p.fecha);
+            const año = d.getFullYear();
+            const mes = String(d.getMonth() + 1).padStart(2, '0');
+            const dia = String(d.getDate()).padStart(2, '0');
+            
+            // Esta es la fecha REAL en Argentina
+            const fechaArgentina = `${año}-${mes}-${dia}`;
+            
+            const enRango = fechaArgentina >= desde && fechaArgentina <= hasta;
             
             const st = p.estado ? p.estado.toUpperCase().trim() : "";
             const estadoValido = st === 'COMPLETADO' || st === 'PENDIENTE';
@@ -2681,10 +2685,7 @@ async function ejecutarLogisticaDual() {
             return enRango && estadoValido;
         });
 
-        // --- TU LÓGICA DE INTERFAZ (SIN CAMBIOS) ---
-        const minoristas = pedidosValidos.filter(p => !p.cliente_id);
-        const mayoristas = pedidosValidos.filter(p => p.cliente_id);
-
+        // --- TU LÓGICA DE INTERFAZ (SIN TOCAR NADA) ---
         const msgVacio = document.getElementById('mensaje-transporte-vacio');
         const btnPdf = document.getElementById('btn-pdf-mayorista');
         const contenedor = document.getElementById('contenedor-correo');
@@ -2699,6 +2700,9 @@ async function ejecutarLogisticaDual() {
             msgVacio.classList.remove('hidden');
             return;
         }
+
+        const minoristas = pedidosValidos.filter(p => !p.cliente_id);
+        const mayoristas = pedidosValidos.filter(p => p.cliente_id);
 
         if (mayoristas.length > 0) btnPdf.classList.remove('hidden');
 
@@ -2733,7 +2737,7 @@ async function ejecutarLogisticaDual() {
             });
         }
     } catch (err) {
-        console.error("Error:", err);
+        console.error("Error cargando logística:", err);
     }
 }
 async function guardarTracking(id) {
