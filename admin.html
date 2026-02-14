@@ -2650,26 +2650,26 @@ async function ejecutarLogisticaDual() {
 
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
-    // 1. ENSANCHAMOS LA RED: Calculamos el día siguiente al "hasta"
-    // Esto es para que Supabase traiga los pedidos que por el huso horario ya son día 15
-    const fechaHastaPlus = new Date(hasta);
-    fechaHastaPlus.setDate(fechaHastaPlus.getDate() + 1);
-    const hastaMargen = fechaHastaPlus.toISOString().split('T')[0];
+    // 1. EL TRUCO: Le pedimos a la DB hasta el día siguiente (hasta + 1)
+    // porque tus ventas de la noche ya tienen fecha del día siguiente para Supabase.
+    const fechaHastaObj = new Date(hasta + 'T12:00:00'); 
+    fechaHastaObj.setDate(fechaHastaObj.getDate() + 1);
+    const hastaMañana = fechaHastaObj.toISOString().split('T')[0];
 
     try {
-        // 2. Pedimos a Supabase un rango más amplio (hasta el día siguiente)
+        // 2. Traemos un rango más grande para no perder los pedidos nocturnos
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
             .gte('fecha', desde) 
-            .lte('fecha', hastaMargen + ' 23:59:59')
+            .lte('fecha', hastaMañana + ' 23:59:59')
             .order('fecha', { ascending: false });
 
         if (error) throw error;
 
-        // 3. FILTRO LOCAL: Aquí es donde "domamos" los datos.
-        // Aunque Supabase trajo cosas del día 15, nosotros solo mostramos lo que 
-        // según el horario de Argentina (substring 0,10) es el día que vos pediste.
+        // 3. FILTRO DE SEGURIDAD (Tu lógica exacta)
+        // Aunque trajimos cosas del día 15, acá solo dejamos pasar lo que
+        // en texto (YYYY-MM-DD) coincide con lo que vos elegiste.
         const pedidosValidos = pedidos.filter(p => {
             const fechaLimpia = p.fecha.substring(0, 10);
             const fechaEnRango = fechaLimpia >= desde && fechaLimpia <= hasta;
@@ -2680,7 +2680,7 @@ async function ejecutarLogisticaDual() {
             return fechaEnRango && estadoValido;
         });
 
-        // --- TU LÓGICA DE INTERFAZ SE MANTIENE 100% IGUAL ---
+        // --- TU LÓGICA ORIGINAL DE INTERFAZ SE MANTIENE INTACTA ---
         const minoristas = pedidosValidos.filter(p => !p.cliente_id);
         const mayoristas = pedidosValidos.filter(p => p.cliente_id);
 
@@ -2699,9 +2699,7 @@ async function ejecutarLogisticaDual() {
             return;
         }
 
-        if (mayoristas.length > 0) {
-            btnPdf.classList.remove('hidden');
-        }
+        if (mayoristas.length > 0) btnPdf.classList.remove('hidden');
 
         if (minoristas.length > 0) {
             contenedor.classList.remove('hidden');
@@ -2735,8 +2733,7 @@ async function ejecutarLogisticaDual() {
             });
         }
     } catch (err) {
-        console.error("Error cargando logística:", err);
-        alert("Error al cargar datos: " + err.message);
+        console.error("Error:", err);
     }
 }
 async function guardarTracking(id) {
