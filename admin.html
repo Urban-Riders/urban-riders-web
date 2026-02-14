@@ -2651,18 +2651,17 @@ async function ejecutarLogisticaDual() {
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
     try {
-        // CAMBIO QUIRÚRGICO: Eliminamos la 'T' y la 'Z' para que la comparación 
-        // sea de texto simple, igual que en el historial que sí te funciona.
+        // 1. Obtener pedidos: Quitamos T y Z para que compare como TEXTO (igual que el historial)
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
-            .gte('fecha', `${desde} 00:00:00`)
-            .lte('fecha', `${hasta} 23:59:59`) 
+            .gte('fecha', desde + ' 00:00:00') 
+            .lte('fecha', hasta + ' 23:59:59')
             .order('fecha', { ascending: false });
 
         if (error) throw error;
 
-        // FILTRO DE SEGURIDAD PARA HORARIOS Y ESTADOS (Mantenemos tu lógica)
+        // FILTRO DE SEGURIDAD (Mantenemos tu lógica intacta)
         const pedidosValidos = pedidos.filter(p => {
             const fechaLimpia = p.fecha.substring(0, 10);
             const fechaEnRango = fechaLimpia >= desde && fechaLimpia <= hasta;
