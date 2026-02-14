@@ -2645,54 +2645,92 @@ async function cargarHistorialIngresos() {
 // Buscá tu función switchTab(tabId) y agregá esto al final:
 // if(tabId === 'tab-ingresos') cargarHistorialIngresos();
 async function ejecutarLogisticaDual() {
-    console.log("Iniciando escáner total de tabla...");
-    const body = document.getElementById('tabla-minorista-body');
-    const msgVacio = document.getElementById('mensaje-transporte-vacio');
-    const contenedor = document.getElementById('contenedor-correo');
+    const desde = document.getElementById('transporte-desde').value; // Ej: "2026-02-14"
+    const hasta = document.getElementById('transporte-hasta').value; // Ej: "2026-02-14"
+
+    if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
     try {
-        // PRUEBA RADICAL: Traer los últimos 10 pedidos de TODA la tabla
-        // Ignoramos los inputs de fecha del calendario por un momento
+        // 1. CONSULTA FLEXIBLE
+        // Pedimos un rango amplio para que el desfasaje de horario de Supabase no nos bloquee
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
-            .limit(10)
+            .gte('fecha', desde + 'T00:00:00')
+            .lte('fecha', hasta + 'T23:59:59') // Quitamos el día extra para probar rango exacto
             .order('fecha', { ascending: false });
 
         if (error) throw error;
 
-        body.innerHTML = '';
-        contenedor.classList.remove('hidden');
-        msgVacio.classList.add('hidden');
+        // 2. EL FILTRO INTELIGENTE
+        // En lugar de comparar objetos Date complicados, comparamos el TEXTO de la fecha
+        const pedidosValidos = pedidos.filter(p => {
+            // Sacamos solo el "2026-02-14" del pedido de la base
+            const fechaSoloDia = p.fecha.substring(0, 10);
+            
+            // Verificamos si el día está en el rango que elegiste
+            const estaEnRango = fechaSoloDia >= desde && fechaSoloDia <= hasta;
+            
+            // Verificamos estado (asegurándonos de que coincida con lo que vimos en el log)
+            const st = p.estado ? p.estado.toUpperCase().trim() : "";
+            const estadoOk = (st === 'COMPLETADO' || st === 'PENDIENTE');
+            
+            return estaEnRango && estadoOk;
+        });
 
-        if (!pedidos || pedidos.length === 0) {
-            body.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-500 font-bold">LA TABLA PEDIDOS ESTÁ VACÍA PARA LA API</td></tr>`;
+        // --- RENDERIZADO DE TU TABLA (Original de Urban Riders) ---
+        const msgVacio = document.getElementById('mensaje-transporte-vacio');
+        const btnPdf = document.getElementById('btn-pdf-mayorista');
+        const contenedor = document.getElementById('contenedor-correo');
+        const body = document.getElementById('tabla-minorista-body');
+
+        msgVacio.classList.add('hidden');
+        btnPdf.classList.add('hidden');
+        contenedor.classList.add('hidden');
+        body.innerHTML = '';
+
+        if (pedidosValidos.length === 0) {
+            msgVacio.classList.remove('hidden');
             return;
         }
 
-        // Listamos lo que sea que haya encontrado para ver por qué no coincide con tu filtro
-        pedidos.forEach(p => {
-            body.innerHTML += `
-                <tr class="border-b bg-yellow-50">
-                    <td class="p-3">
-                        <div class="flex flex-col">
-                            <span class="font-bold">${p.cliente_nombre}</span>
-                            <span class="text-[10px] bg-black text-white px-1 w-fit">FECHA DB: ${p.fecha}</span>
-                        </div>
-                    </td>
-                    <td class="p-3 text-[10px]">
-                        ESTADO: <b>${p.estado}</b>
-                    </td>
-                    <td class="p-3 text-right text-[10px]">
-                        ID: ${p.id}
-                    </td>
-                </tr>`;
-        });
+        const minoristas = pedidosValidos.filter(p => !p.cliente_id);
+        const mayoristas = pedidosValidos.filter(p => p.cliente_id);
 
-        console.log("Pedidos encontrados en la base:", pedidos);
+        if (mayoristas.length > 0) btnPdf.classList.remove('hidden');
 
+        if (minoristas.length > 0) {
+            contenedor.classList.remove('hidden');
+            minoristas.forEach(p => {
+                body.innerHTML += `
+                    <tr class="border-b hover:bg-gray-50 transition">
+                        <td class="p-3">
+                            <div class="flex flex-col">
+                                <span class="font-bold">${p.cliente_nombre}</span>
+                                <span class="text-[8px] text-blue-500 uppercase">${p.vendedor_nombre || 'WEB'}</span>
+                            </div>
+                        </td>
+                        <td class="p-3">
+                            <div class="flex gap-1">
+                                <input type="text" id="input-track-${p.id}" value="${p.tracking_number || ''}" 
+                                       placeholder="CP...AR"
+                                       class="border-2 border-gray-200 rounded px-2 py-1 text-[10px] w-32 outline-none focus:border-black">
+                                <button onclick="guardarTracking(${p.id})" class="bg-black text-white px-3 py-1 rounded text-[9px] font-bold">OK</button>
+                            </div>
+                        </td>
+                        <td class="p-3 text-right">
+                            ${p.tracking_number ? 
+                                `<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${p.tracking_number}" 
+                                   target="_blank" class="text-blue-600 font-bold hover:underline text-[10px]">
+                                   <i class="fas fa-truck mr-1"></i> RASTREAR
+                                </a>` : 
+                                `<span class="text-gray-400 italic text-[9px]">PENDIENTE</span>`}
+                        </td>
+                    </tr>`;
+            });
+        }
     } catch (err) {
-        body.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-500">Error de conexión: ${err.message}</td></tr>`;
+        console.error("Error en carga final:", err);
     }
 }
 async function guardarTracking(id) {
