@@ -2651,24 +2651,21 @@ async function ejecutarLogisticaDual() {
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
     try {
-        // ESTA ES LA CONSULTA ULTRA-SIMPLIFICADA
+        // 1. CONSULTA SIN FILTROS DE HORA (Solo fechas puras)
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
-            .gte('fecha', desde + 'T00:00:00')
+            .gte('fecha', desde)
             .lte('fecha', hasta + 'T23:59:59')
             .order('fecha', { ascending: false });
 
         if (error) throw error;
 
-        // NO FILTRAMOS POR FECHA EN JS (Para que no se borre nada)
-        // Solo filtramos que el estado sea válido
-        const pedidosValidos = pedidos.filter(p => {
-            const st = p.estado ? p.estado.toUpperCase().trim() : "";
-            return st === 'COMPLETADO' || st === 'PENDIENTE';
-        });
+        // 2. PRUEBA DE FUEGO: NO FILTRAMOS NADA. 
+        // Si hay pedidos en Supabase para esa fecha, VAN A APARECER.
+        const pedidosValidos = pedidos; 
 
-        // --- RENDERIZADO (Tal cual está en tu admin.txt) ---
+        // --- RENDERIZADO ---
         const msgVacio = document.getElementById('mensaje-transporte-vacio');
         const btnPdf = document.getElementById('btn-pdf-mayorista');
         const contenedor = document.getElementById('contenedor-correo');
@@ -2679,8 +2676,10 @@ async function ejecutarLogisticaDual() {
         contenedor.classList.add('hidden');
         body.innerHTML = '';
 
-        if (pedidosValidos.length === 0) {
+        if (!pedidosValidos || pedidosValidos.length === 0) {
             msgVacio.classList.remove('hidden');
+            // Agregamos un log para que veas en la consola qué está llegando exactamente
+            console.log("Supabase devolvió esto:", pedidos);
             return;
         }
 
@@ -2688,7 +2687,6 @@ async function ejecutarLogisticaDual() {
         const mayoristas = pedidosValidos.filter(p => p.cliente_id);
 
         if (mayoristas.length > 0) btnPdf.classList.remove('hidden');
-
         if (minoristas.length > 0) {
             contenedor.classList.remove('hidden');
             minoristas.forEach(p => {
@@ -2697,30 +2695,25 @@ async function ejecutarLogisticaDual() {
                         <td class="p-3">
                             <div class="flex flex-col">
                                 <span class="font-bold">${p.cliente_nombre}</span>
+                                <span class="text-[10px] text-red-500 font-bold">ESTADO: ${p.estado}</span>
                                 <span class="text-[8px] text-blue-500 uppercase">${p.vendedor_nombre || 'WEB'}</span>
                             </div>
                         </td>
                         <td class="p-3">
                             <div class="flex gap-1">
                                 <input type="text" id="input-track-${p.id}" value="${p.tracking_number || ''}" 
-                                       placeholder="CP...AR"
-                                       class="border-2 border-gray-200 rounded px-2 py-1 text-[10px] w-32 outline-none focus:border-black">
-                                <button onclick="guardarTracking(${p.id})" class="bg-black text-white px-3 py-1 rounded text-[9px] font-bold hover:bg-gray-800">OK</button>
+                                       class="border-2 border-gray-200 rounded px-2 py-1 text-[10px] w-32">
+                                <button onclick="guardarTracking(${p.id})" class="bg-black text-white px-3 py-1 rounded text-[9px] font-bold">OK</button>
                             </div>
                         </td>
                         <td class="p-3 text-right">
-                            ${p.tracking_number ? 
-                                `<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${p.tracking_number}" 
-                                   target="_blank" class="text-blue-600 font-bold hover:underline text-[10px]">
-                                   <i class="fas fa-truck mr-1"></i> RASTREAR
-                                </a>` : 
-                                `<span class="text-gray-400 italic text-[9px]">PENDIENTE</span>`}
+                            <span class="text-[9px] text-gray-400">${p.fecha}</span>
                         </td>
                     </tr>`;
             });
         }
     } catch (err) {
-        console.error("Error:", err);
+        console.error("Error en diagnóstico:", err);
     }
 }
 async function guardarTracking(id) {
