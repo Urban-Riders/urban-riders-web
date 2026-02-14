@@ -2651,8 +2651,7 @@ async function ejecutarLogisticaDual() {
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
     try {
-        // 1. CONSULTA DIRECTA (Lo que la DB diga, es ley)
-        // Usamos el formato del historial que sí funciona
+        // 1. CONSULTA IGUAL AL ESCÁNER (Sin vueltas)
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
@@ -2662,43 +2661,38 @@ async function ejecutarLogisticaDual() {
 
         if (error) throw error;
 
-        // 2. FILTRO DE ESTADO ÚNICAMENTE
-        // Quitamos cualquier validación manual de fecha aquí para que no se borre nada
-        const pedidosValidos = pedidos.filter(p => {
-            const st = p.estado ? p.estado.toUpperCase().trim() : "";
-            return st === 'COMPLETADO' || st === 'PENDIENTE';
-        });
-
-        // --- RENDERIZADO (Tu lógica original de admin.txt) ---
-        const msgVacio = document.getElementById('mensaje-transporte-vacio');
-        const btnPdf = document.getElementById('btn-pdf-mayorista');
-        const contenedor = document.getElementById('contenedor-correo');
         const body = document.getElementById('tabla-minorista-body');
+        const msgVacio = document.getElementById('mensaje-transporte-vacio');
+        const contenedor = document.getElementById('contenedor-correo');
+        const btnPdf = document.getElementById('btn-pdf-mayorista');
 
-        msgVacio.classList.add('hidden');
-        btnPdf.classList.add('hidden');
-        contenedor.classList.add('hidden');
         body.innerHTML = '';
-
-        if (!pedidosValidos || pedidosValidos.length === 0) {
+        
+        // Si la base de datos no devuelve nada, mostramos el mensaje
+        if (!pedidos || pedidos.length === 0) {
             msgVacio.classList.remove('hidden');
+            contenedor.classList.add('hidden');
+            btnPdf.classList.add('hidden');
             return;
         }
 
-        const minoristas = pedidosValidos.filter(p => !p.cliente_id);
-        const mayoristas = pedidosValidos.filter(p => p.cliente_id);
+        // Si devuelve algo, lo mostramos TODO (Sin filtros de JS)
+        msgVacio.classList.add('hidden');
+        contenedor.classList.remove('hidden');
 
-        if (mayoristas.length > 0) btnPdf.classList.remove('hidden');
+        // Activamos PDF si hay mayoristas
+        if (pedidos.some(p => p.cliente_id)) btnPdf.classList.remove('hidden');
 
-        if (minoristas.length > 0) {
-            contenedor.classList.remove('hidden');
-            minoristas.forEach(p => {
+        pedidos.forEach(p => {
+            // Solo separamos visualmente minoristas para tu tabla principal
+            if (!p.cliente_id) {
                 body.innerHTML += `
                     <tr class="border-b hover:bg-gray-50 transition">
                         <td class="p-3">
                             <div class="flex flex-col">
-                                <span class="font-bold">${p.cliente_nombre}</span>
+                                <span class="font-bold">${p.cliente_nombre || 'Sin Nombre'}</span>
                                 <span class="text-[8px] text-blue-500 uppercase">${p.vendedor_nombre || 'WEB'}</span>
+                                <span class="text-[7px] text-gray-400">${p.fecha}</span>
                             </div>
                         </td>
                         <td class="p-3">
@@ -2718,10 +2712,11 @@ async function ejecutarLogisticaDual() {
                                 `<span class="text-gray-400 italic text-[9px]">PENDIENTE</span>`}
                         </td>
                     </tr>`;
-            });
-        }
+            }
+        });
+
     } catch (err) {
-        console.error("Error final:", err);
+        console.error("Error definitivo:", err);
     }
 }
 async function guardarTracking(id) {
