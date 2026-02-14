@@ -2645,40 +2645,30 @@ async function cargarHistorialIngresos() {
 // Buscá tu función switchTab(tabId) y agregá esto al final:
 // if(tabId === 'tab-ingresos') cargarHistorialIngresos();
 async function ejecutarLogisticaDual() {
-    const desde = document.getElementById('transporte-desde').value; // Ej: "2026-02-14"
-    const hasta = document.getElementById('transporte-hasta').value; // Ej: "2026-02-14"
+    const desde = document.getElementById('transporte-desde').value;
+    const hasta = document.getElementById('transporte-hasta').value;
 
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
     try {
-        // 1. CONSULTA FLEXIBLE
-        // Pedimos un rango amplio para que el desfasaje de horario de Supabase no nos bloquee
+        // 1. CONSULTA IGUAL AL HISTORIAL
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
             .gte('fecha', desde + 'T00:00:00')
-            .lte('fecha', hasta + 'T23:59:59') // Quitamos el día extra para probar rango exacto
+            .lte('fecha', hasta + 'T23:59:59')
             .order('fecha', { ascending: false });
 
         if (error) throw error;
 
-        // 2. EL FILTRO INTELIGENTE
-        // En lugar de comparar objetos Date complicados, comparamos el TEXTO de la fecha
+        // 2. FILTRO DE SEGURIDAD (Si el escáner los mostró, esto los muestra)
+        // Quitamos cualquier comparación de fecha extra aquí, confiamos en la DB
         const pedidosValidos = pedidos.filter(p => {
-            // Sacamos solo el "2026-02-14" del pedido de la base
-            const fechaSoloDia = p.fecha.substring(0, 10);
-            
-            // Verificamos si el día está en el rango que elegiste
-            const estaEnRango = fechaSoloDia >= desde && fechaSoloDia <= hasta;
-            
-            // Verificamos estado (asegurándonos de que coincida con lo que vimos en el log)
             const st = p.estado ? p.estado.toUpperCase().trim() : "";
-            const estadoOk = (st === 'COMPLETADO' || st === 'PENDIENTE');
-            
-            return estaEnRango && estadoOk;
+            return st === 'COMPLETADO' || st === 'PENDIENTE';
         });
 
-        // --- RENDERIZADO DE TU TABLA (Original de Urban Riders) ---
+        // --- RENDERIZADO DE INTERFAZ (Tu diseño original) ---
         const msgVacio = document.getElementById('mensaje-transporte-vacio');
         const btnPdf = document.getElementById('btn-pdf-mayorista');
         const contenedor = document.getElementById('contenedor-correo');
@@ -2689,7 +2679,7 @@ async function ejecutarLogisticaDual() {
         contenedor.classList.add('hidden');
         body.innerHTML = '';
 
-        if (pedidosValidos.length === 0) {
+        if (!pedidosValidos || pedidosValidos.length === 0) {
             msgVacio.classList.remove('hidden');
             return;
         }
@@ -2730,7 +2720,7 @@ async function ejecutarLogisticaDual() {
             });
         }
     } catch (err) {
-        console.error("Error en carga final:", err);
+        console.error("Error final:", err);
     }
 }
 async function guardarTracking(id) {
