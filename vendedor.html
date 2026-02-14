@@ -330,35 +330,6 @@ async function logoutVendedor() {
                 // El vigilante de arriba detectará el SIGNED_OUT y mandará a acceso.html
             }
         }
-
-    </script>
-<div id="client-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4">
-    <div class="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl">
-        <div class="bg-black p-6 text-white flex justify-between items-center">
-            <h3 class="font-black uppercase tracking-tighter">Registrar Cliente</h3>
-            <button onclick="closeClientModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
-        </div>
-        <form id="form-nuevo-cliente" class="p-6 space-y-4">
-            <div>
-                <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Nombre Completo</label>
-                <input type="text" name="nombre" required class="w-full border-2 border-gray-100 rounded-xl p-3 focus:border-yellow-500 outline-none transition-all">
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Teléfono</label>
-                    <input type="text" name="telefono" class="w-full border-2 border-gray-100 rounded-xl p-3 focus:border-yellow-500 outline-none transition-all">
-                </div>
-                <div>
-                    <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Email (Opcional)</label>
-                    <input type="email" name="email" class="w-full border-2 border-gray-100 rounded-xl p-3 focus:border-yellow-500 outline-none transition-all">
-                </div>
-            </div>
-            <button type="submit" id="btn-guardar-cliente" class="w-full bg-black text-white font-black py-4 rounded-2xl uppercase tracking-widest hover:bg-yellow-500 hover:text-black transition-all">
-                Guardar Cliente
-            </button>
-        </form>
-    </div>
-</div>
 function openClientModal() {
     document.getElementById('client-modal').classList.remove('hidden');
 }
@@ -409,5 +380,35 @@ document.getElementById('form-nuevo-cliente').addEventListener('submit', async (
         btn.innerText = "GUARDAR CLIENTE";
     }
 });
+
+    </script>
+<div id="client-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl">
+        <div class="bg-black p-6 text-white flex justify-between items-center">
+            <h3 class="font-black uppercase tracking-tighter">Registrar Cliente</h3>
+            <button onclick="closeClientModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="form-nuevo-cliente" class="p-6 space-y-4">
+            <div>
+                <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Nombre Completo</label>
+                <input type="text" name="nombre" required class="w-full border-2 border-gray-100 rounded-xl p-3 focus:border-yellow-500 outline-none transition-all">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Teléfono</label>
+                    <input type="text" name="telefono" class="w-full border-2 border-gray-100 rounded-xl p-3 focus:border-yellow-500 outline-none transition-all">
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Email (Opcional)</label>
+                    <input type="email" name="email" class="w-full border-2 border-gray-100 rounded-xl p-3 focus:border-yellow-500 outline-none transition-all">
+                </div>
+            </div>
+            <button type="submit" id="btn-guardar-cliente" class="w-full bg-black text-white font-black py-4 rounded-2xl uppercase tracking-widest hover:bg-yellow-500 hover:text-black transition-all">
+                Guardar Cliente
+            </button>
+        </form>
+    </div>
+</div>
+
 </body>
 </html>
