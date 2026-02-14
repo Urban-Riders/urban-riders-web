@@ -2645,75 +2645,54 @@ async function cargarHistorialIngresos() {
 // Buscá tu función switchTab(tabId) y agregá esto al final:
 // if(tabId === 'tab-ingresos') cargarHistorialIngresos();
 async function ejecutarLogisticaDual() {
-    const desde = document.getElementById('transporte-desde').value;
-    const hasta = document.getElementById('transporte-hasta').value;
-
-    if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
+    console.log("Iniciando escáner total de tabla...");
+    const body = document.getElementById('tabla-minorista-body');
+    const msgVacio = document.getElementById('mensaje-transporte-vacio');
+    const contenedor = document.getElementById('contenedor-correo');
 
     try {
-        // 1. CONSULTA SIN FILTROS DE HORA (Solo fechas puras)
+        // PRUEBA RADICAL: Traer los últimos 10 pedidos de TODA la tabla
+        // Ignoramos los inputs de fecha del calendario por un momento
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
-            .gte('fecha', desde)
-            .lte('fecha', hasta + 'T23:59:59')
+            .limit(10)
             .order('fecha', { ascending: false });
 
         if (error) throw error;
 
-        // 2. PRUEBA DE FUEGO: NO FILTRAMOS NADA. 
-        // Si hay pedidos en Supabase para esa fecha, VAN A APARECER.
-        const pedidosValidos = pedidos; 
-
-        // --- RENDERIZADO ---
-        const msgVacio = document.getElementById('mensaje-transporte-vacio');
-        const btnPdf = document.getElementById('btn-pdf-mayorista');
-        const contenedor = document.getElementById('contenedor-correo');
-        const body = document.getElementById('tabla-minorista-body');
-
-        msgVacio.classList.add('hidden');
-        btnPdf.classList.add('hidden');
-        contenedor.classList.add('hidden');
         body.innerHTML = '';
+        contenedor.classList.remove('hidden');
+        msgVacio.classList.add('hidden');
 
-        if (!pedidosValidos || pedidosValidos.length === 0) {
-            msgVacio.classList.remove('hidden');
-            // Agregamos un log para que veas en la consola qué está llegando exactamente
-            console.log("Supabase devolvió esto:", pedidos);
+        if (!pedidos || pedidos.length === 0) {
+            body.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-500 font-bold">LA TABLA PEDIDOS ESTÁ VACÍA PARA LA API</td></tr>`;
             return;
         }
 
-        const minoristas = pedidosValidos.filter(p => !p.cliente_id);
-        const mayoristas = pedidosValidos.filter(p => p.cliente_id);
+        // Listamos lo que sea que haya encontrado para ver por qué no coincide con tu filtro
+        pedidos.forEach(p => {
+            body.innerHTML += `
+                <tr class="border-b bg-yellow-50">
+                    <td class="p-3">
+                        <div class="flex flex-col">
+                            <span class="font-bold">${p.cliente_nombre}</span>
+                            <span class="text-[10px] bg-black text-white px-1 w-fit">FECHA DB: ${p.fecha}</span>
+                        </div>
+                    </td>
+                    <td class="p-3 text-[10px]">
+                        ESTADO: <b>${p.estado}</b>
+                    </td>
+                    <td class="p-3 text-right text-[10px]">
+                        ID: ${p.id}
+                    </td>
+                </tr>`;
+        });
 
-        if (mayoristas.length > 0) btnPdf.classList.remove('hidden');
-        if (minoristas.length > 0) {
-            contenedor.classList.remove('hidden');
-            minoristas.forEach(p => {
-                body.innerHTML += `
-                    <tr class="border-b hover:bg-gray-50 transition">
-                        <td class="p-3">
-                            <div class="flex flex-col">
-                                <span class="font-bold">${p.cliente_nombre}</span>
-                                <span class="text-[10px] text-red-500 font-bold">ESTADO: ${p.estado}</span>
-                                <span class="text-[8px] text-blue-500 uppercase">${p.vendedor_nombre || 'WEB'}</span>
-                            </div>
-                        </td>
-                        <td class="p-3">
-                            <div class="flex gap-1">
-                                <input type="text" id="input-track-${p.id}" value="${p.tracking_number || ''}" 
-                                       class="border-2 border-gray-200 rounded px-2 py-1 text-[10px] w-32">
-                                <button onclick="guardarTracking(${p.id})" class="bg-black text-white px-3 py-1 rounded text-[9px] font-bold">OK</button>
-                            </div>
-                        </td>
-                        <td class="p-3 text-right">
-                            <span class="text-[9px] text-gray-400">${p.fecha}</span>
-                        </td>
-                    </tr>`;
-            });
-        }
+        console.log("Pedidos encontrados en la base:", pedidos);
+
     } catch (err) {
-        console.error("Error en diagnóstico:", err);
+        body.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-500">Error de conexión: ${err.message}</td></tr>`;
     }
 }
 async function guardarTracking(id) {
