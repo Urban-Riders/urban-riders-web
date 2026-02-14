@@ -2651,7 +2651,8 @@ async function ejecutarLogisticaDual() {
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
     try {
-        // 1. CONSULTA IGUAL AL HISTORIAL
+        // 1. CONSULTA DIRECTA (Lo que la DB diga, es ley)
+        // Usamos el formato del historial que sí funciona
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
@@ -2661,14 +2662,14 @@ async function ejecutarLogisticaDual() {
 
         if (error) throw error;
 
-        // 2. FILTRO DE SEGURIDAD (Si el escáner los mostró, esto los muestra)
-        // Quitamos cualquier comparación de fecha extra aquí, confiamos en la DB
+        // 2. FILTRO DE ESTADO ÚNICAMENTE
+        // Quitamos cualquier validación manual de fecha aquí para que no se borre nada
         const pedidosValidos = pedidos.filter(p => {
             const st = p.estado ? p.estado.toUpperCase().trim() : "";
             return st === 'COMPLETADO' || st === 'PENDIENTE';
         });
 
-        // --- RENDERIZADO DE INTERFAZ (Tu diseño original) ---
+        // --- RENDERIZADO (Tu lógica original de admin.txt) ---
         const msgVacio = document.getElementById('mensaje-transporte-vacio');
         const btnPdf = document.getElementById('btn-pdf-mayorista');
         const contenedor = document.getElementById('contenedor-correo');
