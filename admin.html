@@ -2650,23 +2650,27 @@ async function ejecutarLogisticaDual() {
 
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
-    // 1. Aplicamos tu lógica de "un día más" para que el servidor UTC no nos robe ventas
-    const fechaHastaObj = new Date(hasta + 'T12:00:00');
-    fechaHastaObj.setDate(fechaHastaObj.getDate() + 1);
-    const hastaPlus = fechaHastaObj.toISOString().split('T')[0];
+    // 1. LÓGICA DE SELECCIÓN MANUAL AUTOMATIZADA
+    // Si 'hasta' es 2026-02-14, 'hastaMañana' será 2026-02-15
+    const dateObj = new Date(hasta + 'T12:00:00');
+    dateObj.setDate(dateObj.getDate() + 1);
+    const hastaMañana = dateObj.toISOString().split('T')[0];
 
     try {
-        // 2. Usamos la sintaxis del HISTORIAL (con la T) que ya sabemos que la DB entiende
+        // 2. CONSULTA IGUAL AL HISTORIAL (Usando 'T' y el día extra)
+        // Traemos todo desde el inicio del día 'desde' hasta el final del día siguiente
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
-            .gte('fecha', desde + 'T00:00:00') 
-            .lte('fecha', hastaPlus + 'T23:59:59') 
+            .gte('fecha', desde + 'T00:00:00')
+            .lte('fecha', hastaMañana + 'T23:59:59') 
             .order('fecha', { ascending: false });
 
         if (error) throw error;
 
-        // 3. FILTRO DE SEGURIDAD (Mismo que el historial para que coincidan)
+        // 3. FILTRO DE SEGURIDAD (Mantiene tu lógica original)
+        // Aquí es donde "limpiamos" el día extra. Solo mostramos lo que 
+        // en texto puro coincide con el rango que elegiste (ej: 14 al 14).
         const pedidosValidos = pedidos.filter(p => {
             const fechaLimpia = p.fecha.substring(0, 10);
             const fechaEnRango = fechaLimpia >= desde && fechaLimpia <= hasta;
@@ -2677,7 +2681,7 @@ async function ejecutarLogisticaDual() {
             return fechaEnRango && estadoValido;
         });
 
-        // --- MANTENEMOS TU LÓGICA DE INTERFAZ INTACTA ---
+        // --- TU LÓGICA DE INTERFAZ (SIN CAMBIOS) ---
         const minoristas = pedidosValidos.filter(p => !p.cliente_id);
         const mayoristas = pedidosValidos.filter(p => p.cliente_id);
 
@@ -2725,11 +2729,13 @@ async function ejecutarLogisticaDual() {
                                 </a>` : 
                                 `<span class="text-gray-400 italic text-[9px]">PENDIENTE</span>`}
                         </td>
-                    </tr>`;
+                    </tr>
+                `;
             });
         }
     } catch (err) {
-        console.error("Error:", err);
+        console.error("Error cargando logística:", err);
+        alert("Error al cargar datos: " + err.message);
     }
 }
 async function guardarTracking(id) {
