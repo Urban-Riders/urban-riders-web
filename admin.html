@@ -2650,18 +2650,23 @@ async function ejecutarLogisticaDual() {
 
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
+    // Calculamos el día siguiente para la consulta de Supabase (Margen para UTC)
+    const fechaHastaObj = new Date(hasta);
+    fechaHastaObj.setDate(fechaHastaObj.getDate() + 1);
+    const hastaMañana = fechaHastaObj.toISOString().split('T')[0];
+
     try {
-        // 1. Obtener pedidos: Quitamos T y Z para que compare como TEXTO (igual que el historial)
+        // 1. Obtener pedidos: Traemos hasta el día siguiente para capturar el desfasaje UTC
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
-            .gte('fecha', desde + ' 00:00:00') 
-            .lte('fecha', hasta + ' 23:59:59')
+            .gte('fecha', desde) 
+            .lte('fecha', hastaMañana) 
             .order('fecha', { ascending: false });
 
         if (error) throw error;
 
-        // FILTRO DE SEGURIDAD (Mantenemos tu lógica intacta)
+        // FILTRO DE SEGURIDAD (Tu lógica exacta para limpiar el desfasaje y validar estado)
         const pedidosValidos = pedidos.filter(p => {
             const fechaLimpia = p.fecha.substring(0, 10);
             const fechaEnRango = fechaLimpia >= desde && fechaLimpia <= hasta;
