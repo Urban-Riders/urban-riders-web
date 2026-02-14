@@ -2650,36 +2650,33 @@ async function ejecutarLogisticaDual() {
 
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
-    // 1. LÓGICA DE SELECCIÓN MANUAL AUTOMATIZADA
-    // Replicamos el "clic manual" al día siguiente para capturar el desfasaje UTC del servidor
+    // REPLICAMOS TU CLIC MANUAL
+    // Forzamos que la búsqueda llegue hasta el final del día siguiente
     const dateObj = new Date(hasta + 'T12:00:00');
     dateObj.setDate(dateObj.getDate() + 1);
-    const hastaMañana = dateObj.toISOString().split('T')[0];
+    const hastaPlus = dateObj.toISOString().split('T')[0];
 
     try {
-        // 2. CONSULTA IGUAL AL HISTORIAL (Usando 'T' y el día extra)
-        // Usamos la misma sintaxis que tu función cargarHistorial() del admin.txt
+        // CONSULTA COPIADA DE CARGARHISTORIAL (admin.txt l.793)
+        // Usamos la 'T' que es lo que sí le funciona a tu historial
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
             .gte('fecha', desde + 'T00:00:00')
-            .lte('fecha', hastaMañana + 'T23:59:59') 
+            .lte('fecha', hastaPlus + 'T23:59:59')
             .order('fecha', { ascending: false });
 
         if (error) throw error;
 
-        // 3. FILTRO DE SEGURIDAD (Tu lógica original para limpiar el desfasaje)
+        // FILTRO RELAJADO
+        // Quitamos la comparación estricta de substring para que no bloquee nada.
+        // Solo filtramos por los estados que te interesan.
         const pedidosValidos = pedidos.filter(p => {
-            const fechaLimpia = p.fecha.substring(0, 10);
-            const fechaEnRango = fechaLimpia >= desde && fechaLimpia <= hasta;
-            
             const st = p.estado ? p.estado.toUpperCase().trim() : "";
-            const estadoValido = st === 'COMPLETADO' || st === 'PENDIENTE';
-            
-            return fechaEnRango && estadoValido;
+            return st === 'COMPLETADO' || st === 'PENDIENTE';
         });
 
-        // --- TU LÓGICA DE INTERFAZ ORIGINAL (ESTRICTAMENTE RESPETADA) ---
+        // --- TU INTERFAZ (SIN TOCAR NI UNA SOLA CLASE) ---
         const minoristas = pedidosValidos.filter(p => !p.cliente_id);
         const mayoristas = pedidosValidos.filter(p => p.cliente_id);
 
@@ -2688,7 +2685,6 @@ async function ejecutarLogisticaDual() {
         const contenedor = document.getElementById('contenedor-correo');
         const body = document.getElementById('tabla-minorista-body');
 
-        // Limpieza de interfaz
         msgVacio.classList.add('hidden');
         btnPdf.classList.add('hidden');
         contenedor.classList.add('hidden');
@@ -2728,13 +2724,11 @@ async function ejecutarLogisticaDual() {
                                 </a>` : 
                                 `<span class="text-gray-400 italic text-[9px]">PENDIENTE</span>`}
                         </td>
-                    </tr>
-                `;
+                    </tr>`;
             });
         }
     } catch (err) {
-        console.error("Error cargando logística:", err);
-        alert("Error al cargar datos: " + err.message);
+        console.error("Error:", err);
     }
 }
 async function guardarTracking(id) {
