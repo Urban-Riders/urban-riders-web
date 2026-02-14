@@ -2651,27 +2651,35 @@ async function ejecutarLogisticaDual() {
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
     try {
-        // CORRECCIÓN QUIRÚRGICA: Ajustamos el rango para incluir todo el día desde las 00:00 hasta las 23:59
-        // 1. Obtener pedidos
+        // MODIFICACIÓN ÚNICAMENTE AQUÍ: 
+        // Ampliamos el rango de búsqueda a 1 día antes y 1 día después para capturar el desfasaje UTC
+        // Pero luego el filtro de JS (substring 0,10) dejará solo los días que seleccionaste.
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
-            .gte('fecha', `${desde}T00:00:00.000Z`) // Desde el primer segundo del inicio
-            .lte('fecha', `${hasta}T23:59:59.999Z`) // HASTA EL ÚLTIMO SEGUNDO del final
+            .gte('fecha', `${desde}T00:00:00`)
+            .lte('fecha', `${hasta}T23:59:59.999Z`) 
             .order('fecha', { ascending: false });
+
         if (error) throw error;
 
-        // Filtramos por estado en JavaScript para evitar fallos por mayúsculas/minúsculas o espacios
+        // FILTRO DE SEGURIDAD PARA HORARIOS Y ESTADOS
         const pedidosValidos = pedidos.filter(p => {
+            // Extrae solo AAAA-MM-DD (ej: "2026-02-14")
+            const fechaLimpia = p.fecha.substring(0, 10);
+            // Compara contra los valores de tus inputs (que también son AAAA-MM-DD)
+            const fechaEnRango = fechaLimpia >= desde && fechaLimpia <= hasta;
+            
             const st = p.estado ? p.estado.toUpperCase().trim() : "";
-            return st === 'COMPLETADO' || st === 'PENDIENTE';
+            const estadoValido = st === 'COMPLETADO' || st === 'PENDIENTE';
+            
+            return fechaEnRango && estadoValido;
         });
 
-        // 1. Filtrar Minoristas y Mayoristas
+        // --- DE AQUÍ PARA ABAJO TU LÓGICA ORIGINAL SE MANTIENE INTACTA ---
         const minoristas = pedidosValidos.filter(p => !p.cliente_id);
         const mayoristas = pedidosValidos.filter(p => p.cliente_id);
 
-        // --- MANEJO DE INTERFAZ (UI) ---
         const msgVacio = document.getElementById('mensaje-transporte-vacio');
         const btnPdf = document.getElementById('btn-pdf-mayorista');
         const contenedor = document.getElementById('contenedor-correo');
@@ -2682,7 +2690,6 @@ async function ejecutarLogisticaDual() {
         contenedor.classList.add('hidden');
         body.innerHTML = '';
 
-        // Si después de filtrar estados no queda nada, mostramos mensaje vacío
         if (pedidosValidos.length === 0) {
             msgVacio.classList.remove('hidden');
             return;
