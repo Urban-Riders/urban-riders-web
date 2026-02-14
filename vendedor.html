@@ -375,7 +375,7 @@ document.addEventListener('submit', async (e) => {
             
             // Limpiar buscador y refrescar lista
             document.getElementById('search-cliente').value = '';
-            await fetchInitialData(); // Esta función ya existe en tu vendedor.txt
+            await await init(); // Esta función ya existe en tu vendedor.txt
             renderClientes(clientes); // Esta función también existe
 
         } catch (err) {
