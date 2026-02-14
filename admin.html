@@ -2650,20 +2650,26 @@ async function ejecutarLogisticaDual() {
 
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
+    // 1. ENSANCHAMOS LA RED: Calculamos el día siguiente al "hasta"
+    // Esto es para que Supabase traiga los pedidos que por el huso horario ya son día 15
+    const fechaHastaPlus = new Date(hasta);
+    fechaHastaPlus.setDate(fechaHastaPlus.getDate() + 1);
+    const hastaMargen = fechaHastaPlus.toISOString().split('T')[0];
+
     try {
-        // EL CAMBIO REAL: Enviamos las fechas limpias (AAAA-MM-DD).
-        // Supabase es suficientemente inteligente para entender el rango diario
-        // si no le forzamos un string de hora que rompa la comparación.
+        // 2. Pedimos a Supabase un rango más amplio (hasta el día siguiente)
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
             .gte('fecha', desde) 
-            .lte('fecha', hasta + 'T23:59:59.999Z') 
+            .lte('fecha', hastaMargen + ' 23:59:59')
             .order('fecha', { ascending: false });
 
         if (error) throw error;
 
-        // FILTRO DE SEGURIDAD (Tu lógica original intacta)
+        // 3. FILTRO LOCAL: Aquí es donde "domamos" los datos.
+        // Aunque Supabase trajo cosas del día 15, nosotros solo mostramos lo que 
+        // según el horario de Argentina (substring 0,10) es el día que vos pediste.
         const pedidosValidos = pedidos.filter(p => {
             const fechaLimpia = p.fecha.substring(0, 10);
             const fechaEnRango = fechaLimpia >= desde && fechaLimpia <= hasta;
@@ -2674,7 +2680,7 @@ async function ejecutarLogisticaDual() {
             return fechaEnRango && estadoValido;
         });
 
-        // --- DE AQUÍ PARA ABAJO TU LÓGICA ORIGINAL SE MANTIENE INTACTA ---
+        // --- TU LÓGICA DE INTERFAZ SE MANTIENE 100% IGUAL ---
         const minoristas = pedidosValidos.filter(p => !p.cliente_id);
         const mayoristas = pedidosValidos.filter(p => p.cliente_id);
 
