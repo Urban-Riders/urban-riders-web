@@ -2650,23 +2650,20 @@ async function ejecutarLogisticaDual() {
 
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
-    // Ajuste de margen para UTC: traemos un día extra de la base de datos 
-    // para capturar las ventas que entran después de las 21:00 hs.
-    const fechaHastaAux = new Date(hasta);
-    fechaHastaAux.setDate(fechaHastaAux.getDate() + 1);
-    const hastaMargen = fechaHastaAux.toISOString().split('T')[0];
-
     try {
+        // EL CAMBIO REAL: Enviamos las fechas limpias (AAAA-MM-DD).
+        // Supabase es suficientemente inteligente para entender el rango diario
+        // si no le forzamos un string de hora que rompa la comparación.
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
             .gte('fecha', desde) 
-            .lte('fecha', hastaMargen) 
+            .lte('fecha', hasta + 'T23:59:59.999Z') 
             .order('fecha', { ascending: false });
 
         if (error) throw error;
 
-        // FILTRO DE SEGURIDAD (Mantiene tu lógica original exacta)
+        // FILTRO DE SEGURIDAD (Tu lógica original intacta)
         const pedidosValidos = pedidos.filter(p => {
             const fechaLimpia = p.fecha.substring(0, 10);
             const fechaEnRango = fechaLimpia >= desde && fechaLimpia <= hasta;
