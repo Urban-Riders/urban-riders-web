@@ -2651,29 +2651,24 @@ async function ejecutarLogisticaDual() {
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
     try {
-        // LA SOLUCIÓN DEFINITIVA: 
-        // En lugar de enviar horas (00:00:00), enviamos solo la fecha.
-        // Y pedimos un rango más amplio para que la RLS no nos bloquee los pedidos nocturnos.
-        
+        // ESTA ES LA CONSULTA ULTRA-SIMPLIFICADA
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
-            .gte('fecha', desde) // Supabase entiende el string 'YYYY-MM-DD'
-            .lte('fecha', hasta + 'T23:59:59.999Z') // Forzamos el fin del día en formato Z (Zulu/UTC)
+            .gte('fecha', desde + 'T00:00:00')
+            .lte('fecha', hasta + 'T23:59:59')
             .order('fecha', { ascending: false });
 
         if (error) throw error;
 
-        // Filtramos localmente solo por el ESTADO, ya que la fecha ya viene filtrada por Supabase
+        // NO FILTRAMOS POR FECHA EN JS (Para que no se borre nada)
+        // Solo filtramos que el estado sea válido
         const pedidosValidos = pedidos.filter(p => {
             const st = p.estado ? p.estado.toUpperCase().trim() : "";
             return st === 'COMPLETADO' || st === 'PENDIENTE';
         });
 
-        // --- RENDERIZADO DE TABLA (Tu lógica de admin.txt) ---
-        const minoristas = pedidosValidos.filter(p => !p.cliente_id);
-        const mayoristas = pedidosValidos.filter(p => p.cliente_id);
-
+        // --- RENDERIZADO (Tal cual está en tu admin.txt) ---
         const msgVacio = document.getElementById('mensaje-transporte-vacio');
         const btnPdf = document.getElementById('btn-pdf-mayorista');
         const contenedor = document.getElementById('contenedor-correo');
@@ -2688,6 +2683,9 @@ async function ejecutarLogisticaDual() {
             msgVacio.classList.remove('hidden');
             return;
         }
+
+        const minoristas = pedidosValidos.filter(p => !p.cliente_id);
+        const mayoristas = pedidosValidos.filter(p => p.cliente_id);
 
         if (mayoristas.length > 0) btnPdf.classList.remove('hidden');
 
@@ -2722,7 +2720,7 @@ async function ejecutarLogisticaDual() {
             });
         }
     } catch (err) {
-        console.error("Error crítico:", err);
+        console.error("Error:", err);
     }
 }
 async function guardarTracking(id) {
