@@ -2650,65 +2650,81 @@ async function ejecutarLogisticaDual() {
 
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
-    // Traemos los pedidos de la tabla 'pedidos' según tu catálogo
-    const { data: pedidos, error } = await _supabase
-        .from('pedidos')
-        .select('*')
-        .gte('fecha', `${desde}T00:00:00`)
-        .lte('fecha', `${hasta}T23:59:59`)
-        .order('fecha', { ascending: false });
+    try {
+        // Usamos solo las fechas sin la "T" para que Supabase lo maneje de forma nativa
+        // Agregamos un filtro de estado para que solo traiga lo que realmente debe despacharse
+        const { data: pedidos, error } = await _supabase
+            .from('pedidos')
+            .select('*')
+            .gte('fecha', desde) 
+            .lte('fecha', hasta + 'T23:59:59') // Aseguramos que tome todo el último día
+            .or('estado.eq.COMPLETADO,estado.eq.PENDIENTE,estado.eq.pendiente')
+            .order('fecha', { ascending: false });
 
-    if (error) return console.error("Error cargando logística:", error);
+        if (error) throw error;
 
-    // 1. Filtrar Minoristas (Los que NO tienen cliente_id vinculado a la tabla clientes)
-    const minoristas = pedidos.filter(p => !p.cliente_id);
-    const mayoristas = pedidos.filter(p => p.cliente_id);
+        // 1. Filtrar Minoristas (Los que NO tienen cliente_id)
+        // Usamos !! para forzar booleano y asegurar que null/undefined se manejen bien
+        const minoristas = pedidos.filter(p => !p.cliente_id);
+        const mayoristas = pedidos.filter(p => p.cliente_id);
 
-    // Manejo de UI
-    document.getElementById('mensaje-transporte-vacio').classList.add('hidden');
-    
-    // Si hay mayoristas, habilitamos tu botón de PDF original
-    if (mayoristas.length > 0) {
-        document.getElementById('btn-pdf-mayorista').classList.remove('hidden');
-    }
+        // --- MANEJO DE INTERFAZ (UI) ---
+        const msgVacio = document.getElementById('mensaje-transporte-vacio');
+        const btnPdf = document.getElementById('btn-pdf-mayorista');
+        const contenedor = document.getElementById('contenedor-correo');
+        const body = document.getElementById('tabla-minorista-body');
 
-    // Renderizar tabla de Correo Argentino
-    const body = document.getElementById('tabla-minorista-body');
-    const contenedor = document.getElementById('contenedor-correo');
-    body.innerHTML = '';
-
-    if (minoristas.length > 0) {
-        contenedor.classList.remove('hidden');
-        minoristas.forEach(p => {
-            body.innerHTML += `
-                <tr class="border-b hover:bg-gray-50 transition">
-                    <td class="p-3">
-                        <div class="flex flex-col">
-                            <span>${p.cliente_nombre}</span>
-                            <span class="text-[8px] text-blue-500">${p.vendedor_nombre || 'WEB'}</span>
-                        </div>
-                    </td>
-                    <td class="p-3">
-                        <div class="flex gap-1">
-                            <input type="text" id="input-track-${p.id}" value="${p.tracking_number || ''}" 
-                                   placeholder="CP...AR"
-                                   class="border rounded px-2 py-1 text-[10px] w-32 outline-none focus:border-yellow-500">
-                            <button onclick="guardarTracking(${p.id})" class="bg-black text-white px-2 py-1 rounded text-[9px]">OK</button>
-                        </div>
-                    </td>
-                    <td class="p-3 text-right">
-                        ${p.tracking_number ? 
-                            `<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${p.tracking_number}" 
-                               target="_blank" class="text-yellow-600 hover:text-black transition">
-                               <i class="fas fa-truck mr-1"></i> RASTREAR
-                            </a>` : 
-                            `<span class="text-gray-300 italic text-[9px]">SIN CARGAR</span>`}
-                    </td>
-                </tr>
-            `;
-        });
-    } else {
+        // Reset inicial de visibilidad
+        msgVacio.classList.add('hidden');
+        btnPdf.classList.add('hidden');
         contenedor.classList.add('hidden');
+        body.innerHTML = '';
+
+        if (pedidos.length === 0) {
+            msgVacio.classList.remove('hidden');
+            return;
+        }
+
+        // Si hay mayoristas, habilitamos el botón de PDF
+        if (mayoristas.length > 0) {
+            btnPdf.classList.remove('hidden');
+        }
+
+        // Renderizar tabla de Minoristas (Correo Argentino)
+        if (minoristas.length > 0) {
+            contenedor.classList.remove('hidden');
+            minoristas.forEach(p => {
+                body.innerHTML += `
+                    <tr class="border-b hover:bg-gray-50 transition">
+                        <td class="p-3">
+                            <div class="flex flex-col">
+                                <span class="font-bold">${p.cliente_nombre}</span>
+                                <span class="text-[8px] text-blue-500 uppercase">${p.vendedor_nombre || 'WEB'}</span>
+                            </div>
+                        </td>
+                        <td class="p-3">
+                            <div class="flex gap-1">
+                                <input type="text" id="input-track-${p.id}" value="${p.tracking_number || ''}" 
+                                       placeholder="CP...AR"
+                                       class="border-2 border-gray-200 rounded px-2 py-1 text-[10px] w-32 outline-none focus:border-black">
+                                <button onclick="guardarTracking(${p.id})" class="bg-black text-white px-3 py-1 rounded text-[9px] font-bold hover:bg-gray-800">OK</button>
+                            </div>
+                        </td>
+                        <td class="p-3 text-right">
+                            ${p.tracking_number ? 
+                                `<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${p.tracking_number}" 
+                                   target="_blank" class="text-blue-600 font-bold hover:underline text-[10px]">
+                                   <i class="fas fa-truck mr-1"></i> RASTREAR
+                                </a>` : 
+                                `<span class="text-gray-400 italic text-[9px]">PENDIENTE</span>`}
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+    } catch (err) {
+        console.error("Error cargando logística:", err);
+        alert("Error al cargar datos: " + err.message);
     }
 }
 
