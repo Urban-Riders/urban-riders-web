@@ -330,56 +330,64 @@ async function logoutVendedor() {
                 // El vigilante de arriba detectará el SIGNED_OUT y mandará a acceso.html
             }
         }
+/* --- INICIO BLOQUE NUEVO CLIENTE --- */
+// Palabra clave: FUNCIONES_MODAL
 function openClientModal() {
-    document.getElementById('client-modal').classList.remove('hidden');
+    const modal = document.getElementById('client-modal');
+    if (modal) modal.classList.remove('hidden');
 }
 
 function closeClientModal() {
-    document.getElementById('client-modal').classList.add('hidden');
-    document.getElementById('form-nuevo-cliente').reset();
+    const modal = document.getElementById('client-modal');
+    const form = document.getElementById('form-nuevo-cliente');
+    if (modal) modal.classList.add('hidden');
+    if (form) form.reset();
 }
 
-document.getElementById('form-nuevo-cliente').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn = document.getElementById('btn-guardar-cliente');
-    btn.disabled = true;
-    btn.innerText = "GUARDANDO...";
-
-    const formData = new FormData(e.target);
-    const nuevoCliente = {
-        nombre: formData.get('nombre'),
-        telefono: formData.get('telefono'),
-        email: formData.get('email'),
-        saldo: 0,
-        limite_credito: 0
-    };
-
-    try {
-        const { error } = await _supabase.from('clientes').insert([nuevoCliente]);
-        if (error) throw error;
-
-        alert("✅ CLIENTE AGREGADO CON ÉXITO");
+// Palabra clave: ESCUCHADOR_SUBMIT
+// Escuchamos a nivel documento para evitar el error de "null"
+document.addEventListener('submit', async (e) => {
+    if (e.target && e.target.id === 'form-nuevo-cliente') {
+        e.preventDefault(); // EVITA RECARGA Y URL CON ?nombre=...
         
-        // Limpiamos el buscador para que el nuevo cliente sea visible
-        document.getElementById('search-cliente').value = '';
+        const form = e.target;
+        const btn = document.getElementById('btn-guardar-cliente');
         
-        // 1. Cerramos el modal
-        closeClientModal();
-        
-        // 2. RECARGAMOS LOS DATOS (Usando el nombre correcto: fetchInitialData)
-        await fetchInitialData(); 
-        
-        // 3. ACTUALIZAMOS LA VISTA (Para que aparezca en el listado de pedidos)
-        renderClientes(clientes);
+        btn.disabled = true;
+        btn.innerText = "GUARDANDO...";
 
-    } catch (err) {
-        alert("Error al guardar: " + err.message);
-        console.error(err);
-    } finally {
-        btn.disabled = false;
-        btn.innerText = "GUARDAR CLIENTE";
+        const nuevoCliente = {
+            nombre: form.nombre.value,
+            telefono: form.telefono.value,
+            email: form.email.value,
+            saldo: 0,
+            limite_credito: 0
+        };
+
+        try {
+            // Inserción en Supabase
+            const { data, error } = await _supabase.from('clientes').insert([nuevoCliente]).select();
+            
+            if (error) throw error;
+
+            alert("✅ CLIENTE CREADO EXITOSAMENTE");
+            closeClientModal();
+            
+            // Limpiar buscador y refrescar lista
+            document.getElementById('search-cliente').value = '';
+            await fetchInitialData(); // Esta función ya existe en tu vendedor.txt
+            renderClientes(clientes); // Esta función también existe
+
+        } catch (err) {
+            console.error("Error detallado:", err);
+            alert("Error al guardar: " + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "GUARDAR CLIENTE";
+        }
     }
 });
+/* --- FIN BLOQUE NUEVO CLIENTE --- */
 
     </script>
 <div id="client-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4">
