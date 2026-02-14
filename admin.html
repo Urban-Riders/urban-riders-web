@@ -2651,23 +2651,20 @@ async function ejecutarLogisticaDual() {
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
     try {
-        // MODIFICACIÓN ÚNICAMENTE AQUÍ: 
-        // Ampliamos el rango de búsqueda a 1 día antes y 1 día después para capturar el desfasaje UTC
-        // Pero luego el filtro de JS (substring 0,10) dejará solo los días que seleccionaste.
+        // CAMBIO QUIRÚRGICO: Eliminamos la 'T' y la 'Z' para que la comparación 
+        // sea de texto simple, igual que en el historial que sí te funciona.
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
-            .gte('fecha', `${desde}T00:00:00`)
-            .lte('fecha', `${hasta}T23:59:59.999Z`) 
+            .gte('fecha', `${desde} 00:00:00`)
+            .lte('fecha', `${hasta} 23:59:59`) 
             .order('fecha', { ascending: false });
 
         if (error) throw error;
 
-        // FILTRO DE SEGURIDAD PARA HORARIOS Y ESTADOS
+        // FILTRO DE SEGURIDAD PARA HORARIOS Y ESTADOS (Mantenemos tu lógica)
         const pedidosValidos = pedidos.filter(p => {
-            // Extrae solo AAAA-MM-DD (ej: "2026-02-14")
             const fechaLimpia = p.fecha.substring(0, 10);
-            // Compara contra los valores de tus inputs (que también son AAAA-MM-DD)
             const fechaEnRango = fechaLimpia >= desde && fechaLimpia <= hasta;
             
             const st = p.estado ? p.estado.toUpperCase().trim() : "";
