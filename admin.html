@@ -2652,13 +2652,13 @@ async function ejecutarLogisticaDual() {
 
     try {
         // CORRECCIÓN QUIRÚRGICA: Ajustamos el rango para incluir todo el día desde las 00:00 hasta las 23:59
+        // 1. Obtener pedidos
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
-            .gte('fecha', `${desde}T00:00:00.000Z`) 
-            .lte('fecha', `${hasta}T23:59:59.999Z`)
+            .gte('fecha', `${desde}T00:00:00.000Z`) // Desde el primer segundo del inicio
+            .lte('fecha', `${hasta}T23:59:59.999Z`) // HASTA EL ÚLTIMO SEGUNDO del final
             .order('fecha', { ascending: false });
-
         if (error) throw error;
 
         // Filtramos por estado en JavaScript para evitar fallos por mayúsculas/minúsculas o espacios
