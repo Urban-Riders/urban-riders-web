@@ -2651,22 +2651,25 @@ async function ejecutarLogisticaDual() {
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
     try {
-        // Usamos solo las fechas sin la "T" para que Supabase lo maneje de forma nativa
-        // Agregamos un filtro de estado para que solo traiga lo que realmente debe despacharse
+        // CORRECCIÓN QUIRÚRGICA: Ajustamos el rango para incluir todo el día desde las 00:00 hasta las 23:59
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
-            .gte('fecha', desde) 
-            .lte('fecha', hasta + 'T23:59:59') // Aseguramos que tome todo el último día
-            .or('estado.eq.COMPLETADO,estado.eq.PENDIENTE,estado.eq.pendiente')
+            .gte('fecha', `${desde}T00:00:00.000Z`) 
+            .lte('fecha', `${hasta}T23:59:59.999Z`)
             .order('fecha', { ascending: false });
 
         if (error) throw error;
 
-        // 1. Filtrar Minoristas (Los que NO tienen cliente_id)
-        // Usamos !! para forzar booleano y asegurar que null/undefined se manejen bien
-        const minoristas = pedidos.filter(p => !p.cliente_id);
-        const mayoristas = pedidos.filter(p => p.cliente_id);
+        // Filtramos por estado en JavaScript para evitar fallos por mayúsculas/minúsculas o espacios
+        const pedidosValidos = pedidos.filter(p => {
+            const st = p.estado ? p.estado.toUpperCase().trim() : "";
+            return st === 'COMPLETADO' || st === 'PENDIENTE';
+        });
+
+        // 1. Filtrar Minoristas y Mayoristas
+        const minoristas = pedidosValidos.filter(p => !p.cliente_id);
+        const mayoristas = pedidosValidos.filter(p => p.cliente_id);
 
         // --- MANEJO DE INTERFAZ (UI) ---
         const msgVacio = document.getElementById('mensaje-transporte-vacio');
@@ -2674,23 +2677,21 @@ async function ejecutarLogisticaDual() {
         const contenedor = document.getElementById('contenedor-correo');
         const body = document.getElementById('tabla-minorista-body');
 
-        // Reset inicial de visibilidad
         msgVacio.classList.add('hidden');
         btnPdf.classList.add('hidden');
         contenedor.classList.add('hidden');
         body.innerHTML = '';
 
-        if (pedidos.length === 0) {
+        // Si después de filtrar estados no queda nada, mostramos mensaje vacío
+        if (pedidosValidos.length === 0) {
             msgVacio.classList.remove('hidden');
             return;
         }
 
-        // Si hay mayoristas, habilitamos el botón de PDF
         if (mayoristas.length > 0) {
             btnPdf.classList.remove('hidden');
         }
 
-        // Renderizar tabla de Minoristas (Correo Argentino)
         if (minoristas.length > 0) {
             contenedor.classList.remove('hidden');
             minoristas.forEach(p => {
@@ -2727,7 +2728,6 @@ async function ejecutarLogisticaDual() {
         alert("Error al cargar datos: " + err.message);
     }
 }
-
 async function guardarTracking(id) {
     const tracking = document.getElementById(`input-track-${id}`).value.toUpperCase().trim();
     if (!tracking) return alert("Ingresa un código válido");
