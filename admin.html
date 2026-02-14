@@ -2650,75 +2650,68 @@ async function ejecutarLogisticaDual() {
 
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
-    try {
-        // 1. CONSULTA IGUAL AL ESCÁNER (Sin vueltas)
-        const { data: pedidos, error } = await _supabase
-            .from('pedidos')
-            .select('*')
-            .gte('fecha', desde + 'T00:00:00')
-            .lte('fecha', hasta + 'T23:59:59')
-            .order('fecha', { ascending: false });
+    // Traemos los pedidos de la tabla 'pedidos' según tu catálogo
+    const { data: pedidos, error } = await _supabase
+        .from('pedidos')
+        .select('*')
+        .gte('fecha', `${desde}T00:00:00`)
+        .lte('fecha', `${hasta}T23:59:59`)
+        .order('fecha', { ascending: false });
 
-        if (error) throw error;
+    if (error) return console.error("Error cargando logística:", error);
 
-        const body = document.getElementById('tabla-minorista-body');
-        const msgVacio = document.getElementById('mensaje-transporte-vacio');
-        const contenedor = document.getElementById('contenedor-correo');
-        const btnPdf = document.getElementById('btn-pdf-mayorista');
+    // 1. Filtrar Minoristas (Los que NO tienen cliente_id vinculado a la tabla clientes)
+    const minoristas = pedidos.filter(p => !p.cliente_id);
+    const mayoristas = pedidos.filter(p => p.cliente_id);
 
-        body.innerHTML = '';
-        
-        // Si la base de datos no devuelve nada, mostramos el mensaje
-        if (!pedidos || pedidos.length === 0) {
-            msgVacio.classList.remove('hidden');
-            contenedor.classList.add('hidden');
-            btnPdf.classList.add('hidden');
-            return;
-        }
+    // Manejo de UI
+    document.getElementById('mensaje-transporte-vacio').classList.add('hidden');
+    
+    // Si hay mayoristas, habilitamos tu botón de PDF original
+    if (mayoristas.length > 0) {
+        document.getElementById('btn-pdf-mayorista').classList.remove('hidden');
+    }
 
-        // Si devuelve algo, lo mostramos TODO (Sin filtros de JS)
-        msgVacio.classList.add('hidden');
+    // Renderizar tabla de Correo Argentino
+    const body = document.getElementById('tabla-minorista-body');
+    const contenedor = document.getElementById('contenedor-correo');
+    body.innerHTML = '';
+
+    if (minoristas.length > 0) {
         contenedor.classList.remove('hidden');
-
-        // Activamos PDF si hay mayoristas
-        if (pedidos.some(p => p.cliente_id)) btnPdf.classList.remove('hidden');
-
-        pedidos.forEach(p => {
-            // Solo separamos visualmente minoristas para tu tabla principal
-            if (!p.cliente_id) {
-                body.innerHTML += `
-                    <tr class="border-b hover:bg-gray-50 transition">
-                        <td class="p-3">
-                            <div class="flex flex-col">
-                                <span class="font-bold">${p.cliente_nombre || 'Sin Nombre'}</span>
-                                <span class="text-[8px] text-blue-500 uppercase">${p.vendedor_nombre || 'WEB'}</span>
-                                <span class="text-[7px] text-gray-400">${p.fecha}</span>
-                            </div>
-                        </td>
-                        <td class="p-3">
-                            <div class="flex gap-1">
-                                <input type="text" id="input-track-${p.id}" value="${p.tracking_number || ''}" 
-                                       placeholder="CP...AR"
-                                       class="border-2 border-gray-200 rounded px-2 py-1 text-[10px] w-32 outline-none focus:border-black">
-                                <button onclick="guardarTracking(${p.id})" class="bg-black text-white px-3 py-1 rounded text-[9px] font-bold">OK</button>
-                            </div>
-                        </td>
-                        <td class="p-3 text-right">
-                            ${p.tracking_number ? 
-                                `<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${p.tracking_number}" 
-                                   target="_blank" class="text-blue-600 font-bold hover:underline text-[10px]">
-                                   <i class="fas fa-truck mr-1"></i> RASTREAR
-                                </a>` : 
-                                `<span class="text-gray-400 italic text-[9px]">PENDIENTE</span>`}
-                        </td>
-                    </tr>`;
-            }
+        minoristas.forEach(p => {
+            body.innerHTML += `
+                <tr class="border-b hover:bg-gray-50 transition">
+                    <td class="p-3">
+                        <div class="flex flex-col">
+                            <span>${p.cliente_nombre}</span>
+                            <span class="text-[8px] text-blue-500">${p.vendedor_nombre || 'WEB'}</span>
+                        </div>
+                    </td>
+                    <td class="p-3">
+                        <div class="flex gap-1">
+                            <input type="text" id="input-track-${p.id}" value="${p.tracking_number || ''}" 
+                                   placeholder="CP...AR"
+                                   class="border rounded px-2 py-1 text-[10px] w-32 outline-none focus:border-yellow-500">
+                            <button onclick="guardarTracking(${p.id})" class="bg-black text-white px-2 py-1 rounded text-[9px]">OK</button>
+                        </div>
+                    </td>
+                    <td class="p-3 text-right">
+                        ${p.tracking_number ? 
+                            `<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${p.tracking_number}" 
+                               target="_blank" class="text-yellow-600 hover:text-black transition">
+                               <i class="fas fa-truck mr-1"></i> RASTREAR
+                            </a>` : 
+                            `<span class="text-gray-300 italic text-[9px]">SIN CARGAR</span>`}
+                    </td>
+                </tr>
+            `;
         });
-
-    } catch (err) {
-        console.error("Error definitivo:", err);
+    } else {
+        contenedor.classList.add('hidden');
     }
 }
+
 async function guardarTracking(id) {
     const tracking = document.getElementById(`input-track-${id}`).value.toUpperCase().trim();
     if (!tracking) return alert("Ingresa un código válido");
