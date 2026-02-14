@@ -352,12 +352,22 @@ document.getElementById('form-nuevo-cliente').addEventListener('submit', async (
         if (error) throw error;
 
         alert("✅ CLIENTE AGREGADO CON ÉXITO");
+        
+        // Limpiamos el buscador para que el nuevo cliente sea visible
+        document.getElementById('search-cliente').value = '';
+        
+        // 1. Cerramos el modal
         closeClientModal();
         
-        // Recargamos los datos para que aparezca en la lista del vendedor
+        // 2. RECARGAMOS LOS DATOS (Usando el nombre correcto: fetchInitialData)
         await fetchInitialData(); 
+        
+        // 3. ACTUALIZAMOS LA VISTA (Para que aparezca en el listado de pedidos)
+        renderClientes(clientes);
+
     } catch (err) {
         alert("Error al guardar: " + err.message);
+        console.error(err);
     } finally {
         btn.disabled = false;
         btn.innerText = "GUARDAR CLIENTE";
