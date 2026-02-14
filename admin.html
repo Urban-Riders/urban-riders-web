@@ -2650,37 +2650,38 @@ async function ejecutarLogisticaDual() {
 
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
-    // 1. EL TRUCO: Le pedimos a la DB hasta el día siguiente (hasta + 1)
-    // porque tus ventas de la noche ya tienen fecha del día siguiente para Supabase.
-    const fechaHastaObj = new Date(hasta + 'T12:00:00'); 
-    fechaHastaObj.setDate(fechaHastaObj.getDate() + 1);
-    const hastaMañana = fechaHastaObj.toISOString().split('T')[0];
-
     try {
-        // 2. Traemos un rango más grande para no perder los pedidos nocturnos
+        // 1. Ampliamos el rango de búsqueda en la DB (2 días extra para seguridad absoluta)
+        const fechaHastaObj = new Date(hasta + 'T12:00:00');
+        fechaHastaObj.setDate(fechaHastaObj.getDate() + 2);
+        const hastaMargen = fechaHastaObj.toISOString().split('T')[0];
+
         const { data: pedidos, error } = await _supabase
             .from('pedidos')
             .select('*')
-            .gte('fecha', desde) 
-            .lte('fecha', hastaMañana + ' 23:59:59')
+            .gte('fecha', desde + ' 00:00:00') 
+            .lte('fecha', hastaMargen + ' 23:59:59')
             .order('fecha', { ascending: false });
 
         if (error) throw error;
 
-        // 3. FILTRO DE SEGURIDAD (Tu lógica exacta)
-        // Aunque trajimos cosas del día 15, acá solo dejamos pasar lo que
-        // en texto (YYYY-MM-DD) coincide con lo que vos elegiste.
+        // 2. FILTRO FLEXIBLE: Convertimos la fecha de la DB a objeto Date
+        // para que JavaScript maneje la zona horaria de Argentina (-3) automáticamente.
         const pedidosValidos = pedidos.filter(p => {
-            const fechaLimpia = p.fecha.substring(0, 10);
-            const fechaEnRango = fechaLimpia >= desde && fechaLimpia <= hasta;
+            const fechaPedido = new Date(p.fecha);
+            const inicio = new Date(desde + 'T00:00:00');
+            const fin = new Date(hasta + 'T23:59:59');
+
+            // Verificamos si la fecha del pedido cae dentro del rango real de tiempo
+            const enRango = fechaPedido >= inicio && fechaPedido <= fin;
             
             const st = p.estado ? p.estado.toUpperCase().trim() : "";
             const estadoValido = st === 'COMPLETADO' || st === 'PENDIENTE';
             
-            return fechaEnRango && estadoValido;
+            return enRango && estadoValido;
         });
 
-        // --- TU LÓGICA ORIGINAL DE INTERFAZ SE MANTIENE INTACTA ---
+        // --- TU LÓGICA DE INTERFAZ (SIN CAMBIOS) ---
         const minoristas = pedidosValidos.filter(p => !p.cliente_id);
         const mayoristas = pedidosValidos.filter(p => p.cliente_id);
 
@@ -2728,8 +2729,7 @@ async function ejecutarLogisticaDual() {
                                 </a>` : 
                                 `<span class="text-gray-400 italic text-[9px]">PENDIENTE</span>`}
                         </td>
-                    </tr>
-                `;
+                    </tr>`;
             });
         }
     } catch (err) {
