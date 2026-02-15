@@ -2156,24 +2156,26 @@ async function generarManifiestoTransporte() {
     if (!desde || !hasta) return alert("Por favor, selecciona ambas fechas.");
 
     try {
-        // 1. Obtener ventas del historial
+        // 1. Buscamos en el historial ventas con el rango horario completo
+        // Esto garantiza que si el pedido entró a cualquier hora del día, se incluya.
         const { data: ventas, error: vError } = await _supabase
             .from('historial_ventas')
             .select('cantidad, precio_unitario, cliente_id, fecha')
-            .gte('fecha', desde)
-            .lte('fecha', hasta);
+            .gte('fecha', `${desde}T00:00:00`)
+            .lte('fecha', `${hasta}T23:59:59`);
 
         if (vError) throw vError;
-        if (!ventas || ventas.length === 0) return alert("No hay ventas en este periodo.");
+        if (!ventas || ventas.length === 0) {
+            return alert("No hay ventas confirmadas (con OK) en este periodo para el manifiesto.");
+        }
 
-        // 2. Obtener todos los clientes para cruzar nombres
+        // 2. Obtener clientes para cruzar nombres (Tu lógica original intacta)
         const { data: clientes, error: cError } = await _supabase
             .from('clientes')
             .select('id, nombre');
 
         if (cError) throw cError;
 
-        // Crear un mapa de ID -> Nombre para acceso rápido
         const mapaClientes = {};
         clientes.forEach(c => { mapaClientes[c.id] = c.nombre; });
 
@@ -2186,7 +2188,7 @@ async function generarManifiestoTransporte() {
             return acc;
         }, {});
 
-        // 4. Generar el PDF
+        // 4. Generar el PDF (Tu diseño original)
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
 
