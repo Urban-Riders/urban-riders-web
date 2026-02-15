@@ -282,38 +282,65 @@
             }
         }
 
-        async function enviarPedido() {
+       async function enviarPedido() {
     const btn = document.getElementById('btn-accion-principal');
-    btn.disabled = true; 
+    if (!btn) return;
+
+    btn.disabled = true;
     btn.innerText = "ENVIANDO...";
-    
+
     try {
         const total = carrito.reduce((acc, i) => acc + (i.precio * i.cantidad), 0);
-        
-        // --- AGREGAMOS ESTA LÍNEA PARA FIJAR LA FECHA DE ARGENTINA ---
-        // Esto crea un string exacto: "2026-02-15T11:00:00-03:00"
-        const fechaArgentina = new Date().toLocaleString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" }).replace(" ", "T") + "-03:00";
+
+        // --- SOLUCIÓN DEFINITIVA DE FECHA ---
+        // Obtenemos la fecha actual, le restamos el desfase de Argentina (UTC-3)
+        // y la enviamos en formato ISO. Esto garantiza que se guarde con el día correcto.
+        const ahora = new Date();
+        const offsetArg = -3 * 60 * 60000; // -3 horas en milisegundos
+        const fechaArgentina = new Date(ahora.getTime() + offsetArg).toISOString().replace('Z', '-03:00');
 
         const { data: pedido, error: errP } = await _supabase.from('pedidos').insert([{
             cliente_id: clienteSeleccionado.id,
             cliente_nombre: clienteSeleccionado.nombre,
             total: total,
             estado: 'PENDIENTE',
-            fecha: fechaArgentina // <--- AHORA LE PASAMOS LA FECHA NOSOTROS 
+            fecha: fechaArgentina
         }]).select().single();
 
         if (errP) throw errP;
-        
-        // ... resto del código de detalles ...
-        function filtrarClientes() {
-            const t = document.getElementById('search-cliente').value.toLowerCase();
-            renderClientes(clientes.filter(c => c.nombre.toLowerCase().includes(t)));
-        }
 
-        function filtrarProductos() {
-            const t = document.getElementById('search-producto').value.toLowerCase();
-            renderProductos(productos.filter(p => p.nombre.toLowerCase().includes(t) || p.codigo?.toLowerCase().includes(t)));
-        }
+        const detalles = carrito.map(item => ({
+            pedido_id: pedido.id,
+            producto_id: item.id,
+            producto_nombre: item.nombre,
+            cantidad: item.cantidad,
+            precio_unitario: item.precio,
+            subtotal: item.precio * item.cantidad
+        }));
+
+        const { error: errD } = await _supabase.from('detalles_pedido').insert(detalles);
+        if (errD) throw errD;
+
+        // ÉXITO
+        alert("Pedido enviado correctamente");
+        carrito = [];
+        actualizarCarritoUI();
+        cerrarModalPedido();
+        
+        // Resetear vista de cliente
+        clienteSeleccionado = null;
+        document.getElementById('busqueda-cliente').value = '';
+        document.getElementById('info-cliente-seleccionado').classList.add('hidden');
+        document.getElementById('contenedor-busqueda').classList.remove('hidden');
+        
+    } catch (error) {
+        console.error("Error en enviarPedido:", error);
+        alert("Error al enviar el pedido: " + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "CONFIRMAR PEDIDO";
+    }
+}
 
 async function logoutVendedor() {
             if (confirm("¿Cerrar sesión de vendedor?")) {
