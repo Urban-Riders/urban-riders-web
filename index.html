@@ -350,6 +350,7 @@ _supabase.auth.onAuthStateChange((event, session) => {
     const container = document.getElementById('cart-items');
     const total = document.getElementById('cart-total');
     let sum = 0, items = 0;
+
     container.innerHTML = cart.map(i => {
         const price = i.precio_minorista || 0;
         sum += price * i.quantity; items += i.quantity;
@@ -369,14 +370,29 @@ _supabase.auth.onAuthStateChange((event, session) => {
                 </div>
             </div>`;
     }).join('');
+
     document.getElementById('cart-count').innerText = items;
     total.innerText = `$${sum.toLocaleString()}`;
     document.getElementById('checkout-total-btn').innerText = sum.toLocaleString();
     
-    // GUARDA EL ESTADO ACTUAL DEL CARRITO [cite: 217, 222]
+    // 1. GUARDADO AUTOMÁTICO EN LOCALSTORAGE
     localStorage.setItem('cart_urban', JSON.stringify(cart));
-}
 
+    // 2. CONTROL DE BLOQUEO VISUAL DEL BOTÓN WHATSAPP
+    const btnWpp = document.getElementById('btn-whatsapp-confirmar');
+    if (btnWpp) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const pagoAprobado = urlParams.get('status') === 'success';
+
+        if (!pagoAprobado) {
+            // Si no hay éxito en la URL, lo mantenemos bloqueado y semitransparente
+            btnWpp.classList.add('opacity-50', 'pointer-events-none');
+        } else {
+            // Si hay éxito, liberamos el botón
+            btnWpp.classList.remove('opacity-50', 'pointer-events-none');
+        }
+    }
+}
 function toggleCart() { document.getElementById('cart-panel').classList.toggle('translate-x-full'); }
 function toggleCheckoutModal() { document.getElementById('checkout-modal').classList.toggle('hidden'); }
 function preCheckout() { if (cart.length > 0) { toggleCart(); toggleCheckoutModal(); } else alert("Carrito vacío"); }
