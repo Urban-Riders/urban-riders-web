@@ -284,61 +284,48 @@
 
        async function enviarPedido() {
     const btn = document.getElementById('btn-accion-principal');
-    if (!btn) return;
-
-    btn.disabled = true;
+    btn.disabled = true; 
     btn.innerText = "ENVIANDO...";
-
+    
     try {
         const total = carrito.reduce((acc, i) => acc + (i.precio * i.cantidad), 0);
 
-        // FECHA ARGENTINA (Normalizada para evitar el salto de día en Supabase)
+        // --- ÚNICO CAMBIO: FIJAR FECHA ARGENTINA ---
         const ahora = new Date();
-        const offsetArg = -3 * 60 * 60000;
+        const offsetArg = -3 * 60 * 60000; // Ajuste milisegundos para UTC-3
         const fechaArgentina = new Date(ahora.getTime() + offsetArg).toISOString().replace('Z', '-03:00');
 
-        // 1. INSERTAR EN 'pedidos'
         const { data: pedido, error: errP } = await _supabase.from('pedidos').insert([{
             cliente_id: clienteSeleccionado.id,
             cliente_nombre: clienteSeleccionado.nombre,
             total: total,
             estado: 'PENDIENTE',
-            fecha: fechaArgentina
+            fecha: fechaArgentina // Se agrega la columna fecha
         }]).select().single();
-
+        
         if (errP) throw errP;
 
-        // 2. INSERTAR EN 'pedido_detalles' (Nombre verificado en tu código)
-        const detalles = carrito.map(item => ({
+        const detalles = carrito.map(i => ({
             pedido_id: pedido.id,
-            producto_id: item.id,
-            producto_nombre: item.nombre,
-            cantidad: item.cantidad,
-            precio_unitario: item.precio,
-            subtotal: item.precio * item.cantidad
+            producto_id: i.id,
+            producto_nombre: i.nombre,
+            cantidad: i.cantidad,
+            precio_unitario: i.precio,
+            subtotal: i.precio * i.cantidad
         }));
-
+        
         const { error: errD } = await _supabase.from('pedido_detalles').insert(detalles);
         if (errD) throw errD;
 
-        // ÉXITO
-        alert("Pedido enviado correctamente");
-        carrito = [];
-        actualizarCarritoUI();
-        cerrarModalPedido();
-        
-        // Reset de UI del cliente
-        clienteSeleccionado = null;
-        document.getElementById('busqueda-cliente').value = '';
-        document.getElementById('info-cliente-seleccionado').classList.add('hidden');
-        document.getElementById('contenedor-busqueda').classList.remove('hidden');
-        
-    } catch (error) {
-        console.error("Error en enviarPedido:", error);
-        alert("Error al enviar el pedido: " + error.message);
-    } finally {
+        alert("✅ PEDIDO ENVIADO");
+        location.reload(); // Tu lógica original para limpiar todo
+    } catch (e) {
+        alert("Error: " + e.message);
         btn.disabled = false;
         btn.innerText = "CONFIRMAR PEDIDO";
+        if (typeof actualizarVistas === 'function') {
+            actualizarVistas();
+        }
     }
 }
 async function logoutVendedor() {
