@@ -1614,9 +1614,11 @@ async function procesarOperacion(tipo) {
     }
 }
 async function cargarPedidos() {
+    // 1. Agregamos el filtro para que SOLO traiga los que TIENEN cliente_id
     const { data: pedidos, error } = await _supabase
         .from('pedidos')
         .select('*')
+        .not('cliente_id', 'is', null) // <--- Filtro agregado: Solo ventas de vendedores
         .order('fecha', { ascending: false });
 
     if (error) {
@@ -1628,13 +1630,13 @@ async function cargarPedidos() {
     if (!tbody) return;
 
     tbody.innerHTML = pedidos.map((p, index) => {
-        // Forzamos la limpieza y espiamos qué llega de la base de datos
-// Reemplaza la línea del estadoLimpio por esta:
-const estadoLimpio = String(p.estado || '').trim().toUpperCase(); // Lo pasamos TODO a mayúsculas
-const esPendiente = estadoLimpio === 'PENDIENTE'; // Comparamos con TODO en mayúsculas
+        // Mantenemos tu lógica de limpieza de estados intacta
+        const estadoLimpio = String(p.estado || '').trim().toUpperCase();
+        const esPendiente = estadoLimpio === 'PENDIENTE';
 
-// Mantenemos el log para confirmar
-console.log("PEDIDO ID:", p.id, "| ESTADO EN BD:", p.estado, "| ¿AHORA ES PENDIENTE?:", esPendiente);
+        // Mantenemos tu log para confirmación
+        console.log("PEDIDO ID:", p.id, "| ESTADO EN BD:", p.estado, "| ¿AHORA ES PENDIENTE?:", esPendiente);
+        
         return `
             <tr class="hover:bg-gray-50 border-b">
                 <td class="p-4 text-center text-gray-400 font-black">${index + 1}</td>
@@ -1647,20 +1649,20 @@ console.log("PEDIDO ID:", p.id, "| ESTADO EN BD:", p.estado, "| ¿AHORA ES PENDI
                     </span>
                 </td>
                 <td class="p-4 text-right flex justify-end gap-2">
-    <button onclick="verDetallePedido(${p.id})" class="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition" title="Ver Detalle">
-        <i class="fas fa-eye"></i>
-    </button>
-    
-    ${esPendiente ? `
-        <button onclick="confirmarVentaPedido(${p.id})" class="bg-green-600 text-white p-2 rounded-lg hover:bg-green-700 transition" title="Confirmar Venta">
-            <i class="fas fa-check"></i>
-        </button>
-    ` : ''}
+                    <button onclick="verDetallePedido(${p.id})" class="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition" title="Ver Detalle">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    
+                    ${esPendiente ? `
+                        <button onclick="confirmarVentaPedido(${p.id})" class="bg-green-600 text-white p-2 rounded-lg hover:bg-green-700 transition" title="Confirmar Venta">
+                            <i class="fas fa-check"></i>
+                        </button>
+                    ` : ''}
 
-    <button onclick="eliminarPedido(${p.id})" class="text-gray-300 hover:text-red-600 p-2 transition">
-        <i class="fas fa-trash"></i>
-    </button>
-</td>
+                    <button onclick="eliminarPedido(${p.id})" class="text-gray-300 hover:text-red-600 p-2 transition">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
             </tr>
         `;
     }).join('');
