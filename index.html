@@ -392,25 +392,76 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
 });
 
         async function checkoutMP(customer) {
-            const btn = document.getElementById('btn-confirmar-pago');
-            btn.innerText = "Procesando..."; btn.disabled = true;
-            const itemsMP = cart.map(i => ({ title: i.nombre, unit_price: Number(i.precio_minorista), quantity: i.quantity, currency_id: 'ARS', picture_url: i.imagen_url }));
+    const btn = document.getElementById('btn-confirmar-pago');
+    btn.innerText = "Registrando Pedido..."; 
+    btn.disabled = true;
 
-            try {
-                const res = await fetch('https://api.mercadopago.com/checkout/preferences', {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        items: itemsMP,
-                        payer: { name: customer.name, email: customer.email, phone: { number: customer.phone }, identification: { type: "DNI", number: customer.dni }, address: { street_name: customer.address, zip_code: customer.zip } },
-                        back_urls: { success: window.location.href, pending: window.location.href, failure: window.location.href },
-                        auto_return: 'approved'
-                    })
-                });
-                const data = await res.json();
-                window.location.href = data.init_point;
-            } catch (err) { alert("Error al conectar."); btn.innerText = "Ir a pagar"; btn.disabled = false; }
-        }
+    // 1. Calculamos el total para el registro
+    const totalPedido = cart.reduce((sum, item) => sum + (item.precio_minorista * item.quantity), 0);
+
+    try {
+        // 2. REGISTRO PREVIO EN SUPABASE
+        // Insertamos el pedido como 'VALIDAR PAGO' antes de ir a Mercado Pago
+        const { data: nuevoPedido, error: errorSupabase } = await _supabase
+            .from('pedidos')
+            .insert([{
+                fecha: new Date().toISOString(),
+                cliente_nombre: customer.name.toUpperCase(),
+                total: totalPedido,
+                estado: 'VALIDAR PAGO', // Estado centinela para el Admin
+                cliente_id: null,       // Venta minorista
+                vendedor_nombre: 'TIENDA WEB'
+            }])
+            .select();
+
+        if (errorSupabase) throw errorSupabase;
+        const pedidoId = nuevoPedido[0].id;
+
+        // 3. PREPARACIÓN PARA MERCADO PAGO
+        btn.innerText = "Conectando con MP...";
+        const itemsMP = cart.map(i => ({ 
+            title: i.nombre, 
+            unit_price: Number(i.precio_minorista), 
+            quantity: i.quantity, 
+            currency_id: 'ARS', 
+            picture_url: i.imagen_url 
+        }));
+
+        const res = await fetch('https://api.mercadopago.com/checkout/preferences', {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${MP_ACCESS_TOKEN}`, 
+                'Content-Type': 'application/json' 
+            },
+            body: JSON.stringify({
+                items: itemsMP,
+                payer: { 
+                    name: customer.name, 
+                    email: customer.email, 
+                    phone: { number: customer.phone }, 
+                    identification: { type: "DNI", number: customer.dni }, 
+                    address: { street_name: customer.address, zip_code: customer.zip } 
+                },
+                // Vinculamos el ID de Supabase en la URL de retorno para validarlo después
+                back_urls: { 
+                    success: `${window.location.href}?status=success&id=${pedidoId}`, 
+                    pending: `${window.location.href}?status=pending&id=${pedidoId}`, 
+                    failure: `${window.location.href}?status=failure&id=${pedidoId}` 
+                },
+                auto_return: 'approved'
+            })
+        });
+
+        const data = await res.json();
+        window.location.href = data.init_point;
+
+    } catch (err) { 
+        console.error("Error en flujo de compra:", err);
+        alert("Error al procesar el pedido. Intenta nuevamente."); 
+        btn.innerText = "Ir a pagar";
+        btn.disabled = false; 
+    }
+}
 
         function renderCategories() {
     const container = document.getElementById('categories-container');
@@ -524,12 +575,35 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
         function openZoom(url) { document.getElementById('img-ampliada').src = url; document.getElementById('modal-zoom').style.display = 'flex'; }
         function closeZoom() { document.getElementById('modal-zoom').style.display = 'none'; }
         function checkoutWA() {
-            if (cart.length === 0) return alert("Carrito vacío");
-            let msg = `¡Hola Urban Riders! 👋 Me interesa esta compra:\n\n`;
-            cart.forEach(item => { msg += `• ${item.nombre} (Cant: ${item.quantity})\n`; });
-            msg += `\n*TOTAL: ${document.getElementById('cart-total').innerText}*`;
-            window.open(`https://wa.me/5491112345678?text=${encodeURIComponent(msg)}`, '_blank');
-        }
+    // 1. Verificamos si en la URL existe un estado de éxito
+    const urlParams = new URLSearchParams(window.location.search);
+    const status = urlParams.get('status');
+    const pedidoId = urlParams.get('pedido');
+
+    // Si el usuario no pagó (no tiene el sello de success), lo frenamos
+    if (status !== 'success') {
+        alert("⚠️ Por seguridad, primero debes completar el pago con Mercado Pago para habilitar el envío por WhatsApp.");
+        return;
+    }
+
+    if (cart.length === 0 && !pedidoId) return alert("Carrito vacío");
+
+    // 2. Armamos el mensaje incluyendo el ID de referencia que vino de la URL
+    let msg = `¡Hola Urban Riders! 👋\n`;
+    msg += `✅ *PAGO CONFIRMADO* (Pedido #${pedidoId})\n\n`;
+    msg += `*Detalle de mi compra:*\n`;
+    
+    cart.forEach(item => { 
+        msg += `• ${item.nombre} (Cant: ${item.quantity})\n`; 
+    });
+
+    const total = document.getElementById('cart-total')?.innerText || "";
+    msg += `\n*TOTAL PAGADO: ${total}*`;
+    msg += `\n\n_Por favor, confírmenme la recepción para coordinar el envío._`;
+
+    // 3. Abrimos WhatsApp
+    window.open(`https://wa.me/5491112345678?text=${encodeURIComponent(msg)}`, '_blank');
+}
 function loadMore() {
             productosLimite += 12; // Aumentamos la cantidad a mostrar
             loadProducts();        // Recargamos el catálogo
@@ -605,6 +679,36 @@ document.getElementById('newsletter-form').addEventListener('submit', async (e) 
     } finally {
         btn.disabled = false;
         btn.innerText = originalText;
+    }
+});
+// Se ejecuta automáticamente al cargar la web
+window.addEventListener('DOMContentLoaded', async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const status = urlParams.get('status');
+    const pedidoId = urlParams.get('pedido');
+
+    if (status === 'success' && pedidoId) {
+        // 1. Avisamos al usuario
+        alert("¡Pago acreditado con éxito! Ahora puedes enviar tu pedido por WhatsApp para coordinar la entrega.");
+        
+        // 2. Actualizamos Supabase de 'VALIDAR PAGO' a 'PAGO CONFIRMADO'
+        await _supabase
+            .from('pedidos')
+            .update({ estado: 'PAGO CONFIRMADO' })
+            .eq('id', pedidoId);
+
+        // 3. Limpiamos el carrito local porque ya se pagó
+        cart = [];
+        localStorage.removeItem('cart');
+        renderCart();
+
+        // 4. Habilitamos visualmente el botón de WhatsApp (puedes añadirle una clase de brillo)
+        const btnWpp = document.getElementById('btn-whatsapp-confirmar');
+        if(btnWpp) {
+            btnWpp.classList.remove('opacity-50', 'pointer-events-none');
+            btnWpp.classList.add('bg-green-500', 'animate-bounce'); 
+            btnWpp.innerHTML = '<i class="fab fa-whatsapp"></i> ENVIAR PEDIDO PAGADO';
+        }
     }
 });
     </script>
