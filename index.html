@@ -295,7 +295,8 @@ _supabase.auth.onAuthStateChange((event, session) => {
 });
 
         let products = [];
-        let cart = [];
+        // Intenta cargar el carrito guardado; si no existe, inicia vacío 
+        let cart = JSON.parse(localStorage.getItem('cart_urban')) || [];
         let productosLimite = 15;
         let currentCategory = 'TODOS';
         const CATEGORIAS_LIST = ['TODOS', 'CICLISMO', 'CASCOS', 'INDUMENTARIA', 'ACCESORIOS', 'REPUESTOS'];
@@ -371,6 +372,9 @@ _supabase.auth.onAuthStateChange((event, session) => {
     document.getElementById('cart-count').innerText = items;
     total.innerText = `$${sum.toLocaleString()}`;
     document.getElementById('checkout-total-btn').innerText = sum.toLocaleString();
+    
+    // GUARDA EL ESTADO ACTUAL DEL CARRITO [cite: 217, 222]
+    localStorage.setItem('cart_urban', JSON.stringify(cart));
 }
 
 function toggleCart() { document.getElementById('cart-panel').classList.toggle('translate-x-full'); }
@@ -642,7 +646,10 @@ function toggleContactModal() {
             }
         });
 
-        window.onload = loadProducts;
+        window.onload = () => {
+    loadProducts(); // Carga productos de Supabase [cite: 205]
+    updateCart();   // Dibuja el carrito recuperado del LocalStorage 
+};
 // Lógica para el formulario del Club (Newsletter)
 document.getElementById('newsletter-form').addEventListener('submit', async (e) => {
     e.preventDefault();
