@@ -292,13 +292,12 @@
     try {
         const total = carrito.reduce((acc, i) => acc + (i.precio * i.cantidad), 0);
 
-        // --- SOLUCIÓN DEFINITIVA DE FECHA ---
-        // Obtenemos la fecha actual, le restamos el desfase de Argentina (UTC-3)
-        // y la enviamos en formato ISO. Esto garantiza que se guarde con el día correcto.
+        // FECHA ARGENTINA (Normalizada para evitar el salto de día en Supabase)
         const ahora = new Date();
-        const offsetArg = -3 * 60 * 60000; // -3 horas en milisegundos
+        const offsetArg = -3 * 60 * 60000;
         const fechaArgentina = new Date(ahora.getTime() + offsetArg).toISOString().replace('Z', '-03:00');
 
+        // 1. INSERTAR EN 'pedidos'
         const { data: pedido, error: errP } = await _supabase.from('pedidos').insert([{
             cliente_id: clienteSeleccionado.id,
             cliente_nombre: clienteSeleccionado.nombre,
@@ -309,6 +308,7 @@
 
         if (errP) throw errP;
 
+        // 2. INSERTAR EN 'pedido_detalles' (Nombre verificado en tu código)
         const detalles = carrito.map(item => ({
             pedido_id: pedido.id,
             producto_id: item.id,
@@ -318,7 +318,7 @@
             subtotal: item.precio * item.cantidad
         }));
 
-        const { error: errD } = await _supabase.from('detalles_pedido').insert(detalles);
+        const { error: errD } = await _supabase.from('pedido_detalles').insert(detalles);
         if (errD) throw errD;
 
         // ÉXITO
@@ -327,7 +327,7 @@
         actualizarCarritoUI();
         cerrarModalPedido();
         
-        // Resetear vista de cliente
+        // Reset de UI del cliente
         clienteSeleccionado = null;
         document.getElementById('busqueda-cliente').value = '';
         document.getElementById('info-cliente-seleccionado').classList.add('hidden');
@@ -341,7 +341,6 @@
         btn.innerText = "CONFIRMAR PEDIDO";
     }
 }
-
 async function logoutVendedor() {
             if (confirm("¿Cerrar sesión de vendedor?")) {
                 await _supabase.auth.signOut();
