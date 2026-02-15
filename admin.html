@@ -2645,17 +2645,22 @@ async function cargarHistorialIngresos() {
 // Buscá tu función switchTab(tabId) y agregá esto al final:
 // if(tabId === 'tab-ingresos') cargarHistorialIngresos();
 async function ejecutarLogisticaDual() {
-    const desde = document.getElementById('transporte-desde').value;
+    const desde = document.getElementById('transporte-desde').value; // Formato "YYYY-MM-DD"
     const hasta = document.getElementById('transporte-hasta').value;
 
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
-    // Traemos los pedidos de la tabla 'pedidos' según tu catálogo
+    // --- SOLUCIÓN HORARIA: Convertimos el rango de Argentina (UTC-3) a ISO (UTC) ---
+    // Creamos el inicio del día (00:00:00) y fin del día (23:59:59) forzando la zona horaria -03:00
+    const desdeISO = new Date(`${desde}T00:00:00-03:00`).toISOString();
+    const hastaISO = new Date(`${hasta}T23:59:59-03:00`).toISOString();
+
+    // Traemos los pedidos de la tabla 'pedidos' con el rango compensado
     const { data: pedidos, error } = await _supabase
         .from('pedidos')
         .select('*')
-        .gte('fecha', `${desde}T00:00:00`)
-        .lte('fecha', `${hasta}T23:59:59`)
+        .gte('fecha', desdeISO) // Ahora enviamos la hora exacta en UTC
+        .lte('fecha', hastaISO)
         .order('fecha', { ascending: false });
 
     if (error) return console.error("Error cargando logística:", error);
@@ -2709,6 +2714,10 @@ async function ejecutarLogisticaDual() {
         });
     } else {
         contenedor.classList.add('hidden');
+        // Si no hay minoristas pero quizás hay mayoristas o nada, mostramos el mensaje de vacío
+        if (mayoristas.length === 0) {
+            document.getElementById('mensaje-transporte-vacio').classList.remove('hidden');
+        }
     }
 }
 
