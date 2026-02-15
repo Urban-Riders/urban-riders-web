@@ -265,7 +265,9 @@
                 <button onclick="preCheckout()" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold uppercase hover:bg-blue-700 transition flex items-center justify-center gap-2 mb-2 shadow-lg shadow-blue-500/20">
                     <i class="fas fa-credit-card"></i> Pagar con Mercado Pago
                 </button>
-                <button onclick="checkoutWA()" class="w-full border-2 border-green-600 text-green-600 py-2 rounded-xl font-bold uppercase hover:bg-green-50 transition flex items-center justify-center gap-2">
+                <button id="btn-whatsapp-confirmar" onclick="checkoutWA()" class="w-full border-2 border-green-600 text-green-600 py-2 rounded-xl font-bold uppercase hover:bg-green-50 transition flex items-center justify-center gap-2">
+    <i class="fab fa-whatsapp"></i> Consultar por WhatsApp
+</button>
                     <i class="fab fa-whatsapp"></i> Consultar por WhatsApp
                 </button>
             </div>
@@ -722,7 +724,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         // 3. Limpiamos el carrito local porque ya se pagó
         cart = [];
-        localStorage.removeItem('cart');
+        localStorage.removeItem('cart_urban');
         renderCart();
 
         // 4. Habilitamos visualmente el botón de WhatsApp (puedes añadirle una clase de brillo)
