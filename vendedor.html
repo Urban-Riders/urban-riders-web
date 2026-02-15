@@ -283,37 +283,28 @@
         }
 
         async function enviarPedido() {
-            const btn = document.getElementById('btn-accion-principal');
-            btn.disabled = true; btn.innerText = "ENVIANDO...";
-            try {
-                const total = carrito.reduce((acc, i) => acc + (i.precio * i.cantidad), 0);
-                const { data: pedido, error: errP } = await _supabase.from('pedidos').insert([{
-                    cliente_id: clienteSeleccionado.id,
-                    cliente_nombre: clienteSeleccionado.nombre,
-                    total: total,
-                    estado: 'PENDIENTE'
-                }]).select().single();
-                if (errP) throw errP;
+    const btn = document.getElementById('btn-accion-principal');
+    btn.disabled = true; 
+    btn.innerText = "ENVIANDO...";
+    
+    try {
+        const total = carrito.reduce((acc, i) => acc + (i.precio * i.cantidad), 0);
+        
+        // --- AGREGAMOS ESTA LÍNEA PARA FIJAR LA FECHA DE ARGENTINA ---
+        // Esto crea un string exacto: "2026-02-15T11:00:00-03:00"
+        const fechaArgentina = new Date().toLocaleString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" }).replace(" ", "T") + "-03:00";
 
-                const detalles = carrito.map(i => ({
-                    pedido_id: pedido.id,
-                    producto_id: i.id,
-                    producto_nombre: i.nombre,
-                    cantidad: i.cantidad,
-                    precio_unitario: i.precio,
-                    subtotal: i.precio * i.cantidad
-                }));
-                await _supabase.from('pedido_detalles').insert(detalles);
+        const { data: pedido, error: errP } = await _supabase.from('pedidos').insert([{
+            cliente_id: clienteSeleccionado.id,
+            cliente_nombre: clienteSeleccionado.nombre,
+            total: total,
+            estado: 'PENDIENTE',
+            fecha: fechaArgentina // <--- AHORA LE PASAMOS LA FECHA NOSOTROS 
+        }]).select().single();
 
-                alert("✅ PEDIDO ENVIADO");
-                location.reload();
-            } catch (e) {
-                alert("Error: " + e.message);
-                btn.disabled = false;
-                actualizarVistas();
-            }
-        }
-
+        if (errP) throw errP;
+        
+        // ... resto del código de detalles ...
         function filtrarClientes() {
             const t = document.getElementById('search-cliente').value.toLowerCase();
             renderClientes(clientes.filter(c => c.nombre.toLowerCase().includes(t)));
