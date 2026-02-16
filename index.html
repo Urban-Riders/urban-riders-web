@@ -679,28 +679,34 @@ function habilitarBotonWhatsapp() {
     }
 }
 
-/window.addEventListener('DOMContentLoaded', async () => {
+// --- INICIALIZACIÓN Y GESTIÓN DE ESTADO ---
+window.addEventListener('DOMContentLoaded', async () => {
+    // 1. CARGA DEL CATÁLOGO (Esto devuelve los productos a la pantalla)
+    await loadProducts();
+
+    // 2. ANALISIS DE URL PARA MERCADO PAGO
     const urlParams = new URLSearchParams(window.location.search);
     const status = urlParams.get('status');
     const pedidoId = urlParams.get('pedido');
 
-    // Si entramos normal (sin pago en la URL), limpiamos el permiso de WhatsApp
+    // 3. LIMPIEZA DE SEGURIDAD
+    // Si la URL no tiene éxito, borramos permisos viejos de WhatsApp
     if (status !== 'success') {
         sessionStorage.removeItem('ultimo_pedido_pago');
     }
 
+    // 4. PROCESO DE RETORNO DE PAGO
     if (status === 'success' && pedidoId) {
-        // Guardamos el permiso de pago
         sessionStorage.setItem('ultimo_pedido_pago', pedidoId);
         
-        // Actualizamos Supabase
+        // Actualizamos Supabase a 'pago'
         await _supabase.from('pedidos').update({ estado_pago: 'pago' }).eq('id', pedidoId);
 
-        // AVISO: El carrito NO se vacía aquí.
-        alert("¡Pago exitoso! Presiona el botón verde en el carrito para enviarnos el pedido por WhatsApp.");
+        alert("¡Pago exitoso! El botón de WhatsApp ya está listo en tu carrito.");
     }
     
-    updateCart(); // Esto activará el botón verde porque los productos siguen ahí
+    // 5. REFRESCO DE VISTA (Esto activa el botón si corresponde)
+    updateCart(); 
 });
     </script>
 </body>
