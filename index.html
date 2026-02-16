@@ -553,34 +553,34 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
         function clearCart() { if (confirm("¿Vaciar?")) { cart = []; updateCart(); toggleCart(); } }
         function openZoom(url) { document.getElementById('img-ampliada').src = url; document.getElementById('modal-zoom').style.display = 'flex'; }
         function closeZoom() { document.getElementById('modal-zoom').style.display = 'none'; }
-       function checkoutWA() {
+      function checkoutWA() {
     const pedidoId = sessionStorage.getItem('ultimo_pedido_pago');
     
-    // Si no hay pedido pago, no dejamos enviar (por seguridad)
     if (!pedidoId) {
-        alert("Primero debes realizar el pago.");
+        alert("Debes completar el pago antes de enviar el pedido.");
         return;
     }
 
     let msg = `¡Hola Urban Riders! 👋\n`;
     msg += `✅ *PAGO CONFIRMADO DEL PEDIDO #${pedidoId}*\n\n`;
-    msg += `Detalle del pedido:\n`;
+    msg += `*Detalle:* \n`;
 
-    // El carrito todavía existe, así que podemos leerlo:
+    // Generamos el mensaje con los productos que SIGUEN en el carrito
     cart.forEach(item => { 
         msg += `• ${item.nombre} (Cant: ${item.quantity})\n`; 
     });
     
     msg += `\n*TOTAL: ${document.getElementById('cart-total').innerText}*`;
     
-    // Abrimos WhatsApp
+    // Abrimos el chat
     window.open(`https://wa.me/5491112345678?text=${encodeURIComponent(msg)}`, '_blank');
 
-    // RECIÉN AHORA, después de abrir WhatsApp, limpiamos todo:
+    // RECIÉN AHORA limpiamos todo para el próximo cliente
     sessionStorage.removeItem('ultimo_pedido_pago');
     localStorage.removeItem('cart_urban');
     cart = [];
-    updateCart(); // Esto cerrará el círculo y pondrá el carrito en cero para la próxima compra
+    updateCart(); // El carrito se vacía y el botón vuelve a gris aquí
+    closeCart();
 }
 function loadMore() {
             productosLimite += 12; // Aumentamos la cantidad a mostrar
@@ -664,55 +664,43 @@ function habilitarBotonWhatsapp() {
     const pedidoIdPago = sessionStorage.getItem('ultimo_pedido_pago');
     const btnWpp = document.getElementById('btn-whatsapp-confirmar');
     
-    if (!btnWpp) return; // Si el botón no existe en el HTML todavía, salimos
+    if (!btnWpp) return;
 
-    // LÓGICA INTELIGENTE: ¿Hay ticket de pago Y el carrito NO está vacío?
     if (pedidoIdPago && cart.length > 0) {
-        // SE ACTIVA (Verde)
+        // MODO ACTIVO (Verde)
         btnWpp.classList.remove('opacity-50', 'pointer-events-none', 'text-green-600', 'border-green-600');
         btnWpp.classList.add('bg-green-600', 'text-white');
         btnWpp.innerHTML = `<i class="fab fa-whatsapp"></i> ENVIAR PEDIDO #${pedidoIdPago}`;
     } else {
-        // SE BLOQUEA (Gris) - Si falta el pago o si el carrito se vació
+        // MODO BLOQUEADO (Gris)
         btnWpp.classList.add('opacity-50', 'pointer-events-none', 'text-green-600', 'border-green-600');
         btnWpp.classList.remove('bg-green-600', 'text-white');
         btnWpp.innerHTML = `<i class="fab fa-whatsapp"></i> Consultar por WhatsApp`;
     }
 }
 
-// --- GESTIÓN DE ESTADO AL CARGAR LA PÁGINA ---
-window.addEventListener('DOMContentLoaded', async () => {
+/window.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const status = urlParams.get('status');
     const pedidoId = urlParams.get('pedido');
 
-    // 1. EL GRAN FILTRO (SOLUCIÓN A TU PROBLEMA):
-    // Si la URL NO tiene "status=success", significa que el usuario está navegando normal.
-    // ENTONCES: Borramos obligatoriamente cualquier rastro de pagos anteriores.
+    // Si entramos normal (sin pago en la URL), limpiamos el permiso de WhatsApp
     if (status !== 'success') {
         sessionStorage.removeItem('ultimo_pedido_pago');
-        // Si quisieras ser más agresivo, podrías descomentar la siguiente línea:
-        // localStorage.removeItem('cart_urban'); 
     }
 
-    // 2. SOLO SI VENIMOS DE MERCADO PAGO (URL tiene success):
     if (status === 'success' && pedidoId) {
-        // Guardamos el ID válido
+        // Guardamos el permiso de pago
         sessionStorage.setItem('ultimo_pedido_pago', pedidoId);
         
-        // Actualizamos Supabase a 'pago'
+        // Actualizamos Supabase
         await _supabase.from('pedidos').update({ estado_pago: 'pago' }).eq('id', pedidoId);
 
-        // Feedback al usuario
-        alert("¡Pago confirmado! Revisa tu carrito y presiona el botón de WhatsApp para finalizar.");
+        // AVISO: El carrito NO se vacía aquí.
+        alert("¡Pago exitoso! Presiona el botón verde en el carrito para enviarnos el pedido por WhatsApp.");
     }
     
-    // 3. ACTUALIZAMOS LA VISTA
-    // Esto llamará a habilitarBotonWhatsapp(). 
-    // Como acabamos de limpiar la sesión en el paso 1, el botón se quedará GRIS si no hubo pago reciente.
-    if (typeof updateCart === 'function') {
-        updateCart();
-    }
+    updateCart(); // Esto activará el botón verde porque los productos siguen ahí
 });
     </script>
 </body>
