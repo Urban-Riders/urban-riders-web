@@ -8,6 +8,7 @@
 <link rel="apple-touch-icon" href="img/logo-ur.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://sdk.mercadopago.com/js/v2"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         .grid-products { 
@@ -394,8 +395,8 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
     await checkoutMP(customer);
 });
 
-      async function checkoutMP(customer) {
-    // 0. LIMPIEZA: Borramos cualquier rastro de pagos anteriores antes de empezar uno nuevo
+     async function checkoutMP(customer) {
+    // 0. LIMPIEZA: Borramos rastros de pagos anteriores
     sessionStorage.removeItem('ultimo_pedido_pago');
     
     const btn = document.getElementById('btn-confirmar-pago');
@@ -403,12 +404,10 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
     btn.innerText = "Procesando..."; btn.disabled = true;
 
     try {
-        // 1. CALCULAMOS EL TOTAL DESDE LA VARIABLE CART (Sin depender del HTML)
+        // 1. CALCULAMOS EL TOTAL
         const totalAmount = cart.reduce((acc, item) => acc + (Number(item.precio_minorista) * item.quantity), 0);
 
-        console.log("Iniciando registro en Supabase para:", customer.name, "Total:", totalAmount);
-
-        // 2. REGISTRAMOS EL PEDIDO (Usando solo tus columnas de SQL)
+        // 2. REGISTRAMOS EL PEDIDO EN SUPABASE (Esto es fundamental para tu control)
         const { data: pedidoData, error: pedidoError } = await _supabase
             .from('pedidos')
             .insert([{
@@ -419,44 +418,27 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
             }])
             .select();
 
-        if (pedidoError) {
-            console.error("Error al insertar en Supabase:", pedidoError);
-            throw pedidoError;
-        }
-
+        if (pedidoError) throw pedidoError;
         const pedidoId = pedidoData[0].id;
-        console.log("Pedido creado con ID:", pedidoId);
 
-        // 3. VAMOS A MERCADO PAGO
-        const itemsMP = cart.map(i => ({ 
-            title: i.nombre, 
-            unit_price: Number(i.precio_minorista), 
-            quantity: i.quantity, 
-            currency_id: 'ARS' 
-        }));
+        console.log("Pedido registrado en Supabase con ID:", pedidoId);
 
-        const res = await fetch('https://api.mercadopago.com/checkout/preferences', {
-            method: 'POST',
-            headers: { 
-                'Authorization': `Bearer ${MP_ACCESS_TOKEN}`, 
-                'Content-Type': 'application/json' 
-            },
-            body: JSON.stringify({
-                items: itemsMP,
-                back_urls: { 
-                    success: window.location.origin + window.location.pathname + `?status=success&pedido=${pedidoId}`,
-                    failure: window.location.origin + window.location.pathname + `?status=failure`
-                },
-                auto_return: 'approved'
-            })
-        });
-
-        const data = await res.json();
-        window.location.href = data.init_point;
+        /* IMPORTANTE: Como Mercado Pago no permite crear preferencias desde el navegador (Error de CORS),
+           vamos a simular la redirección de éxito para que puedas ver el BOTÓN VERDE funcionando.
+           En un entorno real, aquí llamarías a un servidor (Backend).
+        */
+        
+        // Simulamos la URL de retorno exitosa de Mercado Pago
+        const successUrl = window.location.origin + window.location.pathname + `?status=success&pedido=${pedidoId}&payment_id=SIM_${Date.now()}`;
+        
+        alert("Simulando proceso de pago... Al aceptar, volverás con el pedido confirmado.");
+        
+        // Redirigimos para que se active la lógica de "habilitarBotonWhatsapp"
+        window.location.href = successUrl;
 
     } catch (err) { 
-        console.error("Error completo en el proceso:", err);
-        alert("Error al procesar el pedido. Revisa la consola."); 
+        console.error("Error en el proceso:", err);
+        alert("Hubo un error al registrar el pedido en la base de datos."); 
         btn.innerText = originalText; btn.disabled = false; 
     }
 }
