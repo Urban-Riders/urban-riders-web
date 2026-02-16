@@ -553,17 +553,20 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
         function clearCart() { if (confirm("¿Vaciar?")) { cart = []; updateCart(); toggleCart(); } }
         function openZoom(url) { document.getElementById('img-ampliada').src = url; document.getElementById('modal-zoom').style.display = 'flex'; }
         function closeZoom() { document.getElementById('modal-zoom').style.display = 'none'; }
-        function checkoutWA() {
+       function checkoutWA() {
     const pedidoId = sessionStorage.getItem('ultimo_pedido_pago');
-    let msg = `¡Hola Urban Riders! 👋\n`;
     
-    if (pedidoId) {
-        msg += `✅ *PAGO CONFIRMADO DEL PEDIDO #${pedidoId}*\n\n`;
-    } else {
-        msg += `Me interesa esta compra:\n\n`;
+    // Si no hay pedido pago, no dejamos enviar (por seguridad)
+    if (!pedidoId) {
+        alert("Primero debes realizar el pago.");
+        return;
     }
 
-    // Listamos los productos del carrito
+    let msg = `¡Hola Urban Riders! 👋\n`;
+    msg += `✅ *PAGO CONFIRMADO DEL PEDIDO #${pedidoId}*\n\n`;
+    msg += `Detalle del pedido:\n`;
+
+    // El carrito todavía existe, así que podemos leerlo:
     cart.forEach(item => { 
         msg += `• ${item.nombre} (Cant: ${item.quantity})\n`; 
     });
@@ -573,12 +576,11 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
     // Abrimos WhatsApp
     window.open(`https://wa.me/5491112345678?text=${encodeURIComponent(msg)}`, '_blank');
 
-    // --- LIMPIEZA POST-ENVÍO ---
-    // Borramos el ID de la sesión para que el próximo carrito nazca bloqueado
+    // RECIÉN AHORA, después de abrir WhatsApp, limpiamos todo:
     sessionStorage.removeItem('ultimo_pedido_pago');
-    
-    // Refrescamos visualmente el botón para que vuelva a su estado gris/bloqueado
-    habilitarBotonWhatsapp();
+    localStorage.removeItem('cart_urban');
+    cart = [];
+    updateCart(); // Esto cerrará el círculo y pondrá el carrito en cero para la próxima compra
 }
 function loadMore() {
             productosLimite += 12; // Aumentamos la cantidad a mostrar
@@ -683,26 +685,18 @@ window.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const status = urlParams.get('status');
     const pedidoId = urlParams.get('pedido');
-    const paymentId = urlParams.get('payment_id');
 
     if (status === 'success' && pedidoId) {
-        const { error } = await _supabase
-            .from('pedidos')
-            .update({ 
-                estado_pago: 'pago', 
-                id_pago_externo: paymentId,
-                estado: 'PAGO CONFIRMADO' 
-            })
-            .eq('id', pedidoId);
+        // 1. Guardamos el ID del pago en la sesión
+        sessionStorage.setItem('ultimo_pedido_pago', pedidoId);
+        
+        // 2. Actualizamos Supabase
+        await _supabase.from('pedidos').update({ estado_pago: 'pago' }).eq('id', pedidoId);
 
-        if (!error) {
-            // Guardamos el ID para que la función sepa que debe habilitar el botón
-            sessionStorage.setItem('ultimo_pedido_pago', pedidoId);
-            localStorage.removeItem('cart_urban');
-            cart = [];
-            updateCart();
-            alert("¡Pago confirmado! Botón liberado.");
-        }
+        // IMPORTANTE: NO VACIAMOS EL CARRITO ACÁ. 
+        // Solo avisamos y actualizamos la vista para que el botón se ponga verde.
+        updateCart(); 
+        alert("¡Pago confirmado! Ahora toca el botón de WhatsApp para enviarnos el detalle de tu pedido.");
     }
 });
     </script>
