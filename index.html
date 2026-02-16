@@ -707,6 +707,11 @@ window.addEventListener('DOMContentLoaded', async () => {
         await _supabase.from('pedidos').update({ estado_pago: 'pago' }).eq('id', pedidoId);
 
         alert("¡Pago exitoso! El botón de WhatsApp ya está listo en tu carrito.");
+
+        // --- LINEA DE LIMPIEZA DE URL ---
+        // Esto borra los parámetros de la URL sin recargar la página para evitar el alert infinito al refrescar
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
     }
     
     // 5. REFRESCO DE VISTA (Esto activa el botón si corresponde)
