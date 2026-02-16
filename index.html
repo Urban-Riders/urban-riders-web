@@ -265,9 +265,9 @@
                 <button onclick="preCheckout()" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold uppercase hover:bg-blue-700 transition flex items-center justify-center gap-2 mb-2 shadow-lg shadow-blue-500/20">
                     <i class="fas fa-credit-card"></i> Pagar con Mercado Pago
                 </button>
-                <button onclick="checkoutWA()" class="w-full border-2 border-green-600 text-green-600 py-2 rounded-xl font-bold uppercase hover:bg-green-50 transition flex items-center justify-center gap-2">
-                    <i class="fab fa-whatsapp"></i> Consultar por WhatsApp
-                </button>
+                <button id="btn-whatsapp-confirmar" onclick="checkoutWA()" class="w-full border-2 border-green-600 text-green-600 py-2 rounded-xl font-bold uppercase hover:bg-green-50 transition flex items-center justify-center gap-2 opacity-50 pointer-events-none">
+    <i class="fab fa-whatsapp"></i> Consultar por WhatsApp
+</button>
             </div>
         </div>
     </div>
@@ -392,26 +392,49 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
 });
 
         async function checkoutMP(customer) {
-            const btn = document.getElementById('btn-confirmar-pago');
-            btn.innerText = "Procesando..."; btn.disabled = true;
-            const itemsMP = cart.map(i => ({ title: i.nombre, unit_price: Number(i.precio_minorista), quantity: i.quantity, currency_id: 'ARS', picture_url: i.imagen_url }));
+    const btn = document.getElementById('btn-confirmar-pago');
+    btn.innerText = "Procesando..."; btn.disabled = true;
 
-            try {
-                const res = await fetch('https://api.mercadopago.com/checkout/preferences', {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        items: itemsMP,
-                        payer: { name: customer.name, email: customer.email, phone: { number: customer.phone }, identification: { type: "DNI", number: customer.dni }, address: { street_name: customer.address, zip_code: customer.zip } },
-                        back_urls: { success: window.location.href, pending: window.location.href, failure: window.location.href },
-                        auto_return: 'approved'
-                    })
-                });
-                const data = await res.json();
-                window.location.href = data.init_point;
-            } catch (err) { alert("Error al conectar."); btn.innerText = "Ir a pagar"; btn.disabled = false; }
-        }
+    try {
+        // 1. REGISTRAMOS EL PEDIDO COMO PENDIENTE
+        const { data: pedidoData, error: pedidoError } = await _supabase
+            .from('pedidos')
+            .insert([{
+                cliente_nombre: customer.name,
+                cliente_email: customer.email,
+                total: Number(document.getElementById('checkout-total-btn').innerText.replace('.', '')),
+                estado_pago: 'pendiente', // Nueva columna
+                detalles: JSON.stringify(cart)
+            }])
+            .select();
 
+        if (pedidoError) throw pedidoError;
+        const pedidoId = pedidoData[0].id;
+
+        // 2. VAMOS A MERCADO PAGO PASANDO EL ID DEL PEDIDO
+        const itemsMP = cart.map(i => ({ title: i.nombre, unit_price: Number(i.precio_minorista), quantity: i.quantity, currency_id: 'ARS' }));
+        const res = await fetch('https://api.mercadopago.com/checkout/preferences', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                items: itemsMP,
+                back_urls: { 
+                    success: window.location.origin + window.location.pathname + `?status=success&pedido=${pedidoId}`,
+                    failure: window.location.origin + window.location.pathname + `?status=failure`
+                },
+                auto_return: 'approved'
+            })
+        });
+
+        const data = await res.json();
+        window.location.href = data.init_point;
+
+    } catch (err) { 
+        console.error(err);
+        alert("Error al procesar el pago."); 
+        btn.innerText = "Ir a pagar"; btn.disabled = false; 
+    }
+}
         function renderCategories() {
     const container = document.getElementById('categories-container');
     container.innerHTML = CATEGORIAS_LIST.map(cat => `
@@ -605,6 +628,41 @@ document.getElementById('newsletter-form').addEventListener('submit', async (e) 
     } finally {
         btn.disabled = false;
         btn.innerText = originalText;
+    }
+});
+// VALIDACIÓN DE PAGO Y LIBERACIÓN DE WHATSAPP
+window.addEventListener('DOMContentLoaded', async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const status = urlParams.get('status');
+    const pedidoId = urlParams.get('pedido');
+    const paymentId = urlParams.get('payment_id'); // ID que genera Mercado Pago
+
+    if (status === 'success' && pedidoId) {
+        // ACTUALIZAMOS EN SUPABASE QUE EL PAGO ES REAL
+        const { error } = await _supabase
+            .from('pedidos')
+            .update({ 
+                estado_pago: 'pago', 
+                id_pago_externo: paymentId 
+            })
+            .eq('id', pedidoId);
+
+        if (!error) {
+            const btnWpp = document.getElementById('btn-whatsapp-confirmar');
+            if (btnWpp) {
+                // LIBERAMOS EL BOTÓN
+                btnWpp.classList.remove('opacity-50', 'pointer-events-none');
+                btnWpp.classList.add('bg-green-600', 'text-white');
+                btnWpp.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar Pedido Pagado';
+                
+                alert("¡Pago confirmado en base de datos! Ya puedes enviar el WhatsApp.");
+                
+                // Limpiamos el carrito local
+                localStorage.removeItem('cart_urban');
+                cart = [];
+                updateCart();
+            }
+        }
     }
 });
     </script>
