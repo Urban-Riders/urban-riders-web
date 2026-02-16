@@ -265,7 +265,7 @@
                 <button onclick="preCheckout()" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold uppercase hover:bg-blue-700 transition flex items-center justify-center gap-2 mb-2 shadow-lg shadow-blue-500/20">
                     <i class="fas fa-credit-card"></i> Pagar con Mercado Pago
                 </button>
-               <button id="btn-whatsapp-confirmar" onclick="checkoutWA()" class="w-full border-2 border-green-600 text-green-600 py-2 rounded-xl font-bold uppercase hover:bg-green-50 transition flex items-center justify-center gap-2 opacity-50 pointer-events-none">
+               <button id="btn-whatsapp-confirmar" onclick="enviarPedidoWhatsapp(msg)" class="w-full border-2 border-green-600 text-green-600 py-2 rounded-xl font-bold uppercase hover:bg-green-50 transition flex items-center justify-center gap-2 opacity-50 pointer-events-none">
     <i class="fab fa-whatsapp"></i> Consultar por WhatsApp
 </button>
             </div>
@@ -277,6 +277,20 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzZXh2bXN0ZmphZGpkYnB0bXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2OTc3MzUsImV4cCI6MjA4MjI3MzczNX0.L0Wz3hwZOarNLqkYH5-RAzz2Y6iwI4uaE_rlkcKkgyg';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const MP_ACCESS_TOKEN = 'TU_ACCESS_TOKEN_AQUÍ'; 
+async function verificarPagoPedido(pedidoId) {
+  const { data, error } = await supabase
+    .from("pedidos")
+    .select("estado_pago")
+    .eq("id", pedidoId)
+    .single();
+
+  if (error) {
+    console.log("Error verificando pago:", error);
+    return false;
+  }
+
+  return data?.estado_pago === "pagado";
+}
 // Este vigilante detecta cambios de sesión en TIEMPO REAL
 _supabase.auth.onAuthStateChange((event, session) => {
     console.log("Evento de seguridad detectado:", event);
@@ -382,8 +396,19 @@ _supabase.auth.onAuthStateChange((event, session) => {
     const btnWpp = document.getElementById('btn-whatsapp-confirmar');
     if (btnWpp) {
         const urlParams = new URLSearchParams(window.location.search);
-        const pagoAprobado = urlParams.get('status') === 'success';
+        const pedidoId = urlParams.get('id');
 
+if (pedidoId) {
+  verificarPagoPedido(pedidoId).then(pagado => {
+    if (pagado) {
+      btnWpp.classList.remove('opacity-50', 'pointer-events-none');
+      btnWpp.disabled = false;
+    } else {
+      btnWpp.classList.add('opacity-50', 'pointer-events-none');
+      btnWpp.disabled = true;
+    }
+  });
+}
         if (!pagoAprobado) {
             // Si no hay éxito en la URL, lo mantenemos bloqueado y semitransparente
             btnWpp.classList.add('opacity-50', 'pointer-events-none');
@@ -620,6 +645,30 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
     const total = document.getElementById('cart-total')?.innerText || "";
     msg += `\n*TOTAL PAGADO: ${total}*`;
     msg += `\n\n_Por favor, confírmenme la recepción para coordinar el envío._`;
+async function enviarPedidoWhatsapp(msg) {
+
+  // Obtener ID del pedido desde la URL
+  const pedidoId = new URLSearchParams(window.location.search).get("id");
+
+  if (!pedidoId) {
+    alert("Pedido inválido o incompleto.");
+    return;
+  }
+
+  // Verificar pago en Supabase
+  const pagado = await verificarPagoPedido(pedidoId);
+
+  if (!pagado) {
+    alert("⚠️ El pago aún no está confirmado. Cuando se confirme podrás enviar el pedido.");
+    return;
+  }
+
+  // 👉 Pago confirmado → abrir WhatsApp
+  window.open(
+    `https://wa.me/5491112345678?text=${encodeURIComponent(msg)}`,
+    "_blank"
+  );
+}
 
     // 3. Abrimos WhatsApp
     window.open(`https://wa.me/5491112345678?text=${encodeURIComponent(msg)}`, '_blank');
@@ -733,6 +782,27 @@ window.addEventListener('DOMContentLoaded', async () => {
             btnWpp.innerHTML = '<i class="fab fa-whatsapp"></i> ENVIAR PEDIDO PAGADO';
         }
     }
+});
+document.addEventListener("DOMContentLoaded", async () => {
+
+  const btnWpp = document.getElementById("btn-whatsapp-confirmar");
+  if (!btnWpp) return;
+
+  const pedidoId = new URLSearchParams(window.location.search).get("id");
+
+  if (!pedidoId) {
+    btnWpp.classList.add("opacity-50","pointer-events-none");
+    return;
+  }
+
+  const pagado = await verificarPagoPedido(pedidoId);
+
+  if (pagado) {
+    btnWpp.classList.remove("opacity-50","pointer-events-none");
+  } else {
+    btnWpp.classList.add("opacity-50","pointer-events-none");
+  }
+
 });
     </script>
 </body>
