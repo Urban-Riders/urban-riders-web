@@ -391,31 +391,50 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
     await checkoutMP(customer);
 });
 
-        async function checkoutMP(customer) {
+       async function checkoutMP(customer) {
     const btn = document.getElementById('btn-confirmar-pago');
+    const originalText = btn.innerText;
     btn.innerText = "Procesando..."; btn.disabled = true;
 
     try {
-        // 1. REGISTRAMOS EL PEDIDO (Solo con columnas que existen en tu SQL)
-        const totalAmount = Number(document.getElementById('checkout-total-btn').innerText.replace('.', ''));
+        // 1. CALCULAMOS EL TOTAL DESDE LA VARIABLE CART (Sin depender del HTML)
+        const totalAmount = cart.reduce((acc, item) => acc + (Number(item.precio_minorista) * item.quantity), 0);
+
+        console.log("Iniciando registro en Supabase para:", customer.name, "Total:", totalAmount);
+
+        // 2. REGISTRAMOS EL PEDIDO (Usando solo tus columnas de SQL)
         const { data: pedidoData, error: pedidoError } = await _supabase
             .from('pedidos')
             .insert([{
-                cliente_nombre: customer.name, // Existe
-                total: totalAmount,           // Existe
-                estado_pago: 'pendiente'      // Existe
-                // Quitamos cliente_email y detalles porque NO están en tu SQL
+                cliente_nombre: customer.name,
+                total: totalAmount,
+                estado_pago: 'pendiente',
+                estado: 'Pendiente'
             }])
             .select();
 
-        if (pedidoError) throw pedidoError;
-        const pedidoId = pedidoData[0].id;
+        if (pedidoError) {
+            console.error("Error al insertar en Supabase:", pedidoError);
+            throw pedidoError;
+        }
 
-        // 2. VAMOS A MERCADO PAGO PASANDO EL ID DEL PEDIDO
-        const itemsMP = cart.map(i => ({ title: i.nombre, unit_price: Number(i.precio_minorista), quantity: i.quantity, currency_id: 'ARS' }));
+        const pedidoId = pedidoData[0].id;
+        console.log("Pedido creado con ID:", pedidoId);
+
+        // 3. VAMOS A MERCADO PAGO
+        const itemsMP = cart.map(i => ({ 
+            title: i.nombre, 
+            unit_price: Number(i.precio_minorista), 
+            quantity: i.quantity, 
+            currency_id: 'ARS' 
+        }));
+
         const res = await fetch('https://api.mercadopago.com/checkout/preferences', {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+            headers: { 
+                'Authorization': `Bearer ${MP_ACCESS_TOKEN}`, 
+                'Content-Type': 'application/json' 
+            },
             body: JSON.stringify({
                 items: itemsMP,
                 back_urls: { 
@@ -430,9 +449,9 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
         window.location.href = data.init_point;
 
     } catch (err) { 
-        console.error(err);
-        alert("Error al procesar el pago."); 
-        btn.innerText = "Ir a pagar"; btn.disabled = false; 
+        console.error("Error completo en el proceso:", err);
+        alert("Error al procesar el pedido. Revisa la consola."); 
+        btn.innerText = originalText; btn.disabled = false; 
     }
 }
         function renderCategories() {
