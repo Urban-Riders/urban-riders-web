@@ -680,10 +680,19 @@ function habilitarBotonWhatsapp() {
     const pedidoIdPago = sessionStorage.getItem('ultimo_pedido_pago');
     const btnWpp = document.getElementById('btn-whatsapp-confirmar');
     
-    if (pedidoIdPago && btnWpp) {
+    if (!btnWpp) return; // Si el botón no existe en el HTML todavía, salimos
+
+    // LÓGICA INTELIGENTE: ¿Hay ticket de pago Y el carrito NO está vacío?
+    if (pedidoIdPago && cart.length > 0) {
+        // SE ACTIVA (Verde)
         btnWpp.classList.remove('opacity-50', 'pointer-events-none', 'text-green-600', 'border-green-600');
         btnWpp.classList.add('bg-green-600', 'text-white');
         btnWpp.innerHTML = `<i class="fab fa-whatsapp"></i> ENVIAR PEDIDO #${pedidoIdPago}`;
+    } else {
+        // SE BLOQUEA (Gris) - Si falta el pago o si el carrito se vació
+        btnWpp.classList.add('opacity-50', 'pointer-events-none', 'text-green-600', 'border-green-600');
+        btnWpp.classList.remove('bg-green-600', 'text-white');
+        btnWpp.innerHTML = `<i class="fab fa-whatsapp"></i> Consultar por WhatsApp`;
     }
 }
 
