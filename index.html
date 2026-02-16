@@ -395,21 +395,23 @@ _supabase.auth.onAuthStateChange((event, session) => {
     localStorage.setItem('cart_urban', JSON.stringify(cart));
 
     // 2. CONTROL DE BLOQUEO VISUAL DEL BOTÓN WHATSAPP
-    const btnWpp = document.getElementById('btn-whatsapp-confirmar');
-    if (btnWpp) {
-        const urlParams = new URLSearchParams(window.location.search);
-        const pedidoId = urlParams.get('id');
+const btnWpp = document.getElementById('btn-whatsapp-confirmar');
 
-if (pedidoId) {
-  verificarPagoPedido(pedidoId).then(pagado => {
-    if (pagado) {
-      btnWpp.classList.remove('opacity-50', 'pointer-events-none');
-      btnWpp.disabled = false;
-    } else {
-      btnWpp.classList.add('opacity-50', 'pointer-events-none');
-      btnWpp.disabled = true;
+if (btnWpp) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const pedidoId = urlParams.get('id');
+
+    if (pedidoId) {
+        verificarPagoPedido(pedidoId).then(pagado => {
+            if (pagado) {
+                btnWpp.classList.remove('opacity-50', 'pointer-events-none');
+                btnWpp.disabled = false;
+            } else {
+                btnWpp.classList.add('opacity-50', 'pointer-events-none');
+                btnWpp.disabled = true;
+            }
+        });
     }
-  });
 }
         
 
