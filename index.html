@@ -411,20 +411,8 @@ if (pedidoId) {
     }
   });
 }
-        const pedidoId = new URLSearchParams(window.location.search).get("id");
+        
 
-if (!pedidoId) {
-    btnWpp.classList.add('opacity-50', 'pointer-events-none');
-    return;
-}
-
-const pagado = await verificarPagoPedido(pedidoId);
-
-if (!pagado) {
-    btnWpp.classList.add('opacity-50', 'pointer-events-none');
-} else {
-    btnWpp.classList.remove('opacity-50', 'pointer-events-none');
-}
 function toggleCart() { document.getElementById('cart-panel').classList.toggle('translate-x-full'); }
 function toggleCheckoutModal() { document.getElementById('checkout-modal').classList.toggle('hidden'); }
 function preCheckout() { if (cart.length > 0) { toggleCart(); toggleCheckoutModal(); } else alert("Carrito vacío"); }
@@ -809,6 +797,27 @@ document.addEventListener("DOMContentLoaded", async () => {
   } else {
     btnWpp.classList.add("opacity-50","pointer-events-none");
   }
+
+});
+document.addEventListener("DOMContentLoaded", async () => {
+
+    const btnWpp = document.getElementById("btn-whatsapp-confirmar");
+    if (!btnWpp) return;
+
+    const pedidoId = new URLSearchParams(window.location.search).get("id");
+
+    if (!pedidoId) {
+        btnWpp.classList.add("opacity-50", "pointer-events-none");
+        return;
+    }
+
+    const pagado = await verificarPagoPedido(pedidoId);
+
+    if (!pagado) {
+        btnWpp.classList.add("opacity-50", "pointer-events-none");
+    } else {
+        btnWpp.classList.remove("opacity-50", "pointer-events-none");
+    }
 
 });
     </script>
