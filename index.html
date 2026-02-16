@@ -278,7 +278,7 @@
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const MP_ACCESS_TOKEN = 'TU_ACCESS_TOKEN_AQUÍ'; 
 async function verificarPagoPedido(pedidoId) {
-  const { data, error } = await supabase
+  const { data, error } = await _supabase
     .from("pedidos")
     .select("estado_pago")
     .eq("id", pedidoId)
