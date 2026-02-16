@@ -680,23 +680,38 @@ function habilitarBotonWhatsapp() {
     }
 }
 
-// --- ACTUALIZACIÓN DEL EVENTO DE CARGA ---
+// --- GESTIÓN DE ESTADO AL CARGAR LA PÁGINA ---
 window.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const status = urlParams.get('status');
     const pedidoId = urlParams.get('pedido');
 
+    // 1. EL GRAN FILTRO (SOLUCIÓN A TU PROBLEMA):
+    // Si la URL NO tiene "status=success", significa que el usuario está navegando normal.
+    // ENTONCES: Borramos obligatoriamente cualquier rastro de pagos anteriores.
+    if (status !== 'success') {
+        sessionStorage.removeItem('ultimo_pedido_pago');
+        // Si quisieras ser más agresivo, podrías descomentar la siguiente línea:
+        // localStorage.removeItem('cart_urban'); 
+    }
+
+    // 2. SOLO SI VENIMOS DE MERCADO PAGO (URL tiene success):
     if (status === 'success' && pedidoId) {
-        // 1. Guardamos el ID del pago en la sesión
+        // Guardamos el ID válido
         sessionStorage.setItem('ultimo_pedido_pago', pedidoId);
         
-        // 2. Actualizamos Supabase
+        // Actualizamos Supabase a 'pago'
         await _supabase.from('pedidos').update({ estado_pago: 'pago' }).eq('id', pedidoId);
 
-        // IMPORTANTE: NO VACIAMOS EL CARRITO ACÁ. 
-        // Solo avisamos y actualizamos la vista para que el botón se ponga verde.
-        updateCart(); 
-        alert("¡Pago confirmado! Ahora toca el botón de WhatsApp para enviarnos el detalle de tu pedido.");
+        // Feedback al usuario
+        alert("¡Pago confirmado! Revisa tu carrito y presiona el botón de WhatsApp para finalizar.");
+    }
+    
+    // 3. ACTUALIZAMOS LA VISTA
+    // Esto llamará a habilitarBotonWhatsapp(). 
+    // Como acabamos de limpiar la sesión en el paso 1, el botón se quedará GRIS si no hubo pago reciente.
+    if (typeof updateCart === 'function') {
+        updateCart();
     }
 });
     </script>
