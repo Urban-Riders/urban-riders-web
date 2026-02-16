@@ -411,14 +411,19 @@ if (pedidoId) {
     }
   });
 }
-        if (!pagoAprobado) {
-            // Si no hay éxito en la URL, lo mantenemos bloqueado y semitransparente
-            btnWpp.classList.add('opacity-50', 'pointer-events-none');
-        } else {
-            // Si hay éxito, liberamos el botón
-            btnWpp.classList.remove('opacity-50', 'pointer-events-none');
-        }
-    }
+        const pedidoId = new URLSearchParams(window.location.search).get("id");
+
+if (!pedidoId) {
+    btnWpp.classList.add('opacity-50', 'pointer-events-none');
+    return;
+}
+
+const pagado = await verificarPagoPedido(pedidoId);
+
+if (!pagado) {
+    btnWpp.classList.add('opacity-50', 'pointer-events-none');
+} else {
+    btnWpp.classList.remove('opacity-50', 'pointer-events-none');
 }
 function toggleCart() { document.getElementById('cart-panel').classList.toggle('translate-x-full'); }
 function toggleCheckoutModal() { document.getElementById('checkout-modal').classList.toggle('hidden'); }
