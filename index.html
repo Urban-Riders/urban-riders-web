@@ -396,15 +396,15 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
     btn.innerText = "Procesando..."; btn.disabled = true;
 
     try {
-        // 1. REGISTRAMOS EL PEDIDO COMO PENDIENTE
+        // 1. REGISTRAMOS EL PEDIDO (Solo con columnas que existen en tu SQL)
+        const totalAmount = Number(document.getElementById('checkout-total-btn').innerText.replace('.', ''));
         const { data: pedidoData, error: pedidoError } = await _supabase
             .from('pedidos')
             .insert([{
-                cliente_nombre: customer.name,
-                cliente_email: customer.email,
-                total: Number(document.getElementById('checkout-total-btn').innerText.replace('.', '')),
-                estado_pago: 'pendiente', // Nueva columna
-                detalles: JSON.stringify(cart)
+                cliente_nombre: customer.name, // Existe
+                total: totalAmount,           // Existe
+                estado_pago: 'pendiente'      // Existe
+                // Quitamos cliente_email y detalles porque NO están en tu SQL
             }])
             .select();
 
@@ -638,12 +638,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     const paymentId = urlParams.get('payment_id'); // ID que genera Mercado Pago
 
     if (status === 'success' && pedidoId) {
-        // ACTUALIZAMOS EN SUPABASE QUE EL PAGO ES REAL
+        // Actualizamos el estado real en Supabase
         const { error } = await _supabase
             .from('pedidos')
             .update({ 
                 estado_pago: 'pago', 
-                id_pago_externo: paymentId 
+                id_pago_externo: paymentId,
+                estado: 'PAGO CONFIRMADO' // Usamos tu columna 'estado' también
             })
             .eq('id', pedidoId);
 
