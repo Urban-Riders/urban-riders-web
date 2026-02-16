@@ -296,7 +296,8 @@ _supabase.auth.onAuthStateChange((event, session) => {
 });
 
         let products = [];
-        let cart = [];
+        // Intentamos recuperar el carrito guardado; si no hay nada, empezamos con []
+        let cart = JSON.parse(localStorage.getItem('cart_urban')) || [];
         let productosLimite = 15;
         let currentCategory = 'TODOS';
         const CATEGORIAS_LIST = ['TODOS', 'CICLISMO', 'CASCOS', 'INDUMENTARIA', 'ACCESORIOS', 'REPUESTOS'];
@@ -350,6 +351,7 @@ _supabase.auth.onAuthStateChange((event, session) => {
     const container = document.getElementById('cart-items');
     const total = document.getElementById('cart-total');
     let sum = 0, items = 0;
+    
     container.innerHTML = cart.map(i => {
         const price = i.precio_minorista || 0;
         sum += price * i.quantity; items += i.quantity;
@@ -369,12 +371,14 @@ _supabase.auth.onAuthStateChange((event, session) => {
                 </div>
             </div>`;
     }).join('');
+
     document.getElementById('cart-count').innerText = items;
     total.innerText = `$${sum.toLocaleString()}`;
     document.getElementById('checkout-total-btn').innerText = sum.toLocaleString();
-// AGREGAR ESTO AQUÍ:
- 
-   habilitarBotonWhatsapp();
+
+    // --- LAS DOS LÍNEAS QUE SALVAN EL PROYECTO ---
+    localStorage.setItem('cart_urban', JSON.stringify(cart)); // Guarda el carrito para que no desaparezca
+    habilitarBotonWhatsapp(); // Revisa si el botón debe ser verde o gris
 }
 
 function toggleCart() { document.getElementById('cart-panel').classList.toggle('translate-x-full'); }
