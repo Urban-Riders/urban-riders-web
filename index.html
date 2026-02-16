@@ -371,6 +371,9 @@ _supabase.auth.onAuthStateChange((event, session) => {
     document.getElementById('cart-count').innerText = items;
     total.innerText = `$${sum.toLocaleString()}`;
     document.getElementById('checkout-total-btn').innerText = sum.toLocaleString();
+// AGREGAR ESTO AQUÍ:
+ 
+   habilitarBotonWhatsapp();
 }
 
 function toggleCart() { document.getElementById('cart-panel').classList.toggle('translate-x-full'); }
@@ -566,12 +569,20 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
         function openZoom(url) { document.getElementById('img-ampliada').src = url; document.getElementById('modal-zoom').style.display = 'flex'; }
         function closeZoom() { document.getElementById('modal-zoom').style.display = 'none'; }
         function checkoutWA() {
-            if (cart.length === 0) return alert("Carrito vacío");
-            let msg = `¡Hola Urban Riders! 👋 Me interesa esta compra:\n\n`;
-            cart.forEach(item => { msg += `• ${item.nombre} (Cant: ${item.quantity})\n`; });
-            msg += `\n*TOTAL: ${document.getElementById('cart-total').innerText}*`;
-            window.open(`https://wa.me/5491112345678?text=${encodeURIComponent(msg)}`, '_blank');
-        }
+    const pedidoId = sessionStorage.getItem('ultimo_pedido_pago');
+    let msg = `¡Hola Urban Riders! 👋\n`;
+    
+    if (pedidoId) {
+        msg += `✅ *PAGO CONFIRMADO DEL PEDIDO #${pedidoId}*\n\n`;
+    } else {
+        msg += `Me interesa esta compra:\n\n`;
+    }
+
+    cart.forEach(item => { msg += `• ${item.nombre} (Cant: ${item.quantity})\n`; });
+    msg += `\n*TOTAL: ${document.getElementById('cart-total').innerText}*`;
+    
+    window.open(`https://wa.me/5491112345678?text=${encodeURIComponent(msg)}`, '_blank');
+}
 function loadMore() {
             productosLimite += 12; // Aumentamos la cantidad a mostrar
             loadProducts();        // Recargamos el catálogo
@@ -649,39 +660,42 @@ document.getElementById('newsletter-form').addEventListener('submit', async (e) 
         btn.innerText = originalText;
     }
 });
-// VALIDACIÓN DE PAGO Y LIBERACIÓN DE WHATSAPP
+// --- NUEVA FUNCIÓN INDEPENDIENTE ---
+function habilitarBotonWhatsapp() {
+    const pedidoIdPago = sessionStorage.getItem('ultimo_pedido_pago');
+    const btnWpp = document.getElementById('btn-whatsapp-confirmar');
+    
+    if (pedidoIdPago && btnWpp) {
+        btnWpp.classList.remove('opacity-50', 'pointer-events-none', 'text-green-600', 'border-green-600');
+        btnWpp.classList.add('bg-green-600', 'text-white');
+        btnWpp.innerHTML = `<i class="fab fa-whatsapp"></i> ENVIAR PEDIDO #${pedidoIdPago}`;
+    }
+}
+
+// --- ACTUALIZACIÓN DEL EVENTO DE CARGA ---
 window.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const status = urlParams.get('status');
     const pedidoId = urlParams.get('pedido');
-    const paymentId = urlParams.get('payment_id'); // ID que genera Mercado Pago
+    const paymentId = urlParams.get('payment_id');
 
     if (status === 'success' && pedidoId) {
-        // Actualizamos el estado real en Supabase
         const { error } = await _supabase
             .from('pedidos')
             .update({ 
                 estado_pago: 'pago', 
                 id_pago_externo: paymentId,
-                estado: 'PAGO CONFIRMADO' // Usamos tu columna 'estado' también
+                estado: 'PAGO CONFIRMADO' 
             })
             .eq('id', pedidoId);
 
         if (!error) {
-            const btnWpp = document.getElementById('btn-whatsapp-confirmar');
-            if (btnWpp) {
-                // LIBERAMOS EL BOTÓN
-                btnWpp.classList.remove('opacity-50', 'pointer-events-none');
-                btnWpp.classList.add('bg-green-600', 'text-white');
-                btnWpp.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar Pedido Pagado';
-                
-                alert("¡Pago confirmado en base de datos! Ya puedes enviar el WhatsApp.");
-                
-                // Limpiamos el carrito local
-                localStorage.removeItem('cart_urban');
-                cart = [];
-                updateCart();
-            }
+            // Guardamos el ID para que la función sepa que debe habilitar el botón
+            sessionStorage.setItem('ultimo_pedido_pago', pedidoId);
+            localStorage.removeItem('cart_urban');
+            cart = [];
+            updateCart();
+            alert("¡Pago confirmado! Botón liberado.");
         }
     }
 });
