@@ -394,7 +394,10 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
     await checkoutMP(customer);
 });
 
-       async function checkoutMP(customer) {
+      async function checkoutMP(customer) {
+    // 0. LIMPIEZA: Borramos cualquier rastro de pagos anteriores antes de empezar uno nuevo
+    sessionStorage.removeItem('ultimo_pedido_pago');
+    
     const btn = document.getElementById('btn-confirmar-pago');
     const originalText = btn.innerText;
     btn.innerText = "Procesando..."; btn.disabled = true;
@@ -578,10 +581,22 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
         msg += `Me interesa esta compra:\n\n`;
     }
 
-    cart.forEach(item => { msg += `• ${item.nombre} (Cant: ${item.quantity})\n`; });
+    // Listamos los productos del carrito
+    cart.forEach(item => { 
+        msg += `• ${item.nombre} (Cant: ${item.quantity})\n`; 
+    });
+    
     msg += `\n*TOTAL: ${document.getElementById('cart-total').innerText}*`;
     
+    // Abrimos WhatsApp
     window.open(`https://wa.me/5491112345678?text=${encodeURIComponent(msg)}`, '_blank');
+
+    // --- LIMPIEZA POST-ENVÍO ---
+    // Borramos el ID de la sesión para que el próximo carrito nazca bloqueado
+    sessionStorage.removeItem('ultimo_pedido_pago');
+    
+    // Refrescamos visualmente el botón para que vuelva a su estado gris/bloqueado
+    habilitarBotonWhatsapp();
 }
 function loadMore() {
             productosLimite += 12; // Aumentamos la cantidad a mostrar
