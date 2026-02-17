@@ -303,50 +303,83 @@ _supabase.auth.onAuthStateChange((event, session) => {
         const CATEGORIAS_LIST = ['TODOS', 'CICLISMO', 'CASCOS', 'INDUMENTARIA', 'ACCESORIOS', 'REPUESTOS'];
 
         async function loadProducts() {
-            try {
-                // 1. Obtenemos el conteo total de productos con stock
-                const { count, error: countError } = await _supabase
-                    .from('productos_publicos')
-                    .select('*', { count: 'exact', head: true })
-                    .gt('stock', 0);
+    try {
+        // 1. Obtenemos el conteo total de productos con stock
+        const { count, error: countError } = await _supabase
+            .from('productos_publicos')
+            .select('*', { count: 'exact', head: true })
+            .gt('stock', 0);
 
-                if (countError) throw countError;
+        if (countError) throw countError;
 
-                // 2. Traemos los productos según el límite actual
-                const { data, error } = await _supabase
-                    .from('productos_publicos')
-                    .select('*')
-                    .gt('stock', 0)
-                    .order('nombre', { ascending: true })
-                    .range(0, productosLimite - 1);
+        // 2. Traemos los productos según el límite actual
+        const { data, error } = await _supabase
+            .from('productos_publicos')
+            .select('*')
+            .gt('stock', 0)
+            .order('nombre', { ascending: true })
+            .range(0, productosLimite - 1);
 
-                if (error) throw error;
+        if (error) throw error;
 
-                // 3. Actualizamos la lista global y dibujamos
-                products = data; 
-                renderCategories(); 
-                renderProducts(products);
+        // 3. Actualizamos la lista global y dibujamos
+        products = data; 
+        
+        // --- AGREGA SOLO ESTA LÍNEA ---
+        window.products = data; // <--- ESTO ARREGLA EL "NO ESTÁ EN MEMORIA"
+        // ------------------------------
 
-                // 4. Lógica del botón "Ver más"
-                const btnContainer = document.getElementById('load-more-container');
-                if (count > productosLimite) {
-                    btnContainer.classList.remove('hidden');
-                } else {
-                    btnContainer.classList.add('hidden');
-                }
-            } catch (err) {
-                console.error("Error cargando catálogo:", err);
-            }
+        renderCategories(); 
+        renderProducts(products);
+
+        // 4. Lógica del botón "Ver más"
+        const btnContainer = document.getElementById('load-more-container');
+        if (count > productosLimite) {
+            btnContainer.classList.remove('hidden');
+        } else {
+            btnContainer.classList.add('hidden');
         }
-
+    } catch (err) {
+        console.error("Error cargando catálogo:", err);
+    }
+}
         function addToCart(id) {
-            const p = products.find(p => p.id == id);
-            const item = cart.find(i => i.id == id);
-            if (item) item.quantity++; else cart.push({...p, quantity: 1});
-            updateCart();
-            if(cart.length === 1) toggleCart();
+    // 1. CORRECCIÓN DE MEMORIA: Usamos window.products
+    // Usamos '==' para que el ID 16 encuentre al "16"
+    const p = window.products.find(p => p.id == id);
+
+    // Seguridad: Si por milagro no lo encuentra, cortamos para no romper nada
+    if (!p) {
+        console.error("No se pudo agregar el producto ID:", id);
+        return;
+    }
+
+    const item = cart.find(i => i.id == id);
+
+    if (item) {
+        item.quantity++;
+    } else {
+        // 2. CORRECCIÓN DE IMAGEN:
+        // Antes de meterlo al carrito, verificamos la foto.
+        let imgClean = 'img/logo-ur.png';
+        if (p.imagen_url && p.imagen_url !== "undefined" && p.imagen_url !== null) {
+            imgClean = p.imagen_url;
         }
 
+        // 3. OBJETO LIMPIO:
+        // En vez de usar '...p' (que copia errores), creamos uno nuevo perfecto
+        cart.push({
+            id: p.id,
+            nombre: p.nombre,
+            precio_minorista: Number(p.precio_minorista || p.precio || 0),
+            imagen_url: imgClean,
+            quantity: 1
+        });
+    }
+    
+    updateCart();
+    if(cart.length === 1) toggleCart();
+}
         function updateCart() {
     const container = document.getElementById('cart-items');
     const total = document.getElementById('cart-total');
@@ -532,22 +565,39 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
         });
         
         function renderProducts(list) {
-            const container = document.getElementById('grid-productos');
-            container.innerHTML = list.map(p => `
-                <div class="product-card bg-slate-500/50 backdrop-blur-sm rounded-2xl overflow-hidden shadow-xl border border-white/10 p-3">
-                    <div class="relative mb-2 cursor-zoom-in flex justify-center" onclick="openZoom('${p.imagen_url}')">
-                        <img src="${p.imagen_url}" class="w-full h-32 object-contain">
-                    </div>
-                    <div class="text-[9px] text-yellow-600 font-bold uppercase mb-1">${p.categoria}</div>
-                    <h3 class="font-bold text-white leading-tight h-8 mb-2 uppercase text-[12px] line-clamp-2">${p.nombre}</h3>
-                    <div class="flex items-end justify-between">
-                        <div class="text-lg font-black text-white">$${Number(p.precio_minorista).toLocaleString()}</div>
-                        <button onclick="addToCart(${p.id})" class="bg-black text-white w-8 h-8 rounded-full hover:bg-yellow-500 hover:text-black transition">
-                            <i class="fas fa-plus text-xs"></i>
-                        </button>
-                    </div>
-                </div>`).join('');
+    const container = document.getElementById('grid-productos');
+    // Validación de seguridad por si el contenedor aún no cargó
+    if (!container) return;
+
+    container.innerHTML = list.map(p => {
+        // 1. BLINDAJE DE IMAGEN:
+        // Si no tiene imagen, o es "undefined", usamos el logo.
+        let imgUrl = 'img/logo-ur.png';
+        if (p.imagen_url && p.imagen_url !== "undefined" && p.imagen_url !== null) {
+            imgUrl = p.imagen_url;
         }
+
+        // 2. BLINDAJE DE PRECIO:
+        // Aseguramos que sea número, si falla ponemos 0
+        let precio = Number(p.precio_minorista) || Number(p.precio) || 0;
+
+        return `
+            <div class="product-card bg-slate-500/50 backdrop-blur-sm rounded-2xl overflow-hidden shadow-xl border border-white/10 p-3">
+                <div class="relative mb-2 cursor-zoom-in flex justify-center" onclick="openZoom('${imgUrl}')">
+                    <img src="${imgUrl}" class="w-full h-32 object-contain" onerror="this.src='img/logo-ur.png'">
+                </div>
+                <div class="text-[9px] text-yellow-600 font-bold uppercase mb-1">${p.categoria || 'Varios'}</div>
+                <h3 class="font-bold text-white leading-tight h-8 mb-2 uppercase text-[12px] line-clamp-2">${p.nombre}</h3>
+                <div class="flex items-end justify-between">
+                    <div class="text-lg font-black text-white">$${precio.toLocaleString()}</div>
+                    
+                    <button onclick="addToCart('${p.id}')" class="bg-black text-white w-8 h-8 rounded-full hover:bg-yellow-500 hover:text-black transition flex items-center justify-center">
+                        <i class="fas fa-plus text-xs"></i>
+                    </button>
+                </div>
+            </div>`;
+    }).join('');
+}
         function changeQty(id, delta) {
             const item = cart.find(i => i.id === id);
             item.quantity += delta;
