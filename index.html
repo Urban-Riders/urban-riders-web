@@ -340,26 +340,43 @@ _supabase.auth.onAuthStateChange((event, session) => {
         }
 
         function addToCart(id) {
-            const p = products.find(p => p.id === id);
-            const item = cart.find(i => i.id === id);
-            if (item) item.quantity++; else cart.push({...p, quantity: 1});
-            updateCart();
-            if(cart.length === 1) toggleCart();
-        }
+    const p = products.find(p => p.id === id);
+    if (!p) return;
 
-        function updateCart() {
+    const item = cart.find(i => i.id === id);
+    if (item) {
+        item.quantity++;
+    } else {
+        // Normalizamos el objeto con los nombres exactos del CSV
+        cart.push({
+            id: p.id,
+            nombre: p.nombre,
+            precio_minorista: parseFloat(p.precio_minorista) || 0,
+            imagen_url: p.imagen_url,
+            quantity: 1
+        });
+    }
+    updateCart();
+    if(cart.length === 1) toggleCart();
+}
+function updateCart() {
     const container = document.getElementById('cart-items');
     const total = document.getElementById('cart-total');
     let sum = 0, items = 0;
     
     container.innerHTML = cart.map(i => {
+        // CAMBIO CLAVE: Usamos i.precio_minorista, NO i.precio
         const price = i.precio_minorista || 0;
-        sum += price * i.quantity; items += i.quantity;
+        sum += price * i.quantity; 
+        items += i.quantity;
+        
         return `
             <div class="flex gap-4 border-b border-white/10 pb-4">
-                <img src="${i.imagen_url}" class="w-16 h-16 object-cover rounded cursor-zoom-in" onclick="openZoom('${i.imagen_url}')">
+                <img src="${i.imagen_url}" class="w-16 h-16 object-cover rounded cursor-zoom-in" 
+                     onerror="this.src='img/logo-ur.png'"
+                     onclick="openZoom('${i.imagen_url}')">
                 <div class="flex-1">
-                    <h4 class="font-bold text-xs uppercase text-slate-100">${i.nombre}</h4>
+                    <h4 class="font-bold text-[10px] uppercase text-slate-100">${i.nombre}</h4>
                     <div class="flex justify-between items-center mt-2">
                         <div class="text-sm font-bold text-white">$${Number(price).toLocaleString()}</div>
                         <div class="flex items-center gap-3 bg-slate-800 text-white rounded-lg px-2">
@@ -374,11 +391,12 @@ _supabase.auth.onAuthStateChange((event, session) => {
 
     document.getElementById('cart-count').innerText = items;
     total.innerText = `$${sum.toLocaleString()}`;
-    document.getElementById('checkout-total-btn').innerText = sum.toLocaleString();
+    const btnTotal = document.getElementById('checkout-total-btn');
+    if(btnTotal) btnTotal.innerText = sum.toLocaleString();
 
-    // --- LAS DOS LÍNEAS QUE SALVAN EL PROYECTO ---
-    localStorage.setItem('cart_urban', JSON.stringify(cart)); // Guarda el carrito para que no desaparezca
-    habilitarBotonWhatsapp(); // Revisa si el botón debe ser verde o gris
+    // PERSISTENCIA Y BOTÓN WAPP
+    localStorage.setItem('cart_urban', JSON.stringify(cart));
+    habilitarBotonWhatsapp();
 }
 
 function toggleCart() { document.getElementById('cart-panel').classList.toggle('translate-x-full'); }
