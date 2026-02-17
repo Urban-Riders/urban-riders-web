@@ -275,167 +275,110 @@
 
     <script>
         const SUPABASE_URL = 'https://dsexvmstfjadjdbptmzn.supabase.co';
-        // (Tu clave está bien, la dejo tal cual)
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFub24iLCJpYXQiOjE3NjY2OTc3MzUsImV4cCI6MjA4MjI3MzczNX0.L0Wz3hwZOarNLqkYH5-RAzz2Y6iwI4uaE_rlkcKkgyg';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzZXh2bXN0ZmphZGpkYnB0bXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2OTc3MzUsImV4cCI6MjA4MjI3MzczNX0.L0Wz3hwZOarNLqkYH5-RAzz2Y6iwI4uaE_rlkcKkgyg';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const MP_ACCESS_TOKEN = 'TU_ACCESS_TOKEN_AQUÍ'; 
+// Este vigilante detecta cambios de sesión en TIEMPO REAL
+_supabase.auth.onAuthStateChange((event, session) => {
+    console.log("Evento de seguridad detectado:", event);
 
-        // Este vigilante detecta cambios de sesión en TIEMPO REAL
-        _supabase.auth.onAuthStateChange((event, session) => {
-            console.log("Evento de seguridad detectado:", event);
+    // No importa si entra o sale, en el index siempre queremos 
+    // refrescar el catálogo público para asegurar que se vea bien.
+    if (typeof loadProducts === 'function') {
+        loadProducts();
+    }
 
-            if (typeof loadProducts === 'function') {
-                loadProducts();
-            }
+    // Si el evento es un cierre de sesión, podemos limpiar el carrito
+    if (event === 'SIGNED_OUT') {
+        cart = []; 
+        if (typeof updateCart === 'function') updateCart();
+    }
+});
 
-            if (event === 'SIGNED_OUT') {
-                cart = []; 
-                if (typeof updateCart === 'function') updateCart();
-            }
-        });
-
-        // --- AQUÍ ESTÁ LA CORRECCIÓN MÁGICA ---
-        
-        // Usamos window.products para que sea 100% GLOBAL y el botón la encuentre
-        window.products = []; 
-        
-        // Usamos var para asegurar que la paginación no falle
-        var productosLimite = 15; 
-        
-        // Recuperamos el carrito
+        let products = [];
+        // Intentamos recuperar el carrito guardado; si no hay nada, empezamos con []
         let cart = JSON.parse(localStorage.getItem('cart_urban')) || [];
+        let productosLimite = 15;
         let currentCategory = 'TODOS';
         const CATEGORIAS_LIST = ['TODOS', 'CICLISMO', 'CASCOS', 'INDUMENTARIA', 'ACCESORIOS', 'REPUESTOS'];
 
-       async function loadProducts() {
-    try {
-        console.log("--- INTENTANDO RECUPERAR CATÁLOGO ---");
+        async function loadProducts() {
+            try {
+                // 1. Obtenemos el conteo total de productos con stock
+                const { count, error: countError } = await _supabase
+                    .from('productos_publicos')
+                    .select('*', { count: 'exact', head: true })
+                    .gt('stock', 0);
 
-        // 1. Volvemos a 'productos_publicos' que es la que SÍ te funcionaba
-        const { count, error: countError } = await _supabase
-            .from('productos_publicos') 
-            .select('*', { count: 'exact', head: true })
-            .gt('stock', 0);
+                if (countError) throw countError;
 
-        if (countError) throw countError;
+                // 2. Traemos los productos según el límite actual
+                const { data, error } = await _supabase
+                    .from('productos_publicos')
+                    .select('*')
+                    .gt('stock', 0)
+                    .order('nombre', { ascending: true })
+                    .range(0, productosLimite - 1);
 
-        // 2. Traemos los datos de la tabla PÚBLICA
-        const { data, error } = await _supabase
-            .from('productos_publicos')
-            .select('*')
-            .gt('stock', 0)
-            .order('nombre', { ascending: true })
-            .range(0, productosLimite - 1);
+                if (error) throw error;
 
-        if (error) throw error;
+                // 3. Actualizamos la lista global y dibujamos
+                products = data; 
+                renderCategories(); 
+                renderProducts(products);
 
-        // --- AQUÍ ESTÁ EL ARREGLO REAL DEL BOTÓN ---
-        // Guardamos los datos en la ventana global para que el click los encuentre
-        window.products = data; 
-        
-        console.log(`✅ Recuperados ${data.length} productos.`);
-
-        // Dibujamos
-        if (typeof renderCategories === 'function') renderCategories();
-        
-        // Pasamos window.products explícitamente
-        renderProducts(window.products);
-
-        // 4. Botón ver más (Tu lógica original)
-        const btnContainer = document.getElementById('load-more-container');
-        if (btnContainer) {
-            if (count > productosLimite) {
-                btnContainer.classList.remove('hidden');
-            } else {
-                btnContainer.classList.add('hidden');
+                // 4. Lógica del botón "Ver más"
+                const btnContainer = document.getElementById('load-more-container');
+                if (count > productosLimite) {
+                    btnContainer.classList.remove('hidden');
+                } else {
+                    btnContainer.classList.add('hidden');
+                }
+            } catch (err) {
+                console.error("Error cargando catálogo:", err);
             }
         }
 
-    } catch (err) {
-        console.error("Error FATAL cargando catálogo:", err);
-        alert("Error cargando productos. Revisa la consola.");
-    }
-}
+        function addToCart(id) {
+            const p = products.find(p => p.id === id);
+            const item = cart.find(i => i.id === id);
+            if (item) item.quantity++; else cart.push({...p, quantity: 1});
+            updateCart();
+            if(cart.length === 1) toggleCart();
+        }
 
-      // Reemplaza tu función addToCart completa por esta:
-function addToCart(id) {
-    // CORRECCIÓN: Usamos '==' en lugar de '===' para que "18" sea igual a 18
-    const p = products.find(prod => prod.id == id);
-    
-    if (!p) {
-        console.error("Error: Producto no encontrado en memoria. ID buscado:", id);
-        return;
-    }
-
-    // CORRECCIÓN: Aquí también usamos '=='
-    const item = cart.find(i => i.id == id);
-    
-    if (item) {
-        item.quantity++;
-    } else {
-        // Lógica de seguridad para evitar datos rotos
-        const precioFinal = parseFloat(p.precio_minorista || p.precio || 0);
-        const imagenFinal = (p.imagen_url && p.imagen_url !== "undefined") ? p.imagen_url : 'img/logo-ur.png';
-
-        cart.push({
-            id: p.id,
-            nombre: p.nombre || "Producto Sin Nombre",
-            precio_minorista: precioFinal,
-            imagen_url: imagenFinal,
-            quantity: 1
-        });
-    }
-    updateCart();
-    
-    // Abrimos el carrito automáticamente al agregar el primer producto
-    if(cart.length === 1) toggleCart();
-}
-function updateCart() {
+        function updateCart() {
     const container = document.getElementById('cart-items');
-    if (!container) return;
-
+    const total = document.getElementById('cart-total');
     let sum = 0, items = 0;
     
     container.innerHTML = cart.map(i => {
-        // Si i.precio_minorista no existe, price será 0
-        const price = Number(i.precio_minorista) || 0;
-        sum += price * i.quantity; 
-        items += i.quantity;
-        
-        // Si la URL es undefined o vacía, usamos el logo local
-        const imgPath = (i.imagen_url && i.imagen_url !== "undefined") ? i.imagen_url : 'img/logo-ur.png';
-
+        const price = i.precio_minorista || 0;
+        sum += price * i.quantity; items += i.quantity;
         return `
             <div class="flex gap-4 border-b border-white/10 pb-4">
-                <img src="${imgPath}" 
-                     class="w-16 h-16 object-cover rounded shadow-md" 
-                     onerror="this.src='img/logo-ur.png'">
+                <img src="${i.imagen_url}" class="w-16 h-16 object-cover rounded cursor-zoom-in" onclick="openZoom('${i.imagen_url}')">
                 <div class="flex-1">
-                    <h4 class="font-bold text-[10px] uppercase text-slate-100">${i.nombre || 'Producto'}</h4>
+                    <h4 class="font-bold text-xs uppercase text-slate-100">${i.nombre}</h4>
                     <div class="flex justify-between items-center mt-2">
-                        <div class="text-sm font-bold text-white">$${price.toLocaleString()}</div>
+                        <div class="text-sm font-bold text-white">$${Number(price).toLocaleString()}</div>
                         <div class="flex items-center gap-3 bg-slate-800 text-white rounded-lg px-2">
-                            <button onclick="changeQty(${i.id}, -1)" class="p-1 hover:text-yellow-400">-</button>
-                            <span class="text-xs font-bold w-4 text-center">${i.quantity}</span>
-                            <button onclick="changeQty(${i.id}, 1)" class="p-1 hover:text-yellow-400">+</button>
+                            <button onclick="changeQty(${i.id}, -1)">-</button>
+                            <span class="text-xs font-bold">${i.quantity}</span>
+                            <button onclick="changeQty(${i.id}, 1)">+</button>
                         </div>
                     </div>
                 </div>
             </div>`;
     }).join('');
 
-    // Actualizamos los elementos de la interfaz
-    const cartCount = document.getElementById('cart-count');
-    const cartTotal = document.getElementById('cart-total');
-    const checkoutBtn = document.getElementById('checkout-total-btn');
+    document.getElementById('cart-count').innerText = items;
+    total.innerText = `$${sum.toLocaleString()}`;
+    document.getElementById('checkout-total-btn').innerText = sum.toLocaleString();
 
-    if(cartCount) cartCount.innerText = items;
-    if(cartTotal) cartTotal.innerText = `$${sum.toLocaleString()}`;
-    if(checkoutBtn) checkoutBtn.innerText = sum.toLocaleString();
-
-    // Guardamos en memoria
-    localStorage.setItem('cart_urban', JSON.stringify(cart));
-    habilitarBotonWhatsapp();
+    // --- LAS DOS LÍNEAS QUE SALVAN EL PROYECTO ---
+    localStorage.setItem('cart_urban', JSON.stringify(cart)); // Guarda el carrito para que no desaparezca
+    habilitarBotonWhatsapp(); // Revisa si el botón debe ser verde o gris
 }
 
 function toggleCart() { document.getElementById('cart-panel').classList.toggle('translate-x-full'); }
@@ -588,39 +531,23 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
             }
         });
         
-        // Reemplaza tu función renderProducts completa por esta:
-function renderProducts(list) {
-    const container = document.getElementById('grid-productos');
-    
-    // Si la lista está vacía, mostramos mensaje
-    if(list.length === 0) {
-        container.innerHTML = '<p class="text-white text-center col-span-full">No se encontraron productos.</p>';
-        return;
-    }
-
-    container.innerHTML = list.map(p => {
-        // SEGURIDAD DE DATOS (Lo que arreglamos antes)
-        const precio = parseFloat(p.precio_minorista || p.precio || 0);
-        const imagen = (p.imagen_url && p.imagen_url !== "undefined") ? p.imagen_url : 'img/logo-ur.png';
-
-        return `
-            <div class="product-card bg-slate-500/50 backdrop-blur-sm rounded-2xl overflow-hidden shadow-xl border border-white/10 p-3">
-                <div class="relative mb-2 cursor-zoom-in flex justify-center" onclick="openZoom('${imagen}')">
-                    <img src="${imagen}" class="w-full h-32 object-contain" onerror="this.src='img/logo-ur.png'">
-                </div>
-                <div class="text-[9px] text-yellow-600 font-bold uppercase mb-1">${p.categoria || 'Varios'}</div>
-                <h3 class="font-bold text-white leading-tight h-8 mb-2 uppercase text-[12px] line-clamp-2">${p.nombre}</h3>
-                <div class="flex items-end justify-between">
-                    <div class="text-lg font-black text-white">$${precio.toLocaleString()}</div>
-                    
-                    <button onclick="addToCart('${p.id}')" 
-                            class="bg-black text-white w-8 h-8 rounded-full hover:bg-yellow-500 hover:text-black transition flex items-center justify-center">
-                        <i class="fas fa-plus text-xs"></i>
-                    </button>
-                </div>
-            </div>`;
-    }).join('');
-}
+        function renderProducts(list) {
+            const container = document.getElementById('grid-productos');
+            container.innerHTML = list.map(p => `
+                <div class="product-card bg-slate-500/50 backdrop-blur-sm rounded-2xl overflow-hidden shadow-xl border border-white/10 p-3">
+                    <div class="relative mb-2 cursor-zoom-in flex justify-center" onclick="openZoom('${p.imagen_url}')">
+                        <img src="${p.imagen_url}" class="w-full h-32 object-contain">
+                    </div>
+                    <div class="text-[9px] text-yellow-600 font-bold uppercase mb-1">${p.categoria}</div>
+                    <h3 class="font-bold text-white leading-tight h-8 mb-2 uppercase text-[12px] line-clamp-2">${p.nombre}</h3>
+                    <div class="flex items-end justify-between">
+                        <div class="text-lg font-black text-white">$${Number(p.precio_minorista).toLocaleString()}</div>
+                        <button onclick="addToCart(${p.id})" class="bg-black text-white w-8 h-8 rounded-full hover:bg-yellow-500 hover:text-black transition">
+                            <i class="fas fa-plus text-xs"></i>
+                        </button>
+                    </div>
+                </div>`).join('');
+        }
         function changeQty(id, delta) {
             const item = cart.find(i => i.id === id);
             item.quantity += delta;
