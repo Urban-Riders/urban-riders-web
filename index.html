@@ -439,67 +439,89 @@ function toggleCart() { document.getElementById('cart-panel').classList.toggle('
 function toggleCheckoutModal() { document.getElementById('checkout-modal').classList.toggle('hidden'); }
 function preCheckout() { if (cart.length > 0) { toggleCart(); toggleCheckoutModal(); } else alert("Carrito vacío"); }
 
+// --- NUEVA LÓGICA DE PEDIDO INTEGRADA (CON LOGÍSTICA Y WHATSAPP) ---
+
 document.getElementById('form-datos-cliente').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const customer = {
-        name: document.getElementById('cust-name').value,
-        dni: document.getElementById('cust-dni').value,
-        email: document.getElementById('cust-email').value,
-        phone: document.getElementById('cust-phone').value,
-        address: document.getElementById('cust-address').value,
-        city: document.getElementById('cust-city').value,
-        zip: document.getElementById('cust-zip').value
-    };
-    await checkoutMP(customer);
-});
-
-     async function checkoutMP(customer) {
-    // 0. LIMPIEZA: Borramos rastros de pagos anteriores
-    sessionStorage.removeItem('ultimo_pedido_pago');
     
     const btn = document.getElementById('btn-confirmar-pago');
-    const originalText = btn.innerText;
-    btn.innerText = "Procesando..."; btn.disabled = true;
+    const originalText = btn.innerHTML;
+
+    // 1. CAPTURAR DATOS DE TUS INPUTS (cust-...)
+    const cliente = {
+        nombre: document.getElementById('cust-name').value.trim(),
+        dni: document.getElementById('cust-dni').value.trim(),
+        email: document.getElementById('cust-email').value.trim(),
+        telefono: document.getElementById('cust-phone').value.trim(),
+        direccion: document.getElementById('cust-address').value.trim(),
+        ciudad: document.getElementById('cust-city').value.trim(),
+        cp: document.getElementById('cust-zip').value.trim()
+    };
+
+    if (cart.length === 0) return alert("El carrito está vacío.");
+
+    // Feedback visual
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+    btn.disabled = true;
 
     try {
-        // 1. CALCULAMOS EL TOTAL
-        const totalAmount = cart.reduce((acc, item) => acc + (Number(item.precio_minorista) * item.quantity), 0);
+        const totalCalculado = cart.reduce((sum, item) => sum + (item.precio_minorista * item.quantity), 0);
 
-        // 2. REGISTRAMOS EL PEDIDO EN SUPABASE (Esto es fundamental para tu control)
+        // 2. GUARDAR EL PEDIDO (CABECERA CON DATOS DE LOGÍSTICA)
+        // Guardamos todo para que aparezca en el Admin
         const { data: pedidoData, error: pedidoError } = await _supabase
             .from('pedidos')
             .insert([{
-                cliente_nombre: customer.name,
-                total: totalAmount,
+                cliente_nombre: cliente.nombre,
+                dni_cliente: cliente.dni,           
+                direccion_envio: cliente.direccion, 
+                ciudad: cliente.ciudad,             
+                cp: cliente.cp,                     
+                metodo_envio: 'correo',
+                total: totalCalculado,
+                estado: 'pendiente',        
                 estado_pago: 'pendiente',
-                estado: 'Pendiente'
+                vendedor_nombre: null
             }])
             .select();
 
         if (pedidoError) throw pedidoError;
         const pedidoId = pedidoData[0].id;
 
-        console.log("Pedido registrado en Supabase con ID:", pedidoId);
+        // 3. GUARDAR LOS PRODUCTOS (DETALLE)
+        // Esto permite que el Admin vea la lista de productos al tocar el "ojo"
+        const detalles = cart.map(item => ({
+            pedido_id: pedidoId,
+            producto_nombre: item.nombre,
+            cantidad: item.quantity,
+            precio_unitario: item.precio_minorista,
+            subtotal: item.precio_minorista * item.quantity
+        }));
 
-        /* IMPORTANTE: Como Mercado Pago no permite crear preferencias desde el navegador (Error de CORS),
-           vamos a simular la redirección de éxito para que puedas ver el BOTÓN VERDE funcionando.
-           En un entorno real, aquí llamarías a un servidor (Backend).
-        */
+        const { error: errorDetalles } = await _supabase
+            .from('pedido_detalles')
+            .insert(detalles);
+
+        if (errorDetalles) throw errorDetalles;
+
+        // 4. MANTENER TU LÓGICA DE ÉXITO Y WHATSAPP
+        // Usamos la misma URL de éxito que ya tenías para que se active el botón de WhatsApp
+        const successUrl = window.location.origin + window.location.pathname + 
+                           `?status=success&pedido=${pedidoId}&payment_id=SIM_${Date.now()}`;
         
-        // Simulamos la URL de retorno exitosa de Mercado Pago
-        const successUrl = window.location.origin + window.location.pathname + `?status=success&pedido=${pedidoId}&payment_id=SIM_${Date.now()}`;
+        // Limpieza de seguridad igual a tu código original
+        sessionStorage.removeItem('ultimo_pedido_pago');
         
-        alert("Simulando proceso de pago... Al aceptar, volverás con el pedido confirmado.");
-        
-        // Redirigimos para que se active la lógica de "habilitarBotonWhatsapp"
+        // Redirección final para activar el flujo de WhatsApp
         window.location.href = successUrl;
 
-    } catch (err) { 
-        console.error("Error en el proceso:", err);
-        alert("Hubo un error al registrar el pedido en la base de datos."); 
-        btn.innerText = originalText; btn.disabled = false; 
+    } catch (err) {
+        console.error("Error al procesar pedido:", err);
+        alert("Hubo un error al registrar el pedido. Intenta nuevamente.");
+        btn.innerHTML = originalText;
+        btn.disabled = false;
     }
-}
+});
         function renderCategories() {
     const container = document.getElementById('categories-container');
     container.innerHTML = CATEGORIAS_LIST.map(cat => `
