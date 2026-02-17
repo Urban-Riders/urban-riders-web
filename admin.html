@@ -1800,7 +1800,7 @@ async function verDetallePedido(pedidoId) {
         // 1. Traer la info del pedido
         const { data: pedido } = await _supabase.from('pedidos').select('*').eq('id', pedidoId).single();
         
-        // 2. Traer los detalles (solo los datos de la tabla pedido_detalles)
+        // 2. Traer los detalles
         const { data: detalles, error: errDet } = await _supabase
             .from('pedido_detalles')
             .select('*')
@@ -1808,27 +1808,42 @@ async function verDetallePedido(pedidoId) {
 
         if (errDet) throw errDet;
 
-        // 3. Obtener nombres y códigos de productos MANUALMENTE uno por uno
-        const detallesConNombres = await Promise.all(detalles.map(async (item) => {
-            const { data: p } = await _supabase.from('productos')
-                .select('nombre, codigo')
-                .eq('id', item.producto_id)
-                .single();
-            return { 
-                ...item, 
-                nombre: p ? p.nombre : 'Producto no encontrado', 
-                codigo: p ? p.codigo : '-' 
-            };
+        // 3. Procesar nombres (Lógica DUAL: Web o Mayorista)
+        const detallesProcesados = await Promise.all(detalles.map(async (item) => {
+            // Si ya tiene producto_nombre (Venta Web), lo usamos directo
+            if (item.producto_nombre) {
+                return { 
+                    ...item, 
+                    nombre: item.producto_nombre, 
+                    codigo: 'WEB-ITEM' 
+                };
+            } 
+            
+            // Si no tiene nombre pero tiene ID (Venta Mayorista), buscamos en la tabla productos
+            if (item.producto_id) {
+                const { data: p } = await _supabase.from('productos')
+                    .select('nombre, codigo')
+                    .eq('id', item.producto_id)
+                    .single();
+                return { 
+                    ...item, 
+                    nombre: p ? p.nombre : 'Producto no encontrado', 
+                    codigo: p ? p.codigo : '-' 
+                };
+            }
+
+            return { ...item, nombre: 'Sin datos', codigo: '-' };
         }));
 
         // Guardamos para la función de impresión
-        pedidoActualParaImprimir = { info: pedido, items: detallesConNombres };
+        pedidoActualParaImprimir = { info: pedido, items: detallesProcesados };
 
         let html = `
             <div class="mb-4 bg-gray-50 p-3 rounded-lg border">
                 <p class="text-[10px] font-black text-gray-400 uppercase">Cliente</p>
                 <p class="font-black text-black text-lg">${pedido.cliente_nombre}</p>
                 <p class="text-[10px] text-gray-500">${new Date(pedido.fecha).toLocaleString()}</p>
+                ${pedido.direccion_envio ? `<p class="text-[10px] font-bold text-blue-600 mt-1"><i class="fas fa-map-marker-alt"></i> ${pedido.direccion_envio}, ${pedido.ciudad || ''}</p>` : ''}
             </div>
             <div class="max-h-60 overflow-y-auto pr-2">
                 <table class="w-full text-left">
@@ -1842,12 +1857,12 @@ async function verDetallePedido(pedidoId) {
                     <tbody>
         `;
 
-        detallesConNombres.forEach(item => {
+        detallesProcesados.forEach(item => {
             html += `
                 <tr class="border-b border-gray-50">
                     <td class="py-3 font-black text-blue-600 text-xl">${item.cantidad}</td>
                     <td class="py-3">
-                        <p class="text-xs font-bold">${item.nombre}</p>
+                        <p class="text-xs font-bold uppercase">${item.nombre}</p>
                         <p class="text-[9px] text-gray-400 font-mono">${item.codigo}</p>
                     </td>
                     <td class="py-3 text-right font-bold text-sm">$${(item.cantidad * item.precio_unitario).toLocaleString()}</td>
@@ -1868,7 +1883,6 @@ async function verDetallePedido(pedidoId) {
         contenido.innerHTML = `<div class="p-6 text-center text-red-600"><p class="font-bold">Error: ${e.message}</p></div>`;
     }
 }
-
 function cerrarModalDetalle() {
     document.getElementById('modal-detalle-pedido').classList.add('hidden');
 }
@@ -2689,9 +2703,9 @@ async function ejecutarLogisticaDual() {
                         <div class="flex flex-col">
                             <div class="flex items-center gap-2">
                                 <span class="font-black text-sm">${p.cliente_nombre}</span>
-                                <button onclick="verDetallePedido(${p.id})" class="text-blue-600 hover:text-blue-800 transition" title="Ver Detalle de Productos">
-                                    <i class="fas fa-eye"></i>
-                                </button>
+                                <button onclick="verDetallePedido(${p.id})" class="text-blue-600 hover:text-blue-800 p-1" title="Ver Detalle">
+    <i class="fas fa-eye"></i>
+</button>
                             </div>
                             <span class="text-[9px] text-gray-400">Canal: ${p.vendedor_nombre || 'WEB'}</span>
                         </div>
