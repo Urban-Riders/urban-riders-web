@@ -1793,6 +1793,7 @@ async function verDetallePedido(pedidoId) {
     const contenido = document.getElementById('contenido-detalle-pedido');
     const modal = document.getElementById('modal-detalle-pedido');
     
+    // Mostramos cargando
     contenido.innerHTML = '<div class="p-10 text-center"><i class="fas fa-spinner fa-spin text-3xl mb-2 text-blue-600"></i><p class="font-bold">Buscando productos...</p></div>';
     modal.classList.remove('hidden');
 
@@ -1808,18 +1809,18 @@ async function verDetallePedido(pedidoId) {
 
         if (errDet) throw errDet;
 
-        // 3. Procesar nombres (Lógica DUAL: Web o Mayorista)
-        const detallesProcesados = await Promise.all(detalles.map(async (item) => {
-            // Si ya tiene producto_nombre (Venta Web), lo usamos directo
+        // 3. Obtener nombres (Lógica compatible con WEB y MAYORISTA)
+        const detallesConNombres = await Promise.all(detalles.map(async (item) => {
+            // Si es venta WEB, el nombre ya viene en 'producto_nombre'
             if (item.producto_nombre) {
                 return { 
                     ...item, 
                     nombre: item.producto_nombre, 
                     codigo: 'WEB-ITEM' 
                 };
-            } 
+            }
             
-            // Si no tiene nombre pero tiene ID (Venta Mayorista), buscamos en la tabla productos
+            // Si es venta MAYORISTA, buscamos por 'producto_id' en la tabla productos
             if (item.producto_id) {
                 const { data: p } = await _supabase.from('productos')
                     .select('nombre, codigo')
@@ -1832,18 +1833,18 @@ async function verDetallePedido(pedidoId) {
                 };
             }
 
-            return { ...item, nombre: 'Sin datos', codigo: '-' };
+            return { ...item, nombre: 'Sin nombre', codigo: '-' };
         }));
 
-        // Guardamos para la función de impresión
-        pedidoActualParaImprimir = { info: pedido, items: detallesProcesados };
+        // Guardamos para impresión
+        pedidoActualParaImprimir = { info: pedido, items: detallesConNombres };
 
         let html = `
             <div class="mb-4 bg-gray-50 p-3 rounded-lg border">
                 <p class="text-[10px] font-black text-gray-400 uppercase">Cliente</p>
                 <p class="font-black text-black text-lg">${pedido.cliente_nombre}</p>
                 <p class="text-[10px] text-gray-500">${new Date(pedido.fecha).toLocaleString()}</p>
-                ${pedido.direccion_envio ? `<p class="text-[10px] font-bold text-blue-600 mt-1"><i class="fas fa-map-marker-alt"></i> ${pedido.direccion_envio}, ${pedido.ciudad || ''}</p>` : ''}
+                ${pedido.direccion_envio ? `<p class="text-[10px] font-bold text-blue-600 mt-1 uppercase"><i class="fas fa-map-marker-alt"></i> ${pedido.direccion_envio}, ${pedido.ciudad || ''} (CP: ${pedido.cp || ''})</p>` : ''}
             </div>
             <div class="max-h-60 overflow-y-auto pr-2">
                 <table class="w-full text-left">
@@ -1857,7 +1858,7 @@ async function verDetallePedido(pedidoId) {
                     <tbody>
         `;
 
-        detallesProcesados.forEach(item => {
+        detallesConNombres.forEach(item => {
             html += `
                 <tr class="border-b border-gray-50">
                     <td class="py-3 font-black text-blue-600 text-xl">${item.cantidad}</td>
@@ -1873,14 +1874,14 @@ async function verDetallePedido(pedidoId) {
         html += `</tbody></table></div>
                 <div class="mt-4 pt-3 border-t flex justify-between items-end">
                     <span class="font-black uppercase text-[10px] text-gray-400">Monto Final:</span>
-                    <span class="font-black text-2xl text-red-600 leading-none">$${pedido.total.toLocaleString()}</span>
+                    <span class="font-black text-2xl text-red-600 leading-none">$${Number(pedido.total).toLocaleString()}</span>
                 </div>`;
         
         contenido.innerHTML = html;
 
     } catch (e) {
         console.error("Error detalle:", e);
-        contenido.innerHTML = `<div class="p-6 text-center text-red-600"><p class="font-bold">Error: ${e.message}</p></div>`;
+        contenido.innerHTML = `<div class="p-6 text-center text-red-600"><p class="font-bold">Error al cargar: ${e.message}</p></div>`;
     }
 }
 function cerrarModalDetalle() {
