@@ -1793,121 +1793,96 @@ async function verDetallePedido(pedidoId) {
     const contenido = document.getElementById('contenido-detalle-pedido');
     const modal = document.getElementById('modal-detalle-pedido');
     
-    // 1. Limpieza y Loader
-    contenido.innerHTML = '<div class="p-10 text-center"><i class="fas fa-spinner fa-spin text-3xl mb-2 text-blue-600"></i><p class="font-bold uppercase text-[10px] tracking-widest text-gray-500">Cargando Pedido...</p></div>';
+    contenido.innerHTML = '<div class="p-10 text-center"><i class="fas fa-spinner fa-spin text-3xl mb-2 text-blue-600"></i><p>Cargando detalles...</p></div>';
     modal.classList.remove('hidden');
 
     try {
-        // 2. Traer el pedido y sus detalles en paralelo para ganar velocidad
+        // 1. Traer datos básicos (Pedido e Items)
         const [resPedido, resDetalles] = await Promise.all([
             _supabase.from('pedidos').select('*').eq('id', pedidoId).single(),
             _supabase.from('pedido_detalles').select('*').eq('pedido_id', pedidoId)
         ]);
 
         if (resPedido.error) throw resPedido.error;
-        if (resDetalles.error) throw resDetalles.error;
-
         const pedido = resPedido.data;
-        const detalles = resDetalles.data;
+        const detalles = resDetalles.data || [];
 
-        // 3. Procesar los items (Blindado para Web y Mayorista)
-        const itemsProcesados = [];
+        // 2. Lógica de nombres: No buscamos en 'productos' si ya tenemos el nombre
+        const itemsParaMostrar = [];
+
         for (const item of detalles) {
-            let nombreMostrar = item.producto_nombre || "Producto sin nombre";
-            let codigoMostrar = "WEB";
+            let nombreFinal = "";
+            let codigoFinal = "";
 
-            // Si es mayorista y no tiene nombre, intentamos buscarlo (pero no bloqueamos si falla)
-            if (!item.producto_nombre && item.producto_id) {
-                const { data: p } = await _supabase.from('productos').select('nombre, codigo').eq('id', item.producto_id).single();
-                if (p) {
-                    nombreMostrar = p.nombre;
-                    codigoMostrar = p.codigo;
-                }
+            if (item.producto_nombre) {
+                // CASO WEB: El nombre ya está en el ticket
+                nombreFinal = item.producto_nombre;
+                codigoFinal = "WEB";
+            } else if (item.producto_id) {
+                // CASO MAYORISTA: Hay que ir a la tabla productos
+                const { data: p } = await _supabase.from('productos')
+                    .select('nombre, codigo')
+                    .eq('id', item.producto_id)
+                    .single();
+                nombreFinal = p ? p.nombre : "Producto no encontrado";
+                codigoFinal = p ? p.codigo : "-";
+            } else {
+                nombreFinal = "Sin descripción";
+                codigoFinal = "-";
             }
 
-            itemsProcesados.push({
-                cantidad: item.cantidad || 0,
-                nombre: nombreMostrar,
-                codigo: codigoMostrar,
-                precio: item.precio_unitario || 0
+            itemsParaMostrar.push({
+                cantidad: item.cantidad,
+                nombre: nombreFinal,
+                codigo: codigoFinal,
+                precio: item.precio_unitario,
+                subtotal: item.subtotal || (item.cantidad * item.precio_unitario)
             });
         }
 
-        // 4. Construir el HTML (A prueba de errores de datos)
-        const fechaMsg = pedido.created_at ? new Date(pedido.created_at).toLocaleString() : (pedido.fecha ? new Date(pedido.fecha).toLocaleString() : 'Sin fecha');
-        const totalFinal = Number(pedido.total || 0);
-
+        // 3. Renderizado del HTML
         let html = `
-            <div class="mb-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Comprador</p>
-                        <p class="font-black text-slate-900 text-xl leading-tight">${pedido.cliente_nombre || 'Cliente Desconocido'}</p>
-                        <p class="text-[10px] text-slate-500 mt-1">${fechaMsg}</p>
-                    </div>
-                    <div class="text-right">
-                        <span class="bg-blue-100 text-blue-700 text-[9px] font-black px-2 py-1 rounded-full uppercase">ID #${pedido.id}</span>
-                    </div>
-                </div>
-
-                ${pedido.direccion_envio ? `
-                <div class="mt-4 pt-3 border-t border-slate-200">
-                    <p class="text-[9px] font-black text-indigo-600 uppercase mb-1">Datos de Envío</p>
-                    <p class="text-sm font-bold text-slate-800 uppercase"><i class="fas fa-truck mr-2"></i>${pedido.direccion_envio}</p>
-                    <p class="text-[11px] font-medium text-slate-500">${pedido.ciudad || ''} ${pedido.cp ? `(CP: ${pedido.cp})` : ''}</p>
-                    ${pedido.dni_cliente ? `<p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">DNI: ${pedido.dni_cliente}</p>` : ''}
-                </div>` : ''}
+            <div class="mb-4 bg-gray-50 p-4 rounded-lg border">
+                <p class="text-[10px] font-black text-gray-400 uppercase">Cliente: ${pedido.cliente_nombre}</p>
+                <p class="text-[10px] text-gray-500">ID Pedido: #${pedido.id}</p>
+                ${pedido.direccion_envio ? `<p class="text-xs font-bold text-blue-600 mt-2"><i class="fas fa-map-marker-alt"></i> ${pedido.direccion_envio}, ${pedido.ciudad || ''}</p>` : ''}
             </div>
-
-            <div class="max-h-64 overflow-y-auto pr-2">
-                <table class="w-full">
-                    <thead class="sticky top-0 bg-white">
-                        <tr class="border-b-2 border-slate-100">
-                            <th class="py-2 text-[10px] font-black uppercase text-slate-400 text-left">Cant.</th>
-                            <th class="py-2 text-[10px] font-black uppercase text-slate-400 text-left">Producto</th>
-                            <th class="py-2 text-[10px] font-black uppercase text-slate-400 text-right">Subtotal</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-50">
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="border-b">
+                        <th class="py-2 text-[10px] font-black uppercase text-gray-400">Cant.</th>
+                        <th class="py-2 text-[10px] font-black uppercase text-gray-400">Producto</th>
+                        <th class="py-2 text-right text-[10px] font-black uppercase text-gray-400">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
         `;
 
-        itemsProcesados.forEach(item => {
+        itemsParaMostrar.forEach(item => {
             html += `
-                <tr>
-                    <td class="py-3 font-black text-blue-600 text-2xl w-14">${item.cantidad}</td>
+                <tr class="border-b border-gray-50">
+                    <td class="py-3 font-black text-blue-600 text-xl">${item.cantidad}</td>
                     <td class="py-3">
-                        <p class="text-xs font-black uppercase text-slate-800 leading-tight">${item.nombre}</p>
-                        <p class="text-[9px] text-slate-400 font-mono mt-1 tracking-tighter">${item.codigo}</p>
+                        <p class="text-xs font-bold uppercase">${item.nombre}</p>
+                        <p class="text-[9px] text-gray-400">${item.codigo}</p>
                     </td>
-                    <td class="py-3 text-right font-black text-sm text-slate-600">$${(item.cantidad * item.precio).toLocaleString()}</td>
-                </tr>`;
+                    <td class="py-3 text-right font-bold">$${Number(item.subtotal).toLocaleString()}</td>
+                </tr>
+            `;
         });
 
-        html += `
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="mt-4 pt-4 border-t-2 border-dashed border-slate-200 flex justify-between items-center">
-                <span class="font-black uppercase text-xs text-slate-400">Total a Cobrar:</span>
-                <span class="font-black text-3xl text-red-600 tracking-tighter leading-none">$${totalFinal.toLocaleString()}</span>
+        html += `</tbody></table>
+            <div class="mt-4 pt-3 border-t flex justify-between items-center">
+                <span class="font-black text-gray-400 uppercase text-[10px]">Total:</span>
+                <span class="font-black text-2xl text-red-600">$${Number(pedido.total).toLocaleString()}</span>
             </div>
         `;
 
         contenido.innerHTML = html;
 
-        // Guardar para impresión
-        pedidoActualParaImprimir = { info: pedido, items: itemsProcesados };
-
-    } catch (error) {
-        console.error("Error crítico en detalle:", error);
-        contenido.innerHTML = `
-            <div class="p-10 text-center">
-                <i class="fas fa-exclamation-circle text-red-500 text-3xl mb-2"></i>
-                <p class="font-black text-red-600 uppercase text-xs">Error al cargar datos</p>
-                <p class="text-[10px] text-gray-500 mt-2">${error.message}</p>
-                <button onclick="modal.classList.add('hidden')" class="mt-4 bg-slate-800 text-white text-[10px] px-4 py-2 rounded-lg font-bold">CERRAR</button>
-            </div>`;
+    } catch (err) {
+        console.error("Error detalle:", err);
+        contenido.innerHTML = `<p class="p-10 text-center text-red-500 font-bold">Error al cargar: ${err.message}</p>`;
     }
 }
 function cerrarModalDetalle() {
