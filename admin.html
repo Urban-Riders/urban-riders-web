@@ -2649,39 +2649,31 @@ async function cargarHistorialIngresos() {
 // Buscá tu función switchTab(tabId) y agregá esto al final:
 // if(tabId === 'tab-ingresos') cargarHistorialIngresos();
 async function ejecutarLogisticaDual() {
-    const desde = document.getElementById('transporte-desde').value; // Formato "YYYY-MM-DD"
+    const desde = document.getElementById('transporte-desde').value;
     const hasta = document.getElementById('transporte-hasta').value;
 
     if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
 
-    // --- SOLUCIÓN HORARIA: Convertimos el rango de Argentina (UTC-3) a ISO (UTC) ---
-    // Creamos el inicio del día (00:00:00) y fin del día (23:59:59) forzando la zona horaria -03:00
     const desdeISO = new Date(`${desde}T00:00:00-03:00`).toISOString();
     const hastaISO = new Date(`${hasta}T23:59:59-03:00`).toISOString();
 
-    // Traemos los pedidos de la tabla 'pedidos' con el rango compensado
     const { data: pedidos, error } = await _supabase
         .from('pedidos')
         .select('*')
-        .gte('fecha', desdeISO) // Ahora enviamos la hora exacta en UTC
+        .gte('fecha', desdeISO)
         .lte('fecha', hastaISO)
         .order('fecha', { ascending: false });
 
     if (error) return console.error("Error cargando logística:", error);
 
-    // 1. Filtrar Minoristas (Los que NO tienen cliente_id vinculado a la tabla clientes)
     const minoristas = pedidos.filter(p => !p.cliente_id);
     const mayoristas = pedidos.filter(p => p.cliente_id);
 
-    // Manejo de UI
     document.getElementById('mensaje-transporte-vacio').classList.add('hidden');
-    
-    // Si hay mayoristas, habilitamos tu botón de PDF original
     if (mayoristas.length > 0) {
         document.getElementById('btn-pdf-mayorista').classList.remove('hidden');
     }
 
-    // Renderizar tabla de Correo Argentino
     const body = document.getElementById('tabla-minorista-body');
     const contenedor = document.getElementById('contenedor-correo');
     body.innerHTML = '';
@@ -2689,42 +2681,50 @@ async function ejecutarLogisticaDual() {
     if (minoristas.length > 0) {
         contenedor.classList.remove('hidden');
         minoristas.forEach(p => {
+            const totalFormateado = Number(p.total || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 });
+            
             body.innerHTML += `
                 <tr class="border-b hover:bg-gray-50 transition">
                     <td class="p-3">
                         <div class="flex flex-col">
-                            <span>${p.cliente_nombre}</span>
-                            <span class="text-[8px] text-blue-500">${p.vendedor_nombre || 'WEB'}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="font-black text-sm">${p.cliente_nombre}</span>
+                                <button onclick="verDetallePedido(${p.id})" class="text-blue-600 hover:text-blue-800 transition" title="Ver Detalle de Productos">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            <span class="text-[9px] text-gray-400">Canal: ${p.vendedor_nombre || 'WEB'}</span>
                         </div>
                     </td>
                     <td class="p-3">
-                        <div class="flex gap-1">
-                            <input type="text" id="input-track-${p.id}" value="${p.tracking_number || ''}" 
-                                   placeholder="CP...AR"
-                                   class="border rounded px-2 py-1 text-[10px] w-32 outline-none focus:border-yellow-500">
-                            <button onclick="guardarTracking(${p.id})" class="bg-black text-white px-2 py-1 rounded text-[9px]">OK</button>
+                        <div class="flex flex-col">
+                            <span class="text-red-600 font-black text-sm">$ ${totalFormateado}</span>
+                            <div class="flex gap-1 mt-1">
+                                <input type="text" id="input-track-${p.id}" value="${p.tracking_number || ''}" 
+                                       placeholder="CP...AR"
+                                       class="border-2 border-gray-200 rounded px-2 py-1 text-[10px] w-32 outline-none focus:border-yellow-500 font-bold">
+                                <button onclick="guardarTracking(${p.id})" class="bg-black text-white px-3 py-1 rounded text-[9px] font-bold">OK</button>
+                            </div>
                         </div>
                     </td>
                     <td class="p-3 text-right">
-                        ${p.tracking_number ? 
+                        ${p.tracking_number ?
                             `<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${p.tracking_number}" 
-                               target="_blank" class="text-yellow-600 hover:text-black transition">
+                               target="_blank" class="bg-yellow-500 text-black px-3 py-1.5 rounded-lg font-black text-[9px] hover:bg-yellow-400 transition inline-block">
                                <i class="fas fa-truck mr-1"></i> RASTREAR
                             </a>` : 
-                            `<span class="text-gray-300 italic text-[9px]">SIN CARGAR</span>`}
+                            `<span class="text-gray-300 italic text-[9px] font-black">PENDIENTE DE CARGA</span>`}
                     </td>
                 </tr>
             `;
         });
     } else {
         contenedor.classList.add('hidden');
-        // Si no hay minoristas pero quizás hay mayoristas o nada, mostramos el mensaje de vacío
         if (mayoristas.length === 0) {
             document.getElementById('mensaje-transporte-vacio').classList.remove('hidden');
         }
     }
 }
-
 async function guardarTracking(id) {
     const tracking = document.getElementById(`input-track-${id}`).value.toUpperCase().trim();
     if (!tracking) return alert("Ingresa un código válido");
