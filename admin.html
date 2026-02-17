@@ -1793,100 +1793,121 @@ async function verDetallePedido(pedidoId) {
     const contenido = document.getElementById('contenido-detalle-pedido');
     const modal = document.getElementById('modal-detalle-pedido');
     
-    // Mostramos cargando
-    contenido.innerHTML = '<div class="p-10 text-center"><i class="fas fa-spinner fa-spin text-3xl mb-2 text-blue-600"></i><p class="font-bold uppercase text-[10px] tracking-widest text-gray-500">Buscando productos...</p></div>';
+    // 1. Limpieza y Loader
+    contenido.innerHTML = '<div class="p-10 text-center"><i class="fas fa-spinner fa-spin text-3xl mb-2 text-blue-600"></i><p class="font-bold uppercase text-[10px] tracking-widest text-gray-500">Cargando Pedido...</p></div>';
     modal.classList.remove('hidden');
 
     try {
-        // 1. Traer la info del pedido (Seleccionamos explícitamente las columnas)
-        const { data: pedido, error: errPed } = await _supabase.from('pedidos').select('*').eq('id', pedidoId).single();
-        if (errPed) throw errPed;
-        
-        // 2. Traer los detalles
-        const { data: detalles, error: errDet } = await _supabase
-            .from('pedido_detalles')
-            .select('*')
-            .eq('pedido_id', pedidoId);
+        // 2. Traer el pedido y sus detalles en paralelo para ganar velocidad
+        const [resPedido, resDetalles] = await Promise.all([
+            _supabase.from('pedidos').select('*').eq('id', pedidoId).single(),
+            _supabase.from('pedido_detalles').select('*').eq('pedido_id', pedidoId)
+        ]);
 
-        if (errDet) throw errDet;
+        if (resPedido.error) throw resPedido.error;
+        if (resDetalles.error) throw resDetalles.error;
 
-        // 3. Obtener nombres (Lógica compatible con WEB y MAYORISTA)
-        const detallesConNombres = await Promise.all(detalles.map(async (item) => {
-            if (item.producto_nombre) {
-                return { ...item, nombre: item.producto_nombre, codigo: 'WEB-ITEM' };
-            }
-            if (item.producto_id) {
+        const pedido = resPedido.data;
+        const detalles = resDetalles.data;
+
+        // 3. Procesar los items (Blindado para Web y Mayorista)
+        const itemsProcesados = [];
+        for (const item of detalles) {
+            let nombreMostrar = item.producto_nombre || "Producto sin nombre";
+            let codigoMostrar = "WEB";
+
+            // Si es mayorista y no tiene nombre, intentamos buscarlo (pero no bloqueamos si falla)
+            if (!item.producto_nombre && item.producto_id) {
                 const { data: p } = await _supabase.from('productos').select('nombre, codigo').eq('id', item.producto_id).single();
-                return { 
-                    ...item, 
-                    nombre: p ? p.nombre : 'Producto no encontrado', 
-                    codigo: p ? p.codigo : '-' 
-                };
+                if (p) {
+                    nombreMostrar = p.nombre;
+                    codigoMostrar = p.codigo;
+                }
             }
-            return { ...item, nombre: 'Sin nombre', codigo: '-' };
-        }));
 
-        // Guardamos para impresión
-        pedidoActualParaImprimir = { info: pedido, items: detallesConNombres };
+            itemsProcesados.push({
+                cantidad: item.cantidad || 0,
+                nombre: nombreMostrar,
+                codigo: codigoMostrar,
+                precio: item.precio_unitario || 0
+            });
+        }
 
-        // Usamos created_at o fecha según lo que traiga la base
-        const fechaMostrar = new Date(pedido.created_at || pedido.fecha).toLocaleString();
+        // 4. Construir el HTML (A prueba de errores de datos)
+        const fechaMsg = pedido.created_at ? new Date(pedido.created_at).toLocaleString() : (pedido.fecha ? new Date(pedido.fecha).toLocaleString() : 'Sin fecha');
+        const totalFinal = Number(pedido.total || 0);
 
         let html = `
-            <div class="mb-4 bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
-                <p class="text-[9px] font-black text-gray-400 uppercase tracking-tighter mb-1">Comprador</p>
-                <p class="font-black text-black text-xl leading-none mb-1">${pedido.cliente_nombre}</p>
-                <p class="text-[10px] text-gray-400 font-medium">${fechaMostrar}</p>
-                
+            <div class="mb-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Comprador</p>
+                        <p class="font-black text-slate-900 text-xl leading-tight">${pedido.cliente_nombre || 'Cliente Desconocido'}</p>
+                        <p class="text-[10px] text-slate-500 mt-1">${fechaMsg}</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="bg-blue-100 text-blue-700 text-[9px] font-black px-2 py-1 rounded-full uppercase">ID #${pedido.id}</span>
+                    </div>
+                </div>
+
                 ${pedido.direccion_envio ? `
-                <div class="mt-3 pt-3 border-t border-gray-200/50">
-                    <p class="text-[9px] font-black text-blue-500 uppercase tracking-tighter mb-1">Dirección de Entrega</p>
-                    <p class="text-xs font-bold text-gray-700 uppercase leading-tight">
-                        <i class="fas fa-map-marker-alt mr-1"></i> ${pedido.direccion_envio}
-                    </p>
-                    <p class="text-[10px] font-bold text-gray-500 mt-0.5">${pedido.ciudad || ''} ${pedido.cp ? `(CP: ${pedido.cp})` : ''}</p>
+                <div class="mt-4 pt-3 border-t border-slate-200">
+                    <p class="text-[9px] font-black text-indigo-600 uppercase mb-1">Datos de Envío</p>
+                    <p class="text-sm font-bold text-slate-800 uppercase"><i class="fas fa-truck mr-2"></i>${pedido.direccion_envio}</p>
+                    <p class="text-[11px] font-medium text-slate-500">${pedido.ciudad || ''} ${pedido.cp ? `(CP: ${pedido.cp})` : ''}</p>
+                    ${pedido.dni_cliente ? `<p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">DNI: ${pedido.dni_cliente}</p>` : ''}
                 </div>` : ''}
             </div>
 
-            <div class="max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="border-b border-gray-100">
-                            <th class="py-2 text-[10px] font-black uppercase text-gray-400">Cant.</th>
-                            <th class="py-2 text-[10px] font-black uppercase text-gray-400">Producto</th>
-                            <th class="py-2 text-right text-[10px] font-black uppercase text-gray-400">Total</th>
+            <div class="max-h-64 overflow-y-auto pr-2">
+                <table class="w-full">
+                    <thead class="sticky top-0 bg-white">
+                        <tr class="border-b-2 border-slate-100">
+                            <th class="py-2 text-[10px] font-black uppercase text-slate-400 text-left">Cant.</th>
+                            <th class="py-2 text-[10px] font-black uppercase text-slate-400 text-left">Producto</th>
+                            <th class="py-2 text-[10px] font-black uppercase text-slate-400 text-right">Subtotal</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="divide-y divide-slate-50">
         `;
 
-        detallesConNombres.forEach(item => {
+        itemsProcesados.forEach(item => {
             html += `
-                <tr class="border-b border-gray-50 last:border-0">
-                    <td class="py-3 font-black text-blue-600 text-xl w-12">${item.cantidad}</td>
+                <tr>
+                    <td class="py-3 font-black text-blue-600 text-2xl w-14">${item.cantidad}</td>
                     <td class="py-3">
-                        <p class="text-xs font-black uppercase text-gray-800 leading-tight">${item.nombre}</p>
-                        <p class="text-[9px] text-gray-400 font-mono mt-0.5">${item.codigo}</p>
+                        <p class="text-xs font-black uppercase text-slate-800 leading-tight">${item.nombre}</p>
+                        <p class="text-[9px] text-slate-400 font-mono mt-1 tracking-tighter">${item.codigo}</p>
                     </td>
-                    <td class="py-3 text-right font-black text-sm text-gray-600">$${(item.cantidad * item.precio_unitario).toLocaleString()}</td>
-                </tr>
-            `;
+                    <td class="py-3 text-right font-black text-sm text-slate-600">$${(item.cantidad * item.precio).toLocaleString()}</td>
+                </tr>`;
         });
 
-        html += `</tbody></table></div>
-                <div class="mt-4 pt-4 border-t-2 border-dashed border-gray-100 flex justify-between items-center">
-                    <span class="font-black uppercase text-xs text-gray-400 tracking-tighter">Total del Pedido:</span>
-                    <span class="font-black text-3xl text-red-600 tracking-tighter leading-none">$${Number(pedido.total).toLocaleString()}</span>
-                </div>`;
-        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-4 pt-4 border-t-2 border-dashed border-slate-200 flex justify-between items-center">
+                <span class="font-black uppercase text-xs text-slate-400">Total a Cobrar:</span>
+                <span class="font-black text-3xl text-red-600 tracking-tighter leading-none">$${totalFinal.toLocaleString()}</span>
+            </div>
+        `;
+
         contenido.innerHTML = html;
 
-    } catch (e) {
-        console.error("Error detalle:", e);
-        contenido.innerHTML = `<div class="p-10 text-center text-red-500">
-            <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
-            <p class="font-black uppercase text-xs">Error al cargar: ${e.message}</p>
-        </div>`;
+        // Guardar para impresión
+        pedidoActualParaImprimir = { info: pedido, items: itemsProcesados };
+
+    } catch (error) {
+        console.error("Error crítico en detalle:", error);
+        contenido.innerHTML = `
+            <div class="p-10 text-center">
+                <i class="fas fa-exclamation-circle text-red-500 text-3xl mb-2"></i>
+                <p class="font-black text-red-600 uppercase text-xs">Error al cargar datos</p>
+                <p class="text-[10px] text-gray-500 mt-2">${error.message}</p>
+                <button onclick="modal.classList.add('hidden')" class="mt-4 bg-slate-800 text-white text-[10px] px-4 py-2 rounded-lg font-bold">CERRAR</button>
+            </div>`;
     }
 }
 function cerrarModalDetalle() {
