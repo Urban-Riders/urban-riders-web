@@ -302,9 +302,12 @@ _supabase.auth.onAuthStateChange((event, session) => {
         let currentCategory = 'TODOS';
         const CATEGORIAS_LIST = ['TODOS', 'CICLISMO', 'CASCOS', 'INDUMENTARIA', 'ACCESORIOS', 'REPUESTOS'];
 
-        async function loadProducts() {
+       // Variable global para que no falle la memoria
+window.catalogo = []; 
+
+async function loadProducts() {
     try {
-        // 1. Obtenemos el conteo total de productos con stock
+        // 1. Obtenemos el conteo total
         const { count, error: countError } = await _supabase
             .from('productos_publicos')
             .select('*', { count: 'exact', head: true })
@@ -312,7 +315,7 @@ _supabase.auth.onAuthStateChange((event, session) => {
 
         if (countError) throw countError;
 
-        // 2. Traemos los productos según el límite actual
+        // 2. Traemos los productos (del 0 al límite actual)
         const { data, error } = await _supabase
             .from('productos_publicos')
             .select('*')
@@ -322,34 +325,33 @@ _supabase.auth.onAuthStateChange((event, session) => {
 
         if (error) throw error;
 
-       // ... dentro de loadProducts ...
-products = data; 
+        // --- EL ARREGLO DE MEMORIA ---
+        window.catalogo = data; // Guardamos en la variable global segura
+        
+        // 3. Renderizamos pasando la data segura
+        renderCategories(); 
+        renderProducts(window.catalogo);
 
-// --- AGREGA ESTA LÍNEA OBLIGATORIA ---
-window.products = data; // <--- ESTO ACTUALIZA LA MEMORIA DEL BOTÓN
-// --------------------------------------
-
-renderCategories(); 
-renderProducts(products);
-        // 4. Lógica del botón "Ver más"
+        // 4. Botón Ver Más
         const btnContainer = document.getElementById('load-more-container');
-        if (count > productosLimite) {
-            btnContainer.classList.remove('hidden');
-        } else {
-            btnContainer.classList.add('hidden');
+        if (btnContainer) {
+            if (count > productosLimite) {
+                btnContainer.classList.remove('hidden');
+            } else {
+                btnContainer.classList.add('hidden');
+            }
         }
     } catch (err) {
         console.error("Error cargando catálogo:", err);
     }
 }
-        function addToCart(id) {
-    // 1. CORRECCIÓN DE MEMORIA: Usamos window.products
-    // Usamos '==' para que el ID 16 encuentre al "16"
-    const p = window.products.find(p => p.id == id);
+       function addToCart(id) {
+    // 1. Buscamos en la memoria global (window.catalogo)
+    // 2. Usamos '==' para que el ID texto ("16") coincida con el número (16)
+    const p = window.catalogo.find(prod => prod.id == id);
 
-    // Seguridad: Si por milagro no lo encuentra, cortamos para no romper nada
     if (!p) {
-        console.error("No se pudo agregar el producto ID:", id);
+        console.error("Error crítico: Producto no encontrado en memoria global:", id);
         return;
     }
 
@@ -358,15 +360,9 @@ renderProducts(products);
     if (item) {
         item.quantity++;
     } else {
-        // 2. CORRECCIÓN DE IMAGEN:
-        // Antes de meterlo al carrito, verificamos la foto.
-        let imgClean = 'img/logo-ur.png';
-        if (p.imagen_url && p.imagen_url !== "undefined" && p.imagen_url !== null) {
-            imgClean = p.imagen_url;
-        }
-
-        // 3. OBJETO LIMPIO:
-        // En vez de usar '...p' (que copia errores), creamos uno nuevo perfecto
+        // Limpiamos la imagen antes de meterla al carrito
+        let imgClean = (p.imagen_url && p.imagen_url !== "undefined") ? p.imagen_url : 'img/logo-ur.png';
+        
         cart.push({
             id: p.id,
             nombre: p.nombre,
@@ -375,7 +371,7 @@ renderProducts(products);
             quantity: 1
         });
     }
-    
+
     updateCart();
     if(cart.length === 1) toggleCart();
 }
@@ -563,27 +559,22 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
             }
         });
         
-        function renderProducts(list) {
+       function renderProducts(list) {
     const container = document.getElementById('grid-productos');
-    // Validación de seguridad por si el contenedor aún no cargó
     if (!container) return;
 
     container.innerHTML = list.map(p => {
-        // 1. BLINDAJE DE IMAGEN:
-        // Si no tiene imagen, o es "undefined", usamos el logo.
-        let imgUrl = 'img/logo-ur.png';
-        if (p.imagen_url && p.imagen_url !== "undefined" && p.imagen_url !== null) {
-            imgUrl = p.imagen_url;
-        }
-
-        // 2. BLINDAJE DE PRECIO:
-        // Aseguramos que sea número, si falla ponemos 0
+        // --- BLINDAJE DE IMAGEN ---
+        // Si es null o "undefined", ponemos el logo para evitar errores visuales
+        let imgClean = (p.imagen_url && p.imagen_url !== "undefined") ? p.imagen_url : 'img/logo-ur.png';
+        
+        // --- BLINDAJE DE PRECIO ---
         let precio = Number(p.precio_minorista) || Number(p.precio) || 0;
 
         return `
             <div class="product-card bg-slate-500/50 backdrop-blur-sm rounded-2xl overflow-hidden shadow-xl border border-white/10 p-3">
-                <div class="relative mb-2 cursor-zoom-in flex justify-center" onclick="openZoom('${imgUrl}')">
-                    <img src="${imgUrl}" class="w-full h-32 object-contain" onerror="this.src='img/logo-ur.png'">
+                <div class="relative mb-2 cursor-zoom-in flex justify-center" onclick="openZoom('${imgClean}')">
+                    <img src="${imgClean}" class="w-full h-32 object-contain" onerror="this.src='img/logo-ur.png'">
                 </div>
                 <div class="text-[9px] text-yellow-600 font-bold uppercase mb-1">${p.categoria || 'Varios'}</div>
                 <h3 class="font-bold text-white leading-tight h-8 mb-2 uppercase text-[12px] line-clamp-2">${p.nombre}</h3>
