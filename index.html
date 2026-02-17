@@ -322,16 +322,15 @@ _supabase.auth.onAuthStateChange((event, session) => {
 
         if (error) throw error;
 
-        // 3. Actualizamos la lista global y dibujamos
-        products = data; 
-        
-        // --- AGREGA SOLO ESTA LÍNEA ---
-        window.products = data; // <--- ESTO ARREGLA EL "NO ESTÁ EN MEMORIA"
-        // ------------------------------
+       // ... dentro de loadProducts ...
+products = data; 
 
-        renderCategories(); 
-        renderProducts(products);
+// --- AGREGA ESTA LÍNEA OBLIGATORIA ---
+window.products = data; // <--- ESTO ACTUALIZA LA MEMORIA DEL BOTÓN
+// --------------------------------------
 
+renderCategories(); 
+renderProducts(products);
         // 4. Lógica del botón "Ver más"
         const btnContainer = document.getElementById('load-more-container');
         if (count > productosLimite) {
