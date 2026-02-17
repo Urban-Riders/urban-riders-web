@@ -307,39 +307,41 @@
         let currentCategory = 'TODOS';
         const CATEGORIAS_LIST = ['TODOS', 'CICLISMO', 'CASCOS', 'INDUMENTARIA', 'ACCESORIOS', 'REPUESTOS'];
 
-        async function loadProducts() {
+       async function loadProducts() {
     try {
-        console.log("--- CARGANDO CATÁLOGO DESDE TABLA MAESTRA ---");
+        console.log("--- INTENTANDO RECUPERAR CATÁLOGO ---");
 
-        // 1. Obtenemos el conteo total (CAMBIO: Apuntamos a 'productos')
+        // 1. Volvemos a 'productos_publicos' que es la que SÍ te funcionaba
         const { count, error: countError } = await _supabase
-            .from('productos') 
+            .from('productos_publicos') 
             .select('*', { count: 'exact', head: true })
             .gt('stock', 0);
 
         if (countError) throw countError;
 
-        // 2. Traemos los datos (CAMBIO: Apuntamos a 'productos')
+        // 2. Traemos los datos de la tabla PÚBLICA
         const { data, error } = await _supabase
-            .from('productos')
-            .select('*') // Traemos todo para evitar errores de columnas faltantes
+            .from('productos_publicos')
+            .select('*')
             .gt('stock', 0)
             .order('nombre', { ascending: true })
             .range(0, productosLimite - 1);
 
         if (error) throw error;
 
-        // 3. ACTUALIZACIÓN GLOBAL (LA SOLUCIÓN AL CLICK)
-        // Usamos window.products para asegurar que addToCart los encuentre
+        // --- AQUÍ ESTÁ EL ARREGLO REAL DEL BOTÓN ---
+        // Guardamos los datos en la ventana global para que el click los encuentre
         window.products = data; 
         
-        console.log(`✅ ${data.length} productos cargados en memoria global.`);
+        console.log(`✅ Recuperados ${data.length} productos.`);
 
-        // Dibujamos usando la variable global
+        // Dibujamos
         if (typeof renderCategories === 'function') renderCategories();
+        
+        // Pasamos window.products explícitamente
         renderProducts(window.products);
 
-        // 4. Lógica del botón "Ver más" (Tu lógica original intacta)
+        // 4. Botón ver más (Tu lógica original)
         const btnContainer = document.getElementById('load-more-container');
         if (btnContainer) {
             if (count > productosLimite) {
@@ -348,8 +350,10 @@
                 btnContainer.classList.add('hidden');
             }
         }
+
     } catch (err) {
-        console.error("Error cargando catálogo:", err);
+        console.error("Error FATAL cargando catálogo:", err);
+        alert("Error cargando productos. Revisa la consola.");
     }
 }
 
