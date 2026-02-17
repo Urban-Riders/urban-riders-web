@@ -345,22 +345,44 @@ async function loadProducts() {
         console.error("Error cargando catálogo:", err);
     }
 }
-       function addToCart(id) {
-    // 1. Buscamos en la memoria global (window.catalogo)
-    // 2. Usamos '==' para que el ID texto ("16") coincida con el número (16)
-    const p = window.catalogo.find(prod => prod.id == id);
+     // --- REEMPLAZA TU FUNCIÓN addToCart POR ESTA ---
 
+// --- REEMPLAZA TU FUNCIÓN addToCart POR ESTA ---
+
+async function addToCart(id) {
+    // 1. INTENTO RÁPIDO: Buscar en la memoria global (window.catalogo o products)
+    // Usamos '==' para ignorar si es texto o número
+    let p = (window.catalogo || window.products || []).find(prod => prod.id == id);
+
+    // 2. INTENTO FUERTE: Si la memoria falló, vamos a BUSCARLO A SUPABASE
     if (!p) {
-        console.error("Error crítico: Producto no encontrado en memoria global:", id);
-        return;
+        console.warn(`Producto ${id} no estaba en memoria. Buscando en la nube...`);
+        try {
+            const { data, error } = await _supabase
+                .from('productos_publicos')
+                .select('*')
+                .eq('id', id)
+                .single();
+            
+            if (error || !data) {
+                console.error("Error: El producto no existe ni en la base de datos.");
+                alert("Hubo un error al agregar el producto. Intente recargar.");
+                return;
+            }
+            p = data; // ¡Lo encontramos!
+        } catch (err) {
+            console.error("Error de conexión al buscar producto:", err);
+            return;
+        }
     }
 
-    const item = cart.find(i => i.id == id);
+    // 3. AGREGAR AL CARRITO (Ahora que seguro tenemos 'p')
+    const item = cart.find(i => i.id == id); // Aquí también usamos '==' implícito del sistema o asegurate de que cart use ids consistentes.
 
     if (item) {
         item.quantity++;
     } else {
-        // Limpiamos la imagen antes de meterla al carrito
+        // Limpieza de imagen por si acaso
         let imgClean = (p.imagen_url && p.imagen_url !== "undefined") ? p.imagen_url : 'img/logo-ur.png';
         
         cart.push({
@@ -372,8 +394,12 @@ async function loadProducts() {
         });
     }
 
+    // 4. ACTUALIZAR INTERFAZ
     updateCart();
     if(cart.length === 1) toggleCart();
+    
+    // Feedback visual opcional
+    console.log(`Agregado: ${p.nombre}`);
 }
         function updateCart() {
     const container = document.getElementById('cart-items');
