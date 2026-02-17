@@ -340,8 +340,8 @@ _supabase.auth.onAuthStateChange((event, session) => {
         }
 
         function addToCart(id) {
-            const p = products.find(p => p.id === id);
-            const item = cart.find(i => i.id === id);
+            const p = products.find(p => p.id == id);
+            const item = cart.find(i => i.id == id);
             if (item) item.quantity++; else cart.push({...p, quantity: 1});
             updateCart();
             if(cart.length === 1) toggleCart();
