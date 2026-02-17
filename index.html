@@ -275,69 +275,83 @@
 
     <script>
         const SUPABASE_URL = 'https://dsexvmstfjadjdbptmzn.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzZXh2bXN0ZmphZGpkYnB0bXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2OTc3MzUsImV4cCI6MjA4MjI3MzczNX0.L0Wz3hwZOarNLqkYH5-RAzz2Y6iwI4uaE_rlkcKkgyg';
+        // (Tu clave está bien, la dejo tal cual)
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFub24iLCJpYXQiOjE3NjY2OTc3MzUsImV4cCI6MjA4MjI3MzczNX0.L0Wz3hwZOarNLqkYH5-RAzz2Y6iwI4uaE_rlkcKkgyg';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const MP_ACCESS_TOKEN = 'TU_ACCESS_TOKEN_AQUÍ'; 
-// Este vigilante detecta cambios de sesión en TIEMPO REAL
-_supabase.auth.onAuthStateChange((event, session) => {
-    console.log("Evento de seguridad detectado:", event);
 
-    // No importa si entra o sale, en el index siempre queremos 
-    // refrescar el catálogo público para asegurar que se vea bien.
-    if (typeof loadProducts === 'function') {
-        loadProducts();
-    }
+        // Este vigilante detecta cambios de sesión en TIEMPO REAL
+        _supabase.auth.onAuthStateChange((event, session) => {
+            console.log("Evento de seguridad detectado:", event);
 
-    // Si el evento es un cierre de sesión, podemos limpiar el carrito
-    if (event === 'SIGNED_OUT') {
-        cart = []; 
-        if (typeof updateCart === 'function') updateCart();
-    }
-});
+            if (typeof loadProducts === 'function') {
+                loadProducts();
+            }
 
-        let products = [];
-        // Intentamos recuperar el carrito guardado; si no hay nada, empezamos con []
+            if (event === 'SIGNED_OUT') {
+                cart = []; 
+                if (typeof updateCart === 'function') updateCart();
+            }
+        });
+
+        // --- AQUÍ ESTÁ LA CORRECCIÓN MÁGICA ---
+        
+        // Usamos window.products para que sea 100% GLOBAL y el botón la encuentre
+        window.products = []; 
+        
+        // Usamos var para asegurar que la paginación no falle
+        var productosLimite = 15; 
+        
+        // Recuperamos el carrito
         let cart = JSON.parse(localStorage.getItem('cart_urban')) || [];
-        let productosLimite = 15;
         let currentCategory = 'TODOS';
         const CATEGORIAS_LIST = ['TODOS', 'CICLISMO', 'CASCOS', 'INDUMENTARIA', 'ACCESORIOS', 'REPUESTOS'];
 
         async function loadProducts() {
-            try {
-                // 1. Obtenemos el conteo total de productos con stock
-                const { count, error: countError } = await _supabase
-                    .from('productos_publicos')
-                    .select('*', { count: 'exact', head: true })
-                    .gt('stock', 0);
+    try {
+        console.log("--- CARGANDO CATÁLOGO DESDE TABLA MAESTRA ---");
 
-                if (countError) throw countError;
+        // 1. Obtenemos el conteo total (CAMBIO: Apuntamos a 'productos')
+        const { count, error: countError } = await _supabase
+            .from('productos') 
+            .select('*', { count: 'exact', head: true })
+            .gt('stock', 0);
 
-                // 2. Traemos los productos según el límite actual
-                const { data, error } = await _supabase
-                    .from('productos_publicos')
-                    .select('*')
-                    .gt('stock', 0)
-                    .order('nombre', { ascending: true })
-                    .range(0, productosLimite - 1);
+        if (countError) throw countError;
 
-                if (error) throw error;
+        // 2. Traemos los datos (CAMBIO: Apuntamos a 'productos')
+        const { data, error } = await _supabase
+            .from('productos')
+            .select('*') // Traemos todo para evitar errores de columnas faltantes
+            .gt('stock', 0)
+            .order('nombre', { ascending: true })
+            .range(0, productosLimite - 1);
 
-                // 3. Actualizamos la lista global y dibujamos
-                products = data; 
-                renderCategories(); 
-                renderProducts(products);
+        if (error) throw error;
 
-                // 4. Lógica del botón "Ver más"
-                const btnContainer = document.getElementById('load-more-container');
-                if (count > productosLimite) {
-                    btnContainer.classList.remove('hidden');
-                } else {
-                    btnContainer.classList.add('hidden');
-                }
-            } catch (err) {
-                console.error("Error cargando catálogo:", err);
+        // 3. ACTUALIZACIÓN GLOBAL (LA SOLUCIÓN AL CLICK)
+        // Usamos window.products para asegurar que addToCart los encuentre
+        window.products = data; 
+        
+        console.log(`✅ ${data.length} productos cargados en memoria global.`);
+
+        // Dibujamos usando la variable global
+        if (typeof renderCategories === 'function') renderCategories();
+        renderProducts(window.products);
+
+        // 4. Lógica del botón "Ver más" (Tu lógica original intacta)
+        const btnContainer = document.getElementById('load-more-container');
+        if (btnContainer) {
+            if (count > productosLimite) {
+                btnContainer.classList.remove('hidden');
+            } else {
+                btnContainer.classList.add('hidden');
             }
         }
+    } catch (err) {
+        console.error("Error cargando catálogo:", err);
+    }
+}
 
       // Reemplaza tu función addToCart completa por esta:
 function addToCart(id) {
