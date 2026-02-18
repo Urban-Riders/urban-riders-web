@@ -1614,11 +1614,9 @@ async function procesarOperacion(tipo) {
     }
 }
 async function cargarPedidos() {
-    // 1. Agregamos el filtro para que SOLO traiga los que TIENEN cliente_id
     const { data: pedidos, error } = await _supabase
         .from('pedidos')
         .select('*')
-        .not('cliente_id', 'is', null) // <--- Filtro agregado: Solo ventas de vendedores
         .order('fecha', { ascending: false });
 
     if (error) {
@@ -1668,7 +1666,7 @@ async function cargarPedidos() {
     }).join('');
 }
 async function confirmarVentaPedido(id) {
-    if (!confirm("¿Confirmar venta?\n- El stock bajará\n- La deuda del cliente subirá\n- Se registrará el nombre real del producto")) return;
+    if (!confirm("¿Confirmar venta?\n- Se descontará el stock.\n- Si es mayorista, la deuda subirá.\n- Si es minorista (web), el pago ingresará a caja.")) return;
 
     try {
         // 1. Obtener el pedido
@@ -1690,12 +1688,16 @@ async function confirmarVentaPedido(id) {
 
         // 3. Procesar productos
         for (const item of detalles) {
-            // Buscamos el producto para tener el nombre real y el stock actual
-            const { data: prodDB } = await _supabase
-                .from('productos')
-                .select('*')
-                .eq('id', item.producto_id)
-                .single();
+            let prodDB = null;
+
+            // Buscamos el producto. Como los minoristas web no mandan ID, buscamos por nombre si el ID no existe
+            if (item.producto_id) {
+                const { data } = await _supabase.from('productos').select('*').eq('id', item.producto_id).single();
+                prodDB = data;
+            } else {
+                const { data } = await _supabase.from('productos').select('*').eq('nombre', item.producto_nombre).single();
+                prodDB = data;
+            }
 
             const nombreReal = prodDB ? prodDB.nombre : item.producto_nombre;
 
@@ -1712,46 +1714,57 @@ async function confirmarVentaPedido(id) {
                 codigo: prodDB ? prodDB.codigo : '',
                 precio_unitario: item.precio_unitario,
                 fecha: new Date().toISOString(),
-                cliente_id: pedido.cliente_id
+                cliente_id: pedido.cliente_id // Si es minorista, esto quedará null (lo cual está perfecto)
             }]);
         }
 
-        // 4. Corregir Saldo del Cliente (INVERTIMOS LA LÓGICA)
-        const { data: cliente } = await _supabase
-            .from('clientes')
-            .select('saldo')
-            .eq('id', pedido.cliente_id)
-            .single();
+        const importePedido = Number(pedido.total);
 
-        if (cliente) {
-            const saldoActual = Number(cliente.saldo || 0);
-            const importePedido = Number(pedido.total);
-            
-            // PROBAMOS RESTANDO: Si sumando bajaba la deuda, restando tiene que subirla
-            const nuevoSaldo = saldoActual - importePedido; 
-
-            console.log("SISTEMA DE SIGNOS DETECTADO");
-            console.log(`Saldo anterior: ${saldoActual} | Importe: ${importePedido} | Nuevo Saldo: ${nuevoSaldo}`);
-
-            await _supabase
+        // 4. Lógica Diferenciada: Mayorista (Cuenta Corriente) vs Minorista Web (Caja)
+        if (pedido.cliente_id) {
+            // ---> ES MAYORISTA: Mantenemos tu lógica original de saldos
+            const { data: cliente } = await _supabase
                 .from('clientes')
-                .update({ saldo: nuevoSaldo })
-                .eq('id', pedido.cliente_id);
+                .select('saldo')
+                .eq('id', pedido.cliente_id)
+                .single();
 
-            // Insertar movimiento con tipo 'DEUDA'
+            if (cliente) {
+                const saldoActual = Number(cliente.saldo || 0);
+                
+                // PROBAMOS RESTANDO: Si sumando bajaba la deuda, restando tiene que subirla
+                const nuevoSaldo = saldoActual - importePedido; 
+
+                console.log("SISTEMA DE SIGNOS DETECTADO");
+                console.log(`Saldo anterior: ${saldoActual} | Importe: ${importePedido} | Nuevo Saldo: ${nuevoSaldo}`);
+
+                await _supabase
+                    .from('clientes')
+                    .update({ saldo: nuevoSaldo })
+                    .eq('id', pedido.cliente_id);
+
+                // Insertar movimiento con tipo 'DEUDA'
+                await _supabase.from('movimientos_cuenta').insert([{
+                    cliente_id: pedido.cliente_id,
+                    tipo: 'DEUDA', 
+                    monto: importePedido,
+                    descripcion: `Compra Pedido #${pedido.id}`,
+                    saldo_resultante: nuevoSaldo
+                }]);
+            }
+        } else {
+            // ---> ES MINORISTA WEB: Registramos la entrada de dinero
             await _supabase.from('movimientos_cuenta').insert([{
-                cliente_id: pedido.cliente_id,
-                tipo: 'DEUDA', 
+                tipo: 'COBRO', 
                 monto: importePedido,
-                descripcion: `Compra Pedido #${pedido.id}`,
-                saldo_resultante: nuevoSaldo
+                descripcion: `Venta Web Minorista #${pedido.id} (${pedido.cliente_nombre})`
             }]);
         }
 
         // 5. Finalizar
         await _supabase.from('pedidos').update({ estado: 'COMPLETADO' }).eq('id', id);
 
-        alert("✅ ¡Venta Registrada!\n- El nombre del producto se guardó correctamente.\n- La deuda del cliente aumentó.");
+        alert("✅ ¡Venta Registrada!\n- Stock descontado.\n- Movimiento de dinero/deuda guardado.");
         
         if (typeof cargarTodo === 'function') await cargarTodo(); else cargarPedidos();
 
@@ -1823,8 +1836,7 @@ async function verDetallePedido(pedidoId) {
         `;
 
         detalles.forEach(item => {
-            // Lógica lógica: si no hay nombre, mostramos el ID. Pero no buscamos en otra tabla para no bloquear.
-            const nombre = item.producto_nombre || `Producto (ID: ${item.producto_id})`;
+            const nombre = item.producto_nombre || 'Producto sin registrar';
             html += `
                 <tr class="border-b border-gray-50">
                     <td class="py-3 font-bold text-blue-600 text-lg">${item.cantidad}</td>
