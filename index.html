@@ -47,52 +47,66 @@
         <img id="img-ampliada" src="" class="img-zoom-content rounded-lg shadow-2xl">
     </div>
 
-    <div id="checkout-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-    
-    <div class="bg-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-white/10">
-        
-        <div class="bg-slate-900 p-4 flex justify-between items-center text-white border-b border-white/10">
-            <h3 class="font-black italic uppercase tracking-tighter text-lg">Envío y Facturación</h3>
-            <button onclick="toggleCheckoutModal()" class="hover:text-yellow-500 transition text-white/70">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
+   <div id="checkout-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-white/10 max-h-[90vh] overflow-y-auto">
+            <div class="bg-slate-900 p-4 flex justify-between items-center text-white border-b border-white/10">
+                <h3 id="modal-title" class="font-black italic uppercase tracking-tighter text-lg">Crear Cuenta y Comprar</h3>
+                <button onclick="toggleCheckoutModal()" class="hover:text-yellow-500 transition text-white/70">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="p-4 bg-slate-800 border-b border-white/10 text-center">
+                <button type="button" id="btn-toggle-auth" onclick="toggleAuthMode()" class="text-yellow-500 text-sm font-bold uppercase hover:underline">
+                    ¿Ya tenés cuenta? Iniciá Sesión acá
+                </button>
+            </div>
+
             <form id="form-datos-cliente" class="p-6 space-y-4 bg-slate-800">
-    <div class="grid grid-cols-2 gap-4">
-        <div>
-            <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Nombre Completo</label>
-            <input type="text" id="cust-name" required class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
-        </div>
-        <div>
-            <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">DNI / CUIT</label>
-            <input type="text" id="cust-dni" required class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
-        </div>
-    </div>
-    <div>
-        <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Email (Para el comprobante)</label>
-        <input type="email" id="cust-email" required class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
-    </div>
-    <div>
-        <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">WhatsApp / Teléfono</label>
-        <input type="tel" id="cust-phone" required class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
-    </div>
-    <div>
-        <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Dirección de Entrega</label>
-        <input type="text" id="cust-address" required placeholder="Calle, Número, Depto" class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:border-yellow-500 transition">
-    </div>
-    <div class="grid grid-cols-2 gap-4">
-        <div>
-            <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Ciudad</label>
-            <input type="text" id="cust-city" required class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
-        </div>
-        <div>
-            <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Código Postal</label>
-            <input type="text" id="cust-zip" required class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
-        </div>
-    </div>
+                <input type="hidden" id="auth-mode" value="register">
+                
+                <div>
+                    <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Email</label>
+                    <input type="email" id="cust-email" required class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Contraseña</label>
+                    <input type="password" id="cust-password" required minlength="6" placeholder="Mínimo 6 caracteres" class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+                </div>
+
+                <div id="register-fields" class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Nombre Completo</label>
+                            <input type="text" id="cust-name" class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">DNI / CUIT</label>
+                            <input type="text" id="cust-dni" class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">WhatsApp / Teléfono</label>
+                        <input type="tel" id="cust-phone" class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Dirección de Entrega</label>
+                        <input type="text" id="cust-address" placeholder="Calle, Número, Depto" class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:border-yellow-500 transition">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Ciudad</label>
+                            <input type="text" id="cust-city" class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Código Postal</label>
+                            <input type="text" id="cust-zip" class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+                        </div>
+                    </div>
+                </div>
                 
                 <button type="submit" id="btn-confirmar-pago" class="w-full bg-yellow-500 text-black font-black uppercase py-4 rounded-xl shadow-lg hover:bg-yellow-400 transition flex items-center justify-center gap-2">
-                    Ir a pagar $ <span id="checkout-total-btn">0</span>
+                    <span id="btn-text-action">Registrarme y Pagar $</span> <span id="checkout-total-btn">0</span>
                 </button>
             </form>
         </div>
@@ -279,8 +293,12 @@
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const MP_ACCESS_TOKEN = 'TU_ACCESS_TOKEN_AQUÍ'; 
 // Este vigilante detecta cambios de sesión en TIEMPO REAL
+let currentUser = null; // Memoria del usuario logueado
+
+// Este vigilante detecta cambios de sesión en TIEMPO REAL
 _supabase.auth.onAuthStateChange((event, session) => {
     console.log("Evento de seguridad detectado:", event);
+    currentUser = session ? session.user : null;
 
     // No importa si entra o sale, en el index siempre queremos 
     // refrescar el catálogo público para asegurar que se vea bien.
@@ -436,88 +454,168 @@ async function addToCart(id) {
 }
 
 function toggleCart() { document.getElementById('cart-panel').classList.toggle('translate-x-full'); }
-function toggleCheckoutModal() { document.getElementById('checkout-modal').classList.toggle('hidden'); }
-function preCheckout() { if (cart.length > 0) { toggleCart(); toggleCheckoutModal(); } else alert("Carrito vacío"); }
 
+function toggleCheckoutModal() { 
+    document.getElementById('checkout-modal').classList.toggle('hidden');
+}
+
+async function preCheckout() { 
+    if (cart.length === 0) return alert("Carrito vacío");
+    toggleCart(); 
+    
+    // Si ya está logueado, pre-llenamos sus datos y ocultamos la contraseña
+    if (currentUser) {
+        document.getElementById('auth-mode').value = 'logged_in';
+        document.getElementById('btn-toggle-auth').style.display = 'none';
+        document.getElementById('cust-password').parentElement.style.display = 'none';
+        document.getElementById('cust-password').required = false;
+        document.getElementById('cust-email').value = currentUser.email;
+        document.getElementById('cust-email').disabled = true;
+        
+        try {
+            const { data: clienteData } = await _supabase.from('clientes').select('*').eq('auth_id', currentUser.id).single();
+            if (clienteData) {
+                document.getElementById('cust-name').value = clienteData.nombre || '';
+                document.getElementById('cust-dni').value = clienteData.dni || '';
+                document.getElementById('cust-phone').value = clienteData.telefono || '';
+                document.getElementById('cust-address').value = clienteData.direccion || '';
+                document.getElementById('cust-city').value = clienteData.ciudad || '';
+                document.getElementById('cust-zip').value = clienteData.cp || '';
+            }
+        } catch(e) {} // Fallo silencioso si no tiene datos extra aún
+        
+        document.getElementById('modal-title').innerText = 'Confirmar Datos de Envío';
+        document.getElementById('btn-text-action').innerText = 'Confirmar y Pagar $';
+    } else {
+        setAuthMode('register');
+    }
+    toggleCheckoutModal(); 
+}
+
+function setAuthMode(mode) {
+    const authModeInput = document.getElementById('auth-mode');
+    const regFields = document.getElementById('register-fields');
+    const btnToggle = document.getElementById('btn-toggle-auth');
+    const title = document.getElementById('modal-title');
+    const btnAction = document.getElementById('btn-text-action');
+    
+    authModeInput.value = mode;
+    
+    if (mode === 'login') {
+        regFields.style.display = 'none';
+        btnToggle.innerText = '¿No tenés cuenta? Registrate acá';
+        title.innerText = 'Iniciar Sesión';
+        btnAction.innerText = 'Iniciar Sesión y Pagar $';
+        document.getElementById('cust-name').required = false;
+        document.getElementById('cust-address').required = false;
+    } else {
+        regFields.style.display = 'block';
+        btnToggle.innerText = '¿Ya tenés cuenta? Iniciá Sesión acá';
+        title.innerText = 'Crear Cuenta y Comprar';
+        btnAction.innerText = 'Registrarme y Pagar $';
+        document.getElementById('cust-name').required = true;
+        document.getElementById('cust-address').required = true;
+    }
+}
+
+function toggleAuthMode() {
+    const currentMode = document.getElementById('auth-mode').value;
+    setAuthMode(currentMode === 'login' ? 'register' : 'login');
+}
 // --- NUEVA LÓGICA DE PEDIDO INTEGRADA (CON LOGÍSTICA Y WHATSAPP) ---
 
 document.getElementById('form-datos-cliente').addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (cart.length === 0) return alert("El carrito está vacío.");
     
     const btn = document.getElementById('btn-confirmar-pago');
     const originalText = btn.innerHTML;
-
-    // 1. CAPTURAR DATOS DE TUS INPUTS (cust-...)
-    const cliente = {
-        nombre: document.getElementById('cust-name').value.trim(),
-        dni: document.getElementById('cust-dni').value.trim(),
-        email: document.getElementById('cust-email').value.trim(),
-        telefono: document.getElementById('cust-phone').value.trim(),
-        direccion: document.getElementById('cust-address').value.trim(),
-        ciudad: document.getElementById('cust-city').value.trim(),
-        cp: document.getElementById('cust-zip').value.trim()
-    };
-
-    if (cart.length === 0) return alert("El carrito está vacío.");
-
-    // Feedback visual
+    const authMode = document.getElementById('auth-mode').value;
+    
+    const emailForm = document.getElementById('cust-email').value.trim();
+    const passwordForm = document.getElementById('cust-password').value;
+    
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
     btn.disabled = true;
 
     try {
-        const totalCalculado = cart.reduce((sum, item) => sum + (item.precio_minorista * item.quantity), 0);
+        let finalUserId = currentUser ? currentUser.id : null;
+        let clienteNombre = document.getElementById('cust-name').value.trim();
+        let clienteDni = document.getElementById('cust-dni').value.trim();
+        let clienteTel = document.getElementById('cust-phone').value.trim();
+        let clienteDir = document.getElementById('cust-address').value.trim();
+        let clienteCiudad = document.getElementById('cust-city').value.trim();
+        let clienteCp = document.getElementById('cust-zip').value.trim();
 
-        // 2. GUARDAR EL PEDIDO (CABECERA CON DATOS DE LOGÍSTICA)
-        // Guardamos todo para que aparezca en el Admin
-        const { data: pedidoData, error: pedidoError } = await _supabase
-            .from('pedidos')
-            .insert([{
-                cliente_nombre: cliente.nombre,
-                dni_cliente: cliente.dni,           
-                direccion_envio: cliente.direccion, 
-                ciudad: cliente.ciudad,             
-                cp: cliente.cp,                     
-                metodo_envio: 'correo',
-                total: totalCalculado,
-                estado: 'pendiente',        
-                estado_pago: 'pendiente',
-                vendedor_nombre: null
-            }])
-            .select();
+        // 1. MANEJAR AUTENTICACIÓN SI NO ESTÁ LOGUEADO
+        if (!currentUser) {
+            if (authMode === 'register') {
+                const { data: authData, error: authError } = await _supabase.auth.signUp({
+                    email: emailForm, password: passwordForm
+                });
+                if (authError) throw new Error("Error al crear cuenta: " + authError.message);
+                finalUserId = authData.user.id;
+                
+                const { error: perfilError } = await _supabase.from('clientes').insert([{
+                    auth_id: finalUserId, tipo_cliente: 'minorista', nombre: clienteNombre,
+                    email: emailForm, dni: clienteDni, telefono: clienteTel,
+                    direccion: clienteDir, ciudad: clienteCiudad, cp: clienteCp
+                }]);
+                if (perfilError) console.error("Error al guardar perfil:", perfilError);
+                
+            } else if (authMode === 'login') {
+                const { data: authData, error: authError } = await _supabase.auth.signInWithPassword({
+                    email: emailForm, password: passwordForm
+                });
+                if (authError) throw new Error("Credenciales incorrectas.");
+                finalUserId = authData.user.id;
+                
+                const { data: perfilData } = await _supabase.from('clientes').select('*').eq('auth_id', finalUserId).single();
+                if (perfilData) {
+                    clienteNombre = perfilData.nombre || 'Cliente Minorista';
+                    clienteDni = perfilData.dni || ''; clienteTel = perfilData.telefono || '';
+                    clienteDir = perfilData.direccion || ''; clienteCiudad = perfilData.ciudad || '';
+                    clienteCp = perfilData.cp || '';
+                }
+            }
+        } else if (authMode === 'logged_in') {
+            await _supabase.from('clientes').update({
+                nombre: clienteNombre, dni: clienteDni, telefono: clienteTel,
+                direccion: clienteDir, ciudad: clienteCiudad, cp: clienteCp
+            }).eq('auth_id', currentUser.id);
+        }
+
+        // 2. GUARDAR EL PEDIDO
+        const totalCalculado = cart.reduce((sum, item) => sum + (item.precio_minorista * item.quantity), 0);
+        
+        const { data: pedidoData, error: pedidoError } = await _supabase.from('pedidos').insert([{
+            cliente_nombre: clienteNombre, dni_cliente: clienteDni,           
+            direccion_envio: clienteDir, ciudad: clienteCiudad, cp: clienteCp,                     
+            metodo_envio: 'correo', total: totalCalculado, estado: 'pendiente',        
+            estado_pago: 'pendiente', vendedor_nombre: null
+        }]).select();
 
         if (pedidoError) throw pedidoError;
         const pedidoId = pedidoData[0].id;
 
-        // 3. GUARDAR LOS PRODUCTOS (DETALLE)
-        // Esto permite que el Admin vea la lista de productos al tocar el "ojo"
+        // 3. GUARDAR LOS PRODUCTOS
         const detalles = cart.map(item => ({
-            pedido_id: pedidoId,
-            producto_nombre: item.nombre,
-            cantidad: item.quantity,
-            precio_unitario: item.precio_minorista,
+            pedido_id: pedidoId, producto_nombre: item.nombre,
+            cantidad: item.quantity, precio_unitario: item.precio_minorista,
             subtotal: item.precio_minorista * item.quantity
         }));
-
-        const { error: errorDetalles } = await _supabase
-            .from('pedido_detalles')
-            .insert(detalles);
-
+        
+        const { error: errorDetalles } = await _supabase.from('pedido_detalles').insert(detalles);
         if (errorDetalles) throw errorDetalles;
 
-        // 4. MANTENER TU LÓGICA DE ÉXITO Y WHATSAPP
-        // Usamos la misma URL de éxito que ya tenías para que se active el botón de WhatsApp
-        const successUrl = window.location.origin + window.location.pathname + 
-                           `?status=success&pedido=${pedidoId}&payment_id=SIM_${Date.now()}`;
-        
-        // Limpieza de seguridad igual a tu código original
+        // 4. ÉXITO Y REDIRECCIÓN
+        const successUrl = window.location.origin + window.location.pathname + `?status=success&pedido=${pedidoId}&payment_id=SIM_${Date.now()}`;
         sessionStorage.removeItem('ultimo_pedido_pago');
-        
-        // Redirección final para activar el flujo de WhatsApp
         window.location.href = successUrl;
 
     } catch (err) {
-        console.error("Error al procesar pedido:", err);
-        alert("Hubo un error al registrar el pedido. Intenta nuevamente.");
+        console.error("Error al procesar:", err);
+        alert(err.message || "Hubo un error al procesar la operación. Intenta nuevamente.");
         btn.innerHTML = originalText;
         btn.disabled = false;
     }
