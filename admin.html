@@ -1802,8 +1802,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     try { if (typeof cargarVentas === 'function') await cargarVentas(); } 
     catch (e) { console.error("Error en cargarVentas:", e); }
 });
+// Variable global para que la impresora sepa qué pedido está abierto
+let pedidoActualParaImprimir = null;
+
 async function verDetallePedido(pedidoId) {
-    console.log("Intentando abrir pedido ID:", pedidoId); // Esto te confirmará en consola que el click funciona
+    console.log("Intentando abrir pedido ID:", pedidoId); 
     const contenido = document.getElementById('contenido-detalle-pedido');
     const modal = document.getElementById('modal-detalle-pedido');
     
@@ -1813,8 +1816,10 @@ async function verDetallePedido(pedidoId) {
     }
 
     contenido.innerHTML = '<div class="p-10 text-center"><i class="fas fa-spinner fa-spin text-3xl mb-2 text-blue-600"></i><p>Cargando productos...</p></div>';
+    
+    // Forma correcta de mostrar el modal sin romper el botón de cerrar
     modal.classList.remove('hidden');
-    modal.style.display = 'flex'; // Forzamos visibilidad
+    modal.style.display = 'flex'; 
 
     try {
         const { data: pedido, error: errPed } = await _supabase.from('pedidos').select('*').eq('id', pedidoId).single();
@@ -1822,6 +1827,16 @@ async function verDetallePedido(pedidoId) {
 
         const { data: detalles, error: errDet } = await _supabase.from('pedido_detalles').select('*').eq('pedido_id', pedidoId);
         if (errDet) throw errDet;
+
+        // ¡AQUÍ ESTÁ LA MAGIA QUE FALTABA PARA IMPRIMIR! Guardamos los datos en la variable global.
+        pedidoActualParaImprimir = {
+            info: pedido,
+            items: detalles.map(item => ({
+                cantidad: item.cantidad,
+                nombre: item.producto_nombre || 'Producto sin registrar',
+                codigo: item.codigo || 'S/C'
+            }))
+        };
 
         let html = `
             <div class="mb-4 bg-gray-50 p-3 rounded border">
@@ -1858,8 +1873,14 @@ async function verDetallePedido(pedidoId) {
         contenido.innerHTML = `<p class="p-10 text-center text-red-500">Error: ${e.message}</p>`;
     }
 }
+
 function cerrarModalDetalle() {
-    document.getElementById('modal-detalle-pedido').classList.add('hidden');
+    const modal = document.getElementById('modal-detalle-pedido');
+    // Forzamos que se oculte quitando el 'flex' y agregando 'hidden'
+    modal.style.display = 'none';
+    modal.classList.add('hidden');
+    // Limpiamos la variable para que no quede guardado un pedido viejo
+    pedidoActualParaImprimir = null;
 }
 
 function imprimirPedidoDeposito() {
