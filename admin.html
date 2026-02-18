@@ -1793,80 +1793,84 @@ async function verDetallePedido(pedidoId) {
     const contenido = document.getElementById('contenido-detalle-pedido');
     const modal = document.getElementById('modal-detalle-pedido');
     
-    // 1. Mostrar estado de carga
-    contenido.innerHTML = '<div class="p-10 text-center"><i class="fas fa-spinner fa-spin text-3xl mb-2 text-blue-600"></i><p class="font-bold uppercase text-[10px]">Cargando Pedido...</p></div>';
+    contenido.innerHTML = '<div class="p-10 text-center"><i class="fas fa-spinner fa-spin text-3xl mb-2 text-blue-600"></i><p class="font-bold">Cargando productos...</p></div>';
     modal.classList.remove('hidden');
 
     try {
-        // 2. Traer el pedido y sus detalles
-        const { data: pedido, error: errPed } = await _supabase.from('pedidos').select('*').eq('id', pedidoId).single();
-        if (errPed) throw errPed;
+        // 1. Traer la info del pedido y sus detalles en paralelo
+        const [resPed, resDet] = await Promise.all([
+            _supabase.from('pedidos').select('*').eq('id', pedidoId).single(),
+            _supabase.from('pedido_detalles').select('*').eq('pedido_id', pedidoId)
+        ]);
 
-        const { data: detalles, error: errDet } = await _supabase.from('pedido_detalles').select('*').eq('pedido_id', pedidoId);
-        if (errDet) throw errDet;
+        if (resPed.error) throw resPed.error;
+        const pedido = resPed.data;
+        const detalles = resDet.data || [];
 
-        // 3. Construir el encabezado del Modal
-        // Usamos created_at como salvavidas si fecha es null
-        const fechaMsg = new Date(pedido.fecha || pedido.created_at).toLocaleString();
-        
+        // 2. Encabezado del Modal (Con datos de envío si existen)
         let html = `
-            <div class="mb-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                <p class="text-[9px] font-black text-gray-400 uppercase">Cliente</p>
-                <p class="font-black text-black text-xl leading-tight">${pedido.cliente_nombre}</p>
-                <p class="text-[10px] text-gray-500 mt-1">${fechaMsg}</p>
-                
+            <div class="mb-4 bg-gray-50 p-3 rounded-lg border">
+                <p class="text-[10px] font-black text-gray-400 uppercase">Cliente</p>
+                <p class="font-black text-black text-lg">${pedido.cliente_nombre}</p>
+                <p class="text-[10px] text-gray-500">${new Date(pedido.created_at || pedido.fecha).toLocaleString()}</p>
                 ${pedido.direccion_envio ? `
-                <div class="mt-4 pt-3 border-t border-gray-200">
-                    <p class="text-[9px] font-black text-blue-600 uppercase mb-1">Datos de Envío</p>
-                    <p class="text-sm font-bold text-gray-800 uppercase"><i class="fas fa-truck mr-2"></i>${pedido.direccion_envio}</p>
-                    <p class="text-[11px] font-medium text-gray-500">${pedido.ciudad || ''} (CP: ${pedido.cp || ''})</p>
-                </div>` : ''}
+                    <div class="mt-2 pt-2 border-t border-gray-200">
+                        <p class="text-xs font-bold text-blue-600 uppercase"><i class="fas fa-truck mr-1"></i> ${pedido.direccion_envio}</p>
+                        <p class="text-[10px] text-gray-400 font-bold">${pedido.ciudad || ''} (CP: ${pedido.cp || ''})</p>
+                    </div>` : ''}
             </div>
             <table class="w-full text-left">
                 <thead>
-                    <tr class="border-b-2 border-gray-100">
-                        <th class="py-2 text-[10px] font-black uppercase text-gray-400">Cant.</th>
-                        <th class="py-2 text-[10px] font-black uppercase text-gray-400">Producto</th>
-                        <th class="py-2 text-right text-[10px] font-black uppercase text-gray-400">Subtotal</th>
+                    <tr class="border-b text-[10px] font-black text-gray-400 uppercase">
+                        <th class="py-2">Cant.</th>
+                        <th class="py-2">Producto</th>
+                        <th class="py-2 text-right">Total</th>
                     </tr>
                 </thead>
                 <tbody>
         `;
 
-        // 4. Lógica de los Items (SIN BUSQUEDAS EXTERNAS QUE BLOQUEEN)
-        detalles.forEach(item => {
-            // REGLA DE ORO: Si 'producto_nombre' existe (Venta Web), lo usamos. 
-            // Si no (Venta Mayorista), usamos el ID como referencia.
-            const nombreParaMostrar = item.producto_nombre || `Producto (ID: ${item.producto_id})`;
-            const subtotalItem = Number(item.subtotal || (item.cantidad * item.precio_unitario) || 0);
+        // 3. Procesar los ítems (Sin buscar en la tabla 'productos' para pedidos WEB)
+        for (const item of detalles) {
+            let nombreMostrar = item.producto_nombre; // Usamos el nombre que grabó el Index
+            let codigoMostrar = "WEB";
+
+            // Si es un pedido viejo o mayorista que NO tiene producto_nombre, buscamos el nombre
+            if (!nombreMostrar && item.producto_id) {
+                const { data: p } = await _supabase.from('productos').select('nombre, codigo').eq('id', item.producto_id).single();
+                if (p) {
+                    nombreMostrar = p.nombre;
+                    codigoMostrar = p.codigo;
+                }
+            }
 
             html += `
                 <tr class="border-b border-gray-50">
-                    <td class="py-3 font-black text-blue-600 text-2xl w-14">${item.cantidad}</td>
+                    <td class="py-3 font-black text-blue-600 text-xl w-12">${item.cantidad}</td>
                     <td class="py-3">
-                        <p class="text-xs font-black uppercase text-gray-800 leading-tight">${nombreParaMostrar}</p>
-                        <p class="text-[9px] text-gray-400 font-mono mt-1">${item.producto_id ? 'MAYORISTA' : 'VENTA WEB'}</p>
+                        <p class="text-xs font-bold uppercase leading-tight">${nombreMostrar || 'Sin descripción'}</p>
+                        <p class="text-[9px] text-gray-400 font-mono">${codigoMostrar}</p>
                     </td>
-                    <td class="py-3 text-right font-black text-sm text-gray-600">$${subtotalItem.toLocaleString()}</td>
-                </tr>`;
-        });
+                    <td class="py-3 text-right font-bold text-sm">$${(item.cantidad * item.precio_unitario).toLocaleString()}</td>
+                </tr>
+            `;
+        }
 
-        // 5. Total Final
-        const importeTotal = Number(pedido.total || 0);
+        // 4. Pie del modal con el total
         html += `
                 </tbody>
             </table>
-            <div class="mt-4 pt-4 border-t-2 border-dashed border-gray-200 flex justify-between items-center">
-                <span class="font-black uppercase text-xs text-gray-400">Monto Final:</span>
-                <span class="font-black text-3xl text-red-600 leading-none">$${importeTotal.toLocaleString()}</span>
+            <div class="mt-4 pt-3 border-t-2 border-dashed border-gray-200 flex justify-between items-center">
+                <span class="font-black uppercase text-[10px] text-gray-400">Total:</span>
+                <span class="font-black text-2xl text-red-600">$${Number(pedido.total || 0).toLocaleString()}</span>
             </div>
         `;
 
         contenido.innerHTML = html;
 
-    } catch (error) {
-        console.error("Error Detalle:", error);
-        contenido.innerHTML = `<div class="p-10 text-center text-red-600 font-bold">Error: ${error.message}</div>`;
+    } catch (e) {
+        console.error("Error detalle:", e);
+        contenido.innerHTML = `<div class="p-6 text-center text-red-600 font-bold">Error al cargar: ${e.message}</div>`;
     }
 }
 function cerrarModalDetalle() {
