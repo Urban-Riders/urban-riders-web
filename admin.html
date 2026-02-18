@@ -710,8 +710,7 @@
 
         let _productosLocales = [];
         let _clientesLocales = [];
-        let pedidoActualParaImprimir = null; // Variable de apoyo
-// --- BLOQUE DE SEGURIDAD ADMIN ---
+        // --- BLOQUE DE SEGURIDAD ADMIN ---
         _supabase.auth.onAuthStateChange(async (event, session) => {
             console.log("Evento de Auth:", event);
 
@@ -1818,7 +1817,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     catch (e) { console.error("Error en cargarVentas:", e); }
 });
 // Variable global para que la impresora sepa qué pedido está abierto
-let pedidoActualParaImprimir = null;
+var pedidoActualParaImprimir = null;
 
 async function verDetallePedido(pedidoId) {
     console.log("Intentando abrir pedido ID:", pedidoId); 
