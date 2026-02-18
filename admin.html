@@ -1387,21 +1387,39 @@ async function generarListaPrecios() {
         console.error("Error en historial:", err);
     }
 }
-        async function eliminarCliente(id) {
-            if (!confirm("¿Estás seguro de eliminar este cliente? Se borrará también su historial de ventas y movimientos de cuenta.")) return;
-            try {
-                await _supabase.from('historial_ventas').delete().eq('cliente_id', id);
-                await _supabase.from('movimientos_cuenta').delete().eq('cliente_id', id);
-                const { error } = await _supabase.from('clientes').delete().eq('id', id);
-                
-                if (error) throw error;
-                alert("Cliente eliminado con éxito");
-                await cargarClientes(); 
-            } catch (err) {
-                console.error(err);
-                alert("Error al eliminar el cliente: " + err.message);
+       async function eliminarCliente(id, nombre) {
+    if (confirm(`¿ESTÁS SEGURO? Se eliminará a "${nombre}" y sus saldos. Esta acción es irreversible.`)) {
+        try {
+            // 1. Borrar movimientos de cuenta (es seguro borrar esto porque es el detalle del saldo)
+            await _supabase.from('movimientos_cuenta').delete().eq('cliente_id', id);
+            
+            // 2. Desvincular pedidos (Para no perder la venta en tu estadística, pero soltar al cliente)
+            await _supabase.from('pedidos').update({ cliente_id: null }).eq('cliente_id', id);
+            
+            // 3. Desvincular del historial de ventas
+            await _supabase.from('historial_ventas').update({ cliente_id: null }).eq('cliente_id', id);
+
+            // 4. Ahora sí, eliminar al cliente (le agregamos .select() para confirmar que se borró)
+            const { data, error } = await _supabase.from('clientes').delete().eq('id', id).select();
+            
+            if (error) throw error;
+            
+            // Si la base de datos nos devuelve vacío, significa que algo lo bloqueó
+            if (!data || data.length === 0) {
+                 throw new Error("La base de datos bloqueó la eliminación. Posiblemente tenga otro registro oculto vinculado.");
             }
+
+            alert("✅ Cliente eliminado correctamente de la base de datos.");
+            
+            // 5. Recargar la tabla para que desaparezca de la pantalla al instante
+            await cargarClientes(); 
+
+        } catch (err) { 
+            console.error("Error real:", err);
+            alert("Error al intentar eliminar: " + err.message); 
         }
+    }
+}
         function filtrarProductos() {
             const busqueda = document.getElementById('buscador').value.toLowerCase();
             const filtrados = _productosLocales.filter(p => p.nombre.toLowerCase().includes(busqueda) || p.codigo.toLowerCase().includes(busqueda));
