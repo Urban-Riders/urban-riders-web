@@ -216,7 +216,6 @@
 </div>
 </div>
 
-<input type="text" id="buscador" onkeyup="filtrarProductos()" ...
                                 <input type="text" id="buscador" onkeyup="filtrarProductos()" placeholder="Buscar producto o código..." class="w-full md:w-80 pl-4 py-2 bg-gray-50 border rounded-full text-xs focus:border-yellow-500 outline-none">
                             </div>
                             <div class="table-container">
@@ -1046,34 +1045,44 @@ async function generarListaPrecios() {
             });
         });
 
-     function switchTab(tabId) {
+    function switchTab(tabId) {
     // 1. Ocultar todas las secciones quitando la clase 'active'
     document.querySelectorAll('.tab-content').forEach(tab => {
         tab.classList.remove('active');
     });
 
     // 2. Determinar el ID correcto
-    // Si ya empieza con 'tab-', lo usamos.
-    // Si no, se lo agregamos.
     let target = tabId.startsWith('tab-') ? tabId : 'tab-' + tabId;
-    
     const activeSection = document.getElementById(target);
+    
     if (activeSection) {
         activeSection.classList.add('active');
     }
 
-    // 3. Manejar el estado visual de los botones del menú
+    // 3. Manejar el estado visual de los botones del menú (apagar todos)
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active', 'bg-red-50', 'text-red-600');
         btn.classList.add('text-gray-500');
     });
 
-    // Resaltar el botón clickeado
-    if (event && event.currentTarget) {
-        event.currentTarget.classList.add('active', 'bg-red-50', 'text-red-600');
-// Dentro de tu función switchTab(tabId)
-if(tabId === 'tab-ventas') generarRankingVentas();
-if (target === 'tab-gastos') cargarGastos();
+    // 4. Encender solo el botón clickeado de forma segura
+    try {
+        const btnActivo = document.querySelector(`button[onclick="switchTab('${tabId}')"]`) || 
+                          document.querySelector(`button[onclick="switchTab('${target}')"]`);
+        if (btnActivo) {
+            btnActivo.classList.add('active', 'bg-red-50', 'text-red-600');
+            btnActivo.classList.remove('text-gray-500');
+        }
+    } catch(e) {
+        console.error("Error visual en el botón del menú:", e);
+    }
+
+    // 5. Cargas especiales según la pestaña que se abre
+    if (target === 'tab-ventas') {
+        if (typeof generarRankingVentas === 'function') generarRankingVentas();
+    }
+    if (target === 'tab-gastos') {
+        if (typeof cargarGastos === 'function') cargarGastos();
     }
 }
         async function cargarTodo() {
