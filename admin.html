@@ -352,14 +352,19 @@
             </div>
         </section>
 <section id="tab-pedidos" class="tab-content p-6">
-    <div class="flex justify-between items-center mb-6">
+   <div class="flex justify-between items-center mb-6">
         <div>
             <h2 class="text-3xl font-black uppercase italic text-black">Pedidos Moviles</h2>
             <p class="text-gray-400 text-xs font-bold uppercase tracking-widest">Validación de preventa desde celular</p>
         </div>
-        <button onclick="cargarPedidos()" class="bg-black text-white px-6 py-3 rounded-xl font-black uppercase text-xs hover:bg-red-600 transition flex items-center gap-2 shadow-lg">
-            <i class="fas fa-sync-alt"></i> Actualizar Pedidos
-        </button>
+        <div class="flex gap-2">
+            <button onclick="imprimirPickingListMinorista()" class="bg-blue-600 text-white px-6 py-3 rounded-xl font-black uppercase text-xs hover:bg-blue-700 transition flex items-center gap-2 shadow-lg">
+                <i class="fas fa-boxes"></i> Planilla Web
+            </button>
+            <button onclick="cargarPedidos()" class="bg-black text-white px-6 py-3 rounded-xl font-black uppercase text-xs hover:bg-red-600 transition flex items-center gap-2 shadow-lg">
+                <i class="fas fa-sync-alt"></i> Actualizar Pedidos
+            </button>
+        </div>
     </div>
 
     <div class="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-black">
@@ -1048,7 +1053,8 @@ async function generarListaPrecios() {
     });
 
     // 2. Determinar el ID correcto
-    // Si ya empieza con 'tab-', lo usamos. Si no, se lo agregamos.
+    // Si ya empieza con 'tab-', lo usamos.
+    // Si no, se lo agregamos.
     let target = tabId.startsWith('tab-') ? tabId : 'tab-' + tabId;
     
     const activeSection = document.getElementById(target);
@@ -2751,6 +2757,62 @@ async function guardarTracking(id) {
         // Efecto visual de éxito
         alert("¡Tracking Guardado!");
         ejecutarLogisticaDual(); // Refresca la tabla
+    }
+}
+async function imprimirPickingListMinorista() {
+    try {
+        const { data: pedidos, error } = await _supabase
+            .from('pedidos')
+            .select('*')
+            .is('cliente_id', null) 
+            .eq('estado', 'pendiente');
+
+        if (error) throw error;
+        if (!pedidos || pedidos.length === 0) return alert("No hay pedidos minoristas pendientes para armar hoy.");
+
+        let htmlImpresion = `
+            <html><head><title>Planilla de Armado - Urban Riders</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+                h1 { margin: 0; font-size: 22px; text-transform: uppercase; }
+                .pedido-card { border: 2px dashed #666; padding: 10px; margin-bottom: 15px; border-radius: 5px; page-break-inside: avoid; }
+                .pedido-titulo { font-size: 16px; font-weight: bold; background: #eee; padding: 5px; margin: -10px -10px 10px -10px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+                th, td { border: 1px solid #ccc; padding: 5px; text-align: left; font-size: 14px; }
+                th { background-color: #f4f4f4; }
+                .totales { margin-top: 20px; font-size: 18px; font-weight: bold; text-align: right; }
+            </style></head><body>
+            <div class="header"><h1>Planilla de Armado Web (Minoristas)</h1><p>Fecha: ${new Date().toLocaleDateString('es-AR')}</p></div>`;
+
+        let totalArticulosGlobal = 0;
+
+        for (const p of pedidos) {
+            const { data: detalles } = await _supabase.from('pedido_detalles').select('*').eq('pedido_id', p.id);
+            
+            htmlImpresion += `
+                <div class="pedido-card">
+                    <div class="pedido-titulo">📦 Pedido #${p.id} - ${p.cliente_nombre || 'Web'}</div>
+                    <p style="margin:0; font-size:13px;"><strong>Enviar a:</strong> ${p.direccion_envio || 'Retira'} - ${p.ciudad || ''} (${p.cp || ''}) | <strong>Tel:</strong> ${p.dni_cliente || ''}</p>
+                    <table><tr><th style="width: 80%;">Producto</th><th style="width: 20%; text-align: center;">Cant.</th></tr>`;
+
+            if (detalles) {
+                detalles.forEach(d => {
+                    htmlImpresion += `<tr><td>${d.producto_nombre || 'S/N'}</td><td style="text-align: center; font-weight: bold;">${d.cantidad}</td></tr>`;
+                    totalArticulosGlobal += Number(d.cantidad);
+                });
+            }
+            htmlImpresion += `</table></div>`;
+        }
+
+        htmlImpresion += `<div class="totales">TOTAL DE ARTÍCULOS A BUSCAR: ${totalArticulosGlobal}</div><script>setTimeout(() => window.print(), 500);</script></body></html>`;
+
+        const ventanaImpresion = window.open('', '_blank');
+        ventanaImpresion.document.write(htmlImpresion);
+        ventanaImpresion.document.close();
+    } catch (err) {
+        console.error(err);
+        alert("Error al generar la planilla: " + err.message);
     }
 }
     </script>
