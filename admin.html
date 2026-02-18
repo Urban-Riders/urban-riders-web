@@ -1388,53 +1388,52 @@ async function generarListaPrecios() {
     }
 }
        async function eliminarCliente(id, nombre) {
-    if (!confirm(`⚠️ ¿ELIMINAR DEFINITIVAMENTE A "${nombre}"?\n\nEste comando borrará primero sus movimientos y luego al cliente para evitar bloqueos de la base de datos.`)) return;
+    if (!confirm(`⚠️ ¿ELIMINAR DEFINITIVAMENTE A "${nombre}"?\n\nSe borrarán sus saldos y se desvincularán sus pedidos para que la base de datos permita el borrado.`)) return;
 
     try {
-        console.log("Iniciando borrado en cascada para cliente:", id);
+        console.log("Iniciando limpieza para cliente ID:", id);
 
-        // PASO 1: Borrar movimientos de cuenta (Los que causan el bloqueo principal)
+        // 1. Borrar movimientos de cuenta (imprescindible para desbloquear el borrado)
         const { error: errMov } = await _supabase
             .from('movimientos_cuenta')
             .delete()
             .eq('cliente_id', id);
-        
-        if (errMov) throw new Error("Error al borrar movimientos: " + errMov.message);
+        if (errMov) console.warn("Aviso en movimientos:", errMov.message);
 
-        // PASO 2: Desvincular pedidos (Para que no bloqueen el borrado del cliente)
-        // En lugar de borrar la venta, la hacemos "Anónima" para que no afecte tus gráficos de dinero.
-        await _supabase
+        // 2. Desvincular pedidos (Cambiamos el cliente_id a NULL para no borrar la venta)
+        const { error: errPed } = await _supabase
             .from('pedidos')
             .update({ cliente_id: null })
             .eq('cliente_id', id);
+        if (errPed) console.warn("Aviso en pedidos:", errPed.message);
 
-        // PASO 3: Desvincular historial de ventas
-        await _supabase
+        // 3. Desvincular del historial de ventas
+        const { error: errHist } = await _supabase
             .from('historial_ventas')
             .update({ cliente_id: null })
             .eq('cliente_id', id);
+        if (errHist) console.warn("Aviso en historial:", errHist.message);
 
-        // PASO 4: Finalmente, borrar al cliente de la tabla principal
+        // 4. ELIMINAR CLIENTE (Ahora que no tiene dependencias)
         const { error: errCli } = await _supabase
             .from('clientes')
             .delete()
             .eq('id', id);
 
-        if (errCli) throw new Error("Error al borrar el perfil del cliente: " + errCli.message);
+        if (errCli) throw errCli;
 
-        // PASO 5: Limpieza visual total
-        alert(`✅ "${nombre}" ha sido eliminado con éxito de todo el sistema.`);
+        // 5. REFRESCAR SISTEMA
+        alert(`✅ Cliente "${nombre}" eliminado correctamente.`);
         
-        // Limpiamos el buscador por si acaso
-        const b = document.getElementById('buscar-cliente');
-        if (b) b.value = '';
-
-        // Recargamos la lista
-        await cargarClientes();
+        // Limpiamos el buscador para asegurar que la tabla se refresque sin filtros
+        const buscador = document.getElementById('buscador-clientes');
+        if (buscador) buscador.value = '';
+        
+        await cargarClientes(); 
 
     } catch (err) {
-        console.error("Fallo el borrado:", err);
-        alert("❌ No se pudo eliminar por completo: " + err.message);
+        console.error("Error crítico al eliminar:", err);
+        alert("No se pudo eliminar el cliente: " + err.message);
     }
 }
         function filtrarProductos() {
