@@ -2813,7 +2813,8 @@ async function imprimirPickingListMinorista() {
             htmlImpresion += `</table></div>`;
         }
 
-        htmlImpresion += `<div class="totales">TOTAL DE ARTÍCULOS A BUSCAR: ${totalArticulosGlobal}</div><script>setTimeout(() => window.print(), 500);</script></body></html>`;
+        // ACÁ ESTÁ EL ARREGLO MÁGICO: <\/script> 
+        htmlImpresion += `<div class="totales">TOTAL DE ARTÍCULOS A BUSCAR: ${totalArticulosGlobal}</div><script>setTimeout(() => window.print(), 500);<\/script></body></html>`;
 
         const ventanaImpresion = window.open('', '_blank');
         ventanaImpresion.document.write(htmlImpresion);
