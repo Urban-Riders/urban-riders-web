@@ -195,45 +195,36 @@
         let _userEmail = null;
         let _currentCategory = 'TODOS';
         let _itemsShown = 12;
-_client.auth.onAuthStateChange(async (event, session) => {
-    console.log("Cambio de sesión en Mayorista:", event);
+_client.auth.onAuthStateChange((event, session) => {
+    console.log("Evento de sesión:", event);
 
-    try {
-        if (session && session.user && session.user.email) {
-            const emailIngresado = session.user.email;
+    if (session && session.user) {
+        _isLoggedIn = true;
+        _userEmail = session.user.email;
 
-            // --- INICIO DEL PATOVICA BLINDADO ---
-            if (emailIngresado.toLowerCase() !== MI_EMAIL_ADMIN.toLowerCase()) {
-                const { data: cliente } = await _client.from('clientes').select('id').eq('email', emailIngresado).maybeSingle();
-                if (!cliente) {
-                    await _client.auth.signOut();
-                    alert("Acceso denegado. Exclusivo para Mayoristas.");
-                    window.location.replace("index.html");
-                    return; // Corta acá y lo devuelve al index
-                }
-            }
-            // --- FIN DEL PATOVICA ---
-
-            _isLoggedIn = true;
-            _userEmail = emailIngresado;
-        } else {
-            _isLoggedIn = false;
-            _userEmail = null;
+        // El Patovica corre de fondo sin bloquear el catálogo
+        if (_userEmail.toLowerCase() !== MI_EMAIL_ADMIN.toLowerCase()) {
+            _client.from('clientes')
+                .select('id')
+                .eq('email', _userEmail)
+                .maybeSingle()
+                .then(({ data: cliente }) => {
+                    if (!cliente) {
+                        _client.auth.signOut().then(() => {
+                            alert("Acceso denegado. Exclusivo para Mayoristas.");
+                            window.location.replace("index.html");
+                        });
+                    }
+                });
         }
-    } catch (err) {
-        // Si la validación falla por conexión, evitamos que la página quede en blanco
-        console.error("Error en validación de sesión:", err);
+    } else {
         _isLoggedIn = false;
         _userEmail = null;
     }
 
-    if (typeof updateAuthUI === "function") {
-        updateAuthUI();
-    }
-
-    if (typeof init === "function") {
-        init(); 
-    }
+    // Estas funciones se ejecutan INMEDIATAMENTE sin esperar a la base de datos
+    if (typeof updateAuthUI === "function") updateAuthUI();
+    if (typeof init === "function") init();
 });
 
         async function init() {
