@@ -2388,6 +2388,10 @@ async function descargarRespaldoTotal() {
                 link.click();
                 document.body.removeChild(link);
                 archivosGenerados++;
+
+                // --- ESTA ES LA MAGIA QUE FALTABA ---
+                // Pausamos el código medio segundo para que el navegador apruebe la descarga
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
         }
         
