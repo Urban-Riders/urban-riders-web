@@ -205,27 +205,37 @@ _client.auth.onAuthStateChange((event, session) => {
             _isLoggedIn = true;
             finalizarCarga();
         } else {
-            // 2. VERIFICACIÓN ESTRICTA: Debe existir Y ser mayorista
+            // 2. VERIFICACIÓN: ¿Es mayorista?
             _client.from('clientes')
                 .select('id, tipo_cliente')
                 .eq('email', _userEmail)
-                .eq('tipo_cliente', 'mayorista') // <--- ESTO FALTABA
+                .eq('tipo_cliente', 'mayorista')
                 .maybeSingle()
                 .then(({ data: cliente }) => {
                     if (cliente) {
-                        _isLoggedIn = true; // Confirmado como Mayorista
+                        // ES MAYORISTA VIP: Pase libre
+                        _isLoggedIn = true; 
                         finalizarCarga();
                     } else {
-                        // NO ES MAYORISTA: Lo echamos
-                        _client.auth.signOut().then(() => {
-                            alert("Acceso Denegado: Tu cuenta no está habilitada como Mayorista.");
-                            window.location.replace("index.html");
-                        });
+                        // ES MINORISTA (O INTRUSO)
+                        _isLoggedIn = false; // No le damos el poder de ver precios
+
+                        // Si está intentando loguearse a la fuerza en esta pantalla, le avisamos
+                        if (event === 'SIGNED_IN') {
+                            _client.auth.signOut().then(() => {
+                                alert("Tu cuenta es Minorista. Puedes ver el catálogo, pero para ver precios mayoristas necesitas pedir una cuenta comercial.");
+                                finalizarCarga();
+                            });
+                        } else {
+                            // Si solo navegó desde el index (footer) estando logueado, lo dejamos ver la página sin precios y sin echarlo.
+                            finalizarCarga();
+                        }
                     }
-                });
+                })
+                .catch(() => finalizarCarga());
         }
     } else {
-        finalizarCarga(); // Usuario deslogueado
+        finalizarCarga(); // No hay nadie logueado
     }
 
     function finalizarCarga() {
