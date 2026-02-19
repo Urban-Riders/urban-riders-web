@@ -365,9 +365,9 @@ document.addEventListener('submit', async (e) => {
             telefono: form.telefono.value,
             email: form.email.value,
             saldo: 0,
-            limite_credito: 0
+            limite_credito: 0,
+            tipo_cliente: 'mayorista' // <--- AGREGAMOS ESTO AQUÍ
         };
-
         try {
             // Inserción en Supabase
             const { data, error } = await _supabase.from('clientes').insert([nuevoCliente]).select();

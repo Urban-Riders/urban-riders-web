@@ -1013,7 +1013,12 @@ async function generarListaPrecios() {
                         const { data: actualizado } = await _supabase.from('clientes').update({ saldo: (existente.saldo || 0) + montoAjuste, telefono: telefono }).eq('id', existente.id).select().single();
                         clienteFinal = actualizado;
                     } else {
-                        const { data: nuevo } = await _supabase.from('clientes').insert([{ nombre, telefono, saldo: montoAjuste }]).select().single();
+                        const { data: nuevo } = await _supabase.from('clientes').insert([{ 
+                            nombre, 
+                            telefono, 
+                            saldo: montoAjuste,
+                            tipo_cliente: 'mayorista' // <--- ESTO ES LO QUE AGREGA EL RANGO DESDE ADMIN
+                        }]).select().single();
                         clienteFinal = nuevo;
                         esNuevo = true;
                     }
