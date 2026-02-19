@@ -2362,12 +2362,14 @@ async function descargarRespaldoTotal() {
         'solicitudes_alta', 
         'suscriptores'
     ];
+    
     let archivosGenerados = 0;
     const fecha = new Date().toISOString().split('T')[0];
 
     try {
         for (const nombre of tablas) {
             const { data, error } = await _supabase.from(nombre).select('*');
+
             if (error) {
                 console.error(`Error en ${nombre}:`, error.message);
                 continue;
@@ -2386,9 +2388,6 @@ async function descargarRespaldoTotal() {
                 link.click();
                 document.body.removeChild(link);
                 archivosGenerados++;
-
-                // ---> ESTA ES LA PAUSA QUE FALTA EN TU ARCHIVO <---
-                await new Promise(resolve => setTimeout(resolve, 500));
             }
         }
         
