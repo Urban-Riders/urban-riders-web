@@ -599,7 +599,6 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
                     clienteCp = perfilData.cp || clienteCp || '';
                 }
             }
-        }
         } else if (authMode === 'logged_in') {
             await _supabase.from('clientes').update({
                 nombre: clienteNombre, dni: clienteDni, telefono: clienteTel,
