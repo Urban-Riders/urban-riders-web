@@ -49,8 +49,16 @@
                     <input type="password" id="user-pass" placeholder="••••••••" class="w-full p-4 rounded-lg bg-black border border-gray-800 outline-none focus:border-yellow-500 text-white transition" required>
                 </div>
                 <button type="submit" id="btn-login-submit" class="w-full bg-yellow-500 text-black py-4 rounded-lg font-black uppercase hover:bg-yellow-400 transition-all transform active:scale-95 shadow-lg">Entrar al Sistema</button>
-            </form>
-            <button onclick="toggleLoginModal()" class="w-full text-gray-500 text-xs mt-6 uppercase tracking-widest hover:text-white transition">Cancelar</button>
+        </form>
+
+        <div class="mt-6 border-t border-gray-800 pt-5 text-center">
+            <p class="text-[10px] text-gray-400 uppercase font-bold leading-relaxed">
+                Si es tu primera vez en la web pero ya sos cliente mayorista.
+                <button type="button" onclick="generarClaveMayorista()" class="text-yellow-500 font-black text-[12px] mt-2 block w-full hover:text-white transition underline">Genera tu clave acá</button>
+            </p>
+        </div>
+
+        <button onclick="toggleLoginModal()" class="w-full text-gray-500 text-xs mt-6 uppercase tracking-widest hover:text-white transition">Cancelar</button>
         </div>
     </div>
 
@@ -272,6 +280,58 @@ _client.auth.onAuthStateChange(async (event, session) => {
                 alert("Error: Credenciales no válidas.");
                 btn.disabled = false;
                 btn.innerText = "ENTRAR AL SISTEMA";
+            }
+        }
+async function generarClaveMayorista() {
+            const email = document.getElementById('user-email').value.trim();
+            const pass = document.getElementById('user-pass').value.trim();
+
+            if (!email || !pass) {
+                alert("Por favor, escribí tu correo y elegí una contraseña en los casilleros de arriba, y luego volvé a presionar 'Genera tu clave acá'.");
+                return;
+            }
+
+            if (pass.length < 6) {
+                alert("Por seguridad, la contraseña debe tener al menos 6 caracteres.");
+                return;
+            }
+
+            try {
+                // 1. Revisamos si el mail ya fue cargado por el vendedor en la tabla VIP
+                const { data: cliente, error: errCli } = await _client
+                    .from('clientes')
+                    .select('id')
+                    .eq('email', email.toLowerCase())
+                    .maybeSingle();
+
+                if (errCli) throw errCli;
+
+                if (!cliente) {
+                    alert("Acceso denegado.\n\nEste correo no figura como cliente mayorista habilitado. Si ya tenés cuenta, verificá no haber escrito mal el correo.");
+                    return; 
+                }
+
+                // 2. Si existe en la tabla VIP, le creamos el acceso web
+                const { error: errAuth } = await _client.auth.signUp({
+                    email: email,
+                    password: pass
+                });
+
+                if (errAuth) {
+                    if (errAuth.message.includes("already registered") || errAuth.message.includes("User already registered")) {
+                        alert("Este correo ya tiene una clave generada. Ingresá directamente presionando el botón amarillo 'ENTRAR AL SISTEMA'.");
+                    } else {
+                        alert("Error al generar la clave: " + errAuth.message);
+                    }
+                    return;
+                }
+
+                alert("¡Clave generada con éxito! Ya podés ver el catálogo y hacer tu pedido.");
+                window.location.reload();
+
+            } catch (err) {
+                console.error("Error al generar clave:", err);
+                alert("Ocurrió un error de conexión, intentá de nuevo.");
             }
         }
 
