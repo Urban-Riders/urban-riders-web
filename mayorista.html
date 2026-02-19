@@ -198,24 +198,31 @@
 _client.auth.onAuthStateChange(async (event, session) => {
     console.log("Cambio de sesión en Mayorista:", event);
 
-    if (session) {
-        const emailIngresado = session.user.email;
+    try {
+        if (session && session.user && session.user.email) {
+            const emailIngresado = session.user.email;
 
-        // --- INICIO DEL PATOVICA ---
-        if (emailIngresado.toLowerCase() !== MI_EMAIL_ADMIN.toLowerCase()) {
-            const { data: cliente } = await _client.from('clientes').select('id').eq('email', emailIngresado).maybeSingle();
-            if (!cliente) {
-                await _client.auth.signOut();
-                alert("Acceso denegado. Exclusivo para Mayoristas.");
-                window.location.replace("index.html");
-                return; // Corta acá y lo devuelve al index
+            // --- INICIO DEL PATOVICA BLINDADO ---
+            if (emailIngresado.toLowerCase() !== MI_EMAIL_ADMIN.toLowerCase()) {
+                const { data: cliente } = await _client.from('clientes').select('id').eq('email', emailIngresado).maybeSingle();
+                if (!cliente) {
+                    await _client.auth.signOut();
+                    alert("Acceso denegado. Exclusivo para Mayoristas.");
+                    window.location.replace("index.html");
+                    return; // Corta acá y lo devuelve al index
+                }
             }
-        }
-        // --- FIN DEL PATOVICA ---
+            // --- FIN DEL PATOVICA ---
 
-        _isLoggedIn = true;
-        _userEmail = emailIngresado;
-    } else {
+            _isLoggedIn = true;
+            _userEmail = emailIngresado;
+        } else {
+            _isLoggedIn = false;
+            _userEmail = null;
+        }
+    } catch (err) {
+        // Si la validación falla por conexión, evitamos que la página quede en blanco
+        console.error("Error en validación de sesión:", err);
         _isLoggedIn = false;
         _userEmail = null;
     }
@@ -224,7 +231,6 @@ _client.auth.onAuthStateChange(async (event, session) => {
         updateAuthUI();
     }
 
-    // Comentario corregido en una sola línea para evitar errores
     if (typeof init === "function") {
         init(); 
     }
