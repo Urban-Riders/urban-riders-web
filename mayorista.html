@@ -198,42 +198,42 @@
 _client.auth.onAuthStateChange((event, session) => {
     console.log("Evento de sesión:", event);
 
-    // 1. Cargamos los datos básicos de sesión inmediatamente
-    if (session && session.user) {
-        _userEmail = session.user.email;
-        // Ojo: No ponemos _isLoggedIn = true todavía para el resto de los mortales
-        if (_userEmail.toLowerCase() === MI_EMAIL_ADMIN.toLowerCase()) {
-            _isLoggedIn = true;
+    // 1. Reset inmediato de seguridad: por defecto nadie es mayorista
+    _isLoggedIn = false; 
+    _userEmail = (session && session.user) ? session.user.email : null;
+
+    // 2. Si hay alguien, el Patovica investiga en silencio
+    if (_userEmail) {
+        const esAdmin = _userEmail.toLowerCase() === MI_EMAIL_ADMIN.toLowerCase();
+        
+        if (esAdmin) {
+            _isLoggedIn = true; // El admin tiene pase libre
+            finalizarCarga();
+        } else {
+            // El Patovica chequea al cliente
+            _client.from('clientes').select('id').eq('email', _userEmail).maybeSingle()
+                .then(({ data: cliente }) => {
+                    if (cliente) {
+                        _isLoggedIn = true; // Solo aquí se habilitan los precios
+                        finalizarCarga();
+                    } else {
+                        // Es un minorista: lo echamos sin piedad
+                        _client.auth.signOut().then(() => {
+                            alert("Acceso denegado. Sección exclusiva para Mayoristas.");
+                            window.location.replace("index.html");
+                        });
+                    }
+                });
         }
     } else {
-        _isLoggedIn = false;
-        _userEmail = null;
+        // No hay nadie logueado: carga normal modo público
+        finalizarCarga();
     }
 
-    // 2. DISPARAMOS EL CATÁLOGO Y BOTONES AL INSTANTE (Esto asegura que no desaparezcan)
-    if (typeof updateAuthUI === "function") updateAuthUI();
-    if (typeof init === "function") init();
-
-    // 3. VALIDACIÓN DE SEGURIDAD (Corre por atrás, después de que todo cargó)
-    if (session && session.user && _userEmail.toLowerCase() !== MI_EMAIL_ADMIN.toLowerCase()) {
-        _client.from('clientes')
-            .select('id')
-            .eq('email', _userEmail)
-            .maybeSingle()
-            .then(({ data: cliente }) => {
-                if (cliente) {
-                    // Es mayorista: Activamos precios y refrescamos solo el catálogo
-                    _isLoggedIn = true;
-                    updateAuthUI();
-                    render(); // Solo redibujamos los productos con los nuevos precios
-                } else {
-                    // Es minorista: Lo sacamos
-                    _client.auth.signOut().then(() => {
-                        alert("Acceso denegado. Exclusivo para Mayoristas.");
-                        window.location.replace("index.html");
-                    });
-                }
-            });
+    // Esta pequeña función asegura que los botones y el catálogo se dibujen SIEMPRE
+    function finalizarCarga() {
+        if (typeof updateAuthUI === "function") updateAuthUI();
+        if (typeof init === "function") init();
     }
 });
 
