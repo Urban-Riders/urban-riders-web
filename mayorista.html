@@ -177,7 +177,7 @@
         const _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
             auth: { persistSession: true, autoRefreshToken: true }
         });
-        
+
         const MI_EMAIL_ADMIN = 'kotur39@gmail.com'; 
 
         let _productos = [];
@@ -187,41 +187,39 @@
         let _userEmail = null;
         let _currentCategory = 'TODOS';
         let _itemsShown = 12;
+_client.auth.onAuthStateChange((event, session) => {
+    console.log("Cambio de sesión en Mayorista:", event);
 
-        // --- EL PATOVICA BLINDADO ---
-        _client.auth.onAuthStateChange(async (event, session) => {
-            console.log("Cambio de sesión:", event);
-            if (session) {
-                const emailIngresado = session.user.email;
-                if (emailIngresado.toLowerCase() !== MI_EMAIL_ADMIN.toLowerCase()) {
-                    try {
-                        const { data: cliente, error } = await _client
-                            .from('clientes')
-                            .select('id')
-                            .eq('email', emailIngresado)
-                            .maybeSingle();
+    if (session) {
+        _isLoggedIn = true;
+        _userEmail = session.user.email;
+    } else {
+        _isLoggedIn = false;
+        _userEmail = null;
+    }
 
-                        if (!cliente) {
-                            console.log("Rebotado: Minorista.");
-                            await _client.auth.signOut();
-                            alert("Acceso denegado. Exclusivo Mayoristas.\nSerás redirigido a la tienda pública.");
-                            window.location.replace("index.html");
-                            return; 
-                        }
-                    } catch (err) { console.error("Error al validar:", err); }
-                }
-                _isLoggedIn = true;
-                _userEmail = emailIngresado;
-            } else {
-                _isLoggedIn = false;
-                _userEmail = null;
-            }
-            updateAuthUI();
-            init(); // Forzamos la carga del catálogo siempre
-        });
+    if (typeof updateAuthUI === "function") {
+        updateAuthUI();
+    }
 
-        // --- INICIALIZACIÓN ---
+    // IMPORTANTE: Quitamos el redirect a index.html para que el 
+    // usuario se quede aquí y pueda volver a loguearse si quiere.
+
+    if (typeof init === "function") {
+        init(); // <--- ESTO ES LO QUE ESTABA VACÍO Y RECARGA LOS PRODUCTOS
+    }
+});
+
         async function init() {
+            const { data: { session } } = await _client.auth.getSession();
+            
+            if (session) {
+                _isLoggedIn = true;
+                _userEmail = session.user.email;
+            }
+
+            updateAuthUI();
+
             try {
                 const { data, error } = await _client.from('productos_publicos').select('*').order('nombre');
                 if (error) throw error;
@@ -233,7 +231,6 @@
             }
         }
 
-        // --- RESTO DE FUNCIONES ---
         async function handleLogin(event) {
             event.preventDefault();
             const email = document.getElementById('user-email').value.trim();
@@ -242,15 +239,23 @@
 
             btn.disabled = true;
             btn.innerText = "ACCEDIENDO...";
+
             try {
-                const { error } = await _client.auth.signInWithPassword({ email: email, password: pass });
+                const { data, error } = await _client.auth.signInWithPassword({
+                    email: email,
+                    password: pass
+                });
+
                 if (error) throw error;
                 
+                localStorage.setItem('isLoggedIn', 'true');
+
                 if (email.toLowerCase() === MI_EMAIL_ADMIN.toLowerCase()) {
                     window.location.href = 'admin.html';
                 } else {
                     window.location.reload();
                 }
+
             } catch (error) {
                 alert("Error: Credenciales no válidas.");
                 btn.disabled = false;
@@ -259,18 +264,22 @@
         }
 
         async function handleLogout() {
-            if (confirm("¿Cerrar sesión?")) {
-                await _client.auth.signOut();
-                localStorage.removeItem('isLoggedIn');
-                window.location.reload();
-            }
-        }
+    if (confirm("¿Cerrar sesión?")) {
+        await _client.auth.signOut();
+        // Borramos el localStorage si lo usás
+        localStorage.removeItem('isLoggedIn'); 
+        
+        // BORRAMOS la línea de window.location.href
+        // Al no haber redirección, el "Vigilante" (onAuthStateChange)
+        // se activará solo y ejecutará init() para mostrar los precios públicos.
+    }
+}
 
         function updateAuthUI() {
             const container = document.getElementById('auth-buttons');
             if (_isLoggedIn) {
                 let html = '';
-                if (_userEmail && _userEmail.toLowerCase() === MI_EMAIL_ADMIN.toLowerCase()) {
+                if (_userEmail.toLowerCase() === MI_EMAIL_ADMIN.toLowerCase()) {
                     html += `<a href="admin.html" class="bg-yellow-500 text-black text-[10px] px-4 py-2 rounded-lg font-black uppercase hover:bg-white transition mr-2 tracking-tighter">Panel</a>`;
                 }
                 html += `<button onclick="handleLogout()" class="text-[10px] border border-red-500 text-red-500 px-4 py-2 rounded-lg font-black uppercase hover:bg-red-500 hover:text-white transition">Salir</button>`;
@@ -281,16 +290,30 @@
         }
 
         function toggleLoginModal() { document.getElementById('login-modal').classList.toggle('active'); }
-        function openZoom(url) { document.getElementById('zoom-img').src = url; document.getElementById('zoom-modal').classList.add('active'); document.body.style.overflow = 'hidden'; }
-        function closeZoom() { document.getElementById('zoom-modal').classList.remove('active'); document.body.style.overflow = 'auto'; }
+
+        function openZoom(url) {
+            const modal = document.getElementById('zoom-modal');
+            const img = document.getElementById('zoom-img');
+            img.src = url;
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden'; 
+        }
+
+        function closeZoom() {
+            document.getElementById('zoom-modal').classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
 
         async function handleAlta(event) {
             event.preventDefault();
             const btn = document.getElementById('btn-envio-alta');
             const form = document.getElementById('form-alta');
             const mensaje = document.getElementById('mensaje-exito');
-            let telRaw = document.getElementById('input-telefono').value.replace(/\D/g, '');
-            if (telRaw.length > 0 && !telRaw.startsWith('54')) telRaw = '54' + telRaw;
+            
+            let telRaw = document.getElementById('input-telefono').value.replace(/\D/g, ''); 
+            if (telRaw.length > 0 && !telRaw.startsWith('54')) {
+                telRaw = '54' + telRaw;
+            }
 
             const datos = {
                 Comercio: document.getElementById('input-comercio').value.trim().toUpperCase(),
@@ -298,8 +321,10 @@
                 Localidad: document.getElementById('input-localidad').value.trim().toUpperCase(),
                 Email: document.getElementById('input-email').value.trim().toLowerCase()
             };
+
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner animate-spin"></i> ENVIANDO...';
+
             try {
                 const { error } = await _client.from('solicitudes_alta').insert([datos]);
                 if (error) throw error;
@@ -344,6 +369,7 @@
                 const hasStock = p.stock > 0;
                 const precio = _isLoggedIn ? `$${Number(p.precio).toLocaleString()}` : "CONSULTAR";
                 const productData = btoa(unescape(encodeURIComponent(JSON.stringify(p)))); 
+                
                 return `
                 <div class="bg-gray-900 rounded-xl overflow-hidden border ${hasStock ? 'border-gray-800' : 'border-red-900/30'} p-3 flex flex-col hover:border-yellow-500 transition">
                     <div class="relative h-32 -mx-3 -mt-3 mb-3 bg-black flex items-center justify-center overflow-hidden">
@@ -385,9 +411,13 @@
             if (!document.getElementById('cart-modal').classList.contains('active')) toggleCart();
         }
 
+        // FUNCION PARA VACIAR CARRITO
         function clearCart() {
             if (_cart.length === 0) return;
-            if (confirm("¿Vaciar el pedido?")) { _cart = []; updateCartUI(); }
+            if (confirm("¿Estás seguro de que quieres vaciar el pedido?")) {
+                _cart = [];
+                updateCartUI();
+            }
         }
 
         function updateCartUI() {
@@ -413,6 +443,7 @@
                         </div>
                     </div>`).join('');
             }
+
             const total = _cart.reduce((s, i) => s + (i.precio * i.cantidad || 0), 0);
             document.getElementById('cart-total').innerText = _isLoggedIn ? `TOTAL: $${total.toLocaleString()}` : 'TOTAL: CONSULTAR';
         }
@@ -429,48 +460,92 @@
 
         async function sendOrder() {
             if (_cart.length === 0) return alert("Carrito vacío");
+
             try {
                 const totalPedido = _cart.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
+
                 if (_isLoggedIn && _userEmail) {
-                    const { data: cliente } = await _client.from('clientes').select('id, saldo').eq('email', _userEmail).single();
-                    if (cliente) {
+                    // 1. Buscamos al cliente por email trayendo ID y Saldo actual
+                    const { data: cliente, error: errorUser } = await _client
+                        .from('clientes')
+                        .select('id, saldo') 
+                        .eq('email', _userEmail)
+                        .single();
+
+                    if (!errorUser && cliente) {
                         const nuevoSaldo = (cliente.saldo || 0) - totalPedido;
-                        await _client.from('clientes').update({ saldo: nuevoSaldo }).eq('id', cliente.id);
-                        await _client.from('movimientos_cuenta').insert([{
-                                cliente_id: cliente.id, tipo: 'COMPRA', monto: -totalPedido,
-                                descripcion: `Pedido Web (${_cart.length} productos)`, saldo_resultante: nuevoSaldo
+                        
+                        // 2. Actualizamos la columna 'saldo' en la tabla 'clientes'
+                        await _client
+                            .from('clientes')
+                            .update({ saldo: nuevoSaldo })
+                            .eq('email', _userEmail);
+
+                        // 3. REGISTRO DE MOVIMIENTOS, HISTORIAL Y STOCK
+                        // A. Actualizar Saldo del Cliente
+                        await _client
+                            .from('clientes')
+                            .update({ saldo: nuevoSaldo })
+                            .eq('id', cliente.id);
+
+                        // B. Registrar Movimiento en Cuenta Corriente
+                        await _client
+                            .from('movimientos_cuenta')
+                            .insert([{
+                                cliente_id: cliente.id,
+                                tipo: 'COMPRA',
+                                monto: -totalPedido,
+                                descripcion: `Pedido Web (${_cart.length} productos)`,
+                                saldo_resultante: nuevoSaldo
                             }]);
+
+                        // C. REGISTRO DE PRODUCTOS EN HISTORIAL Y DESCUENTO DE STOCK
                         for (const item of _cart) {
+                            // 1. Insertar en historial_ventas (lo que lee la LUPA)
                             await _client.from('historial_ventas').insert([{
-                                cliente_id: cliente.id, producto_nombre: item.nombre,
-                                cantidad: item.cantidad, precio_unitario: item.precio,
-                                codigo: item.codigo || 'S/N', fecha: new Date().toISOString()
+                                cliente_id: cliente.id,
+                                producto_nombre: item.nombre,
+                                cantidad: item.cantidad,
+                                precio_unitario: item.precio,
+                                codigo: item.codigo || 'S/N',
+                                fecha: new Date().toISOString()
                             }]);
-                            const { data: prodDB } = await _client.from('productos').select('stock').eq('id', item.id).single();
+
+                            // 2. Descontar Stock real de la tabla productos
+                            const { data: prodDB } = await _client
+                                .from('productos')
+                                .select('stock')
+                                .eq('id', item.id)
+                                .single();
+
                             if (prodDB) {
-                                await _client.from('productos').update({ stock: (prodDB.stock || 0) - item.cantidad }).eq('id', item.id);
+                                await _client
+                                    .from('productos')
+                                    .update({ stock: (prodDB.stock || 0) - item.cantidad })
+                                    .eq('id', item.id);
                             }
                         }
                     }
                 }
 
+                // 4. ENVÍO A WHATSAPP
                 const items = _cart.map(i => `- (${i.cantidad}u) ${i.nombre}`).join("%0A");
                 const totalStr = _isLoggedIn ? `%0A%0ATotal: $${totalPedido.toLocaleString()}` : "";
                 const userText = _isLoggedIn ? `Cliente: ${_userEmail}%0A` : "";
 
                 window.open(`https://wa.me/5493446645264?text=Pedido Urban Riders:%0A${userText}${items}${totalStr}`, '_blank');
                 
+                // 5. LIMPIEZA
                 _cart = [];
                 updateCartUI();
                 toggleCart();
-                init();
+                if (typeof init === "function") await init();
+
             } catch (err) {
-                console.error("Error:", err);
-                alert("Error al procesar el pedido.");
+                console.error("Error completo:", err);
+                alert("Error al registrar deuda en cuenta corriente: " + err.message);
             }
         }
-        
-        // Arrancamos todo
         init();
     </script>
 <script>
