@@ -546,38 +546,60 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
         let clienteDir = document.getElementById('cust-address').value.trim();
         let clienteCiudad = document.getElementById('cust-city').value.trim();
         let clienteCp = document.getElementById('cust-zip').value.trim();
-
-        // 1. MANEJAR AUTENTICACIÓN SI NO ESTÁ LOGUEADO
+// 1. MANEJAR AUTENTICACIÓN SI NO ESTÁ LOGUEADO
         if (!currentUser) {
-            if (authMode === 'register') {
-                const { data: authData, error: authError } = await _supabase.auth.signUp({
-                    email: emailForm, password: passwordForm
-                });
-                if (authError) throw new Error("Error al crear cuenta: " + authError.message);
+            // Intentamos loguear primero (Adivinamos que ya es cliente)
+            let { data: authData, error: authError } = await _supabase.auth.signInWithPassword({
+                email: emailForm, 
+                password: passwordForm
+            });
+
+            if (authError) {
+                // Si falla el login, verificamos si es porque no existe o puso mal la clave
+                if (authError.message.includes("Invalid login credentials") || authError.message.includes("credenciales")) {
+                    
+                    // Como no pudo loguear, intentamos CREAR la cuenta
+                    const { data: regData, error: regError } = await _supabase.auth.signUp({
+                        email: emailForm, 
+                        password: passwordForm
+                    });
+
+                    if (regError) {
+                        // Si da error "User already registered", significa que SÍ existía pero le erró a la clave
+                        if (regError.message.includes("User already registered") || regError.code === "user_already_exists") {
+                            throw new Error("Ya tienes una cuenta. Por favor verifica que tu contraseña sea correcta.");
+                        } else {
+                            throw new Error("Error al crear cuenta: " + regError.message);
+                        }
+                    }
+                    
+                    // Si se creó con éxito:
+                    finalUserId = regData.user.id;
+                    const { error: perfilError } = await _supabase.from('clientes').insert([{
+                        auth_id: finalUserId, tipo_cliente: 'minorista', nombre: clienteNombre,
+                        email: emailForm, dni: clienteDni, telefono: clienteTel,
+                        direccion: clienteDir, ciudad: clienteCiudad, cp: clienteCp
+                    }]);
+                    if (perfilError) console.error("Error al guardar perfil:", perfilError);
+
+                } else {
+                    throw new Error("Error de inicio de sesión: " + authError.message);
+                }
+            } else {
+                // Si el login fue exitoso en el primer intento:
                 finalUserId = authData.user.id;
-                
-                const { error: perfilError } = await _supabase.from('clientes').insert([{
-                    auth_id: finalUserId, tipo_cliente: 'minorista', nombre: clienteNombre,
-                    email: emailForm, dni: clienteDni, telefono: clienteTel,
-                    direccion: clienteDir, ciudad: clienteCiudad, cp: clienteCp
-                }]);
-                if (perfilError) console.error("Error al guardar perfil:", perfilError);
-                
-            } else if (authMode === 'login') {
-                const { data: authData, error: authError } = await _supabase.auth.signInWithPassword({
-                    email: emailForm, password: passwordForm
-                });
-                if (authError) throw new Error("Credenciales incorrectas.");
-                finalUserId = authData.user.id;
-                
                 const { data: perfilData } = await _supabase.from('clientes').select('*').eq('auth_id', finalUserId).single();
+                
                 if (perfilData) {
-                    clienteNombre = perfilData.nombre || 'Cliente Minorista';
-                    clienteDni = perfilData.dni || ''; clienteTel = perfilData.telefono || '';
-                    clienteDir = perfilData.direccion || ''; clienteCiudad = perfilData.ciudad || '';
-                    clienteCp = perfilData.cp || '';
+                    clienteNombre = perfilData.nombre || clienteNombre || 'Cliente Minorista';
+                    clienteDni = perfilData.dni || clienteDni || ''; 
+                    clienteTel = perfilData.telefono || clienteTel || '';
+                    clienteDir = perfilData.direccion || clienteDir || '';
+                    clienteCiudad = perfilData.ciudad || clienteCiudad || '';
+                    clienteCp = perfilData.cp || clienteCp || '';
                 }
             }
+        }
         } else if (authMode === 'logged_in') {
             await _supabase.from('clientes').update({
                 nombre: clienteNombre, dni: clienteDni, telefono: clienteTel,
