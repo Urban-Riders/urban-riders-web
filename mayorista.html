@@ -187,13 +187,49 @@
         let _userEmail = null;
         let _currentCategory = 'TODOS';
         let _itemsShown = 12;
-_client.auth.onAuthStateChange((event, session) => {
+_client.auth.onAuthStateChange(async (event, session) => {
     console.log("Cambio de sesión en Mayorista:", event);
 
     if (session) {
-        _isLoggedIn = true;
-        _userEmail = session.user.email;
+        const emailIngresado = session.user.email;
+        
+        // 1. Si sos el Admin, pasás directo sin que te moleste el sistema
+        if (emailIngresado.toLowerCase() === MI_EMAIL_ADMIN.toLowerCase()) {
+            _isLoggedIn = true;
+            _userEmail = emailIngresado;
+            updateAuthUI();
+            if (typeof init === "function") init();
+            return;
+        }
+
+        // 2. EL PATOVICA: Vamos a ver si este email existe en la tabla "clientes" (Mayoristas aprobados)
+        try {
+            const { data: clienteValido, error } = await _client
+                .from('clientes')
+                .select('id')
+                .eq('email', emailIngresado)
+                .maybeSingle();
+
+            if (!clienteValido) {
+                // Es un minorista colado. Lo echamos y lo mandamos al index.
+                console.log("Acceso denegado: Usuario minorista intentando entrar a Mayorista.");
+                await _client.auth.signOut();
+                localStorage.removeItem('isLoggedIn');
+                alert("Acceso denegado.\n\nEsta sección es exclusiva para clientes Mayoristas con cuenta corriente aprobada.\nSerás redirigido a la tienda pública.");
+                window.location.replace("index.html");
+                return; // Cortamos la ejecución acá
+            }
+
+            // Si llegó hasta acá, es un mayorista real. Lo dejamos pasar.
+            _isLoggedIn = true;
+            _userEmail = emailIngresado;
+
+        } catch (err) {
+            console.error("Error al validar cliente mayorista:", err);
+        }
+
     } else {
+        // No hay nadie logueado (vista pública sin precios)
         _isLoggedIn = false;
         _userEmail = null;
     }
@@ -202,11 +238,8 @@ _client.auth.onAuthStateChange((event, session) => {
         updateAuthUI();
     }
 
-    // IMPORTANTE: Quitamos el redirect a index.html para que el 
-    // usuario se quede aquí y pueda volver a loguearse si quiere.
-
     if (typeof init === "function") {
-        init(); // <--- ESTO ES LO QUE ESTABA VACÍO Y RECARGA LOS PRODUCTOS
+        init(); 
     }
 });
 
