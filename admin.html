@@ -259,7 +259,16 @@
                                     <p class="text-[8px] text-gray-400 mb-1 italic">Negativo si debe (Ej: -5000)</p>
                                     <input type="number" id="c-saldo" class="w-full bg-gray-50 border rounded-lg p-2 text-xs font-bold" value="0">
                                 </div>
-                                <button type="submit" class="w-full bg-black text-white py-3 rounded-xl font-black uppercase text-[10px] hover:bg-blue-600 transition">
+                                
+                                <div>
+                                    <label class="text-[9px] font-bold uppercase text-gray-400">Rango / Tipo de Cuenta</label>
+                                    <select id="c-tipo-cliente" class="w-full bg-blue-50 border border-blue-200 rounded-lg p-2 text-xs font-bold outline-none focus:border-blue-500">
+                                        <option value="mayorista" selected>Mayorista (Verá precios de costo)</option>
+                                        <option value="minorista">Minorista (Cliente final)</option>
+                                    </select>
+                                </div>
+
+                                <button type="submit" class="w-full bg-black text-white py-3 rounded-xl font-black uppercase text-[10px] hover:bg-blue-600 transition mt-2">
                                     Registrar Cliente
                                 </button>
                             </form>
@@ -1005,30 +1014,50 @@ async function generarListaPrecios() {
                 const nombre = document.getElementById('c-nombre').value.trim();
                 const telefono = document.getElementById('c-telefono').value.trim();
                 const montoAjuste = parseFloat(document.getElementById('c-saldo').value) || 0;
+                
+                // LEEMOS LO QUE ELEGISTE EN EL DESPLEGABLE
+                const tipoCliente = document.getElementById('c-tipo-cliente').value;
+
                 try {
                     const { data: existente } = await _supabase.from('clientes').select('*').ilike('nombre', nombre).maybeSingle();
                     let clienteFinal;
                     let esNuevo = false;
+                    
                     if (existente) {
-                        const { data: actualizado } = await _supabase.from('clientes').update({ saldo: (existente.saldo || 0) + montoAjuste, telefono: telefono }).eq('id', existente.id).select().single();
+                        // SI YA EXISTE, LO ACTUALIZA Y LE PISA EL RANGO CON LO QUE HAYAS ELEGIDO AHORA
+                        const { data: actualizado } = await _supabase.from('clientes').update({ 
+                            saldo: (existente.saldo || 0) + montoAjuste, 
+                            telefono: telefono,
+                            tipo_cliente: tipoCliente 
+                        }).eq('id', existente.id).select().single();
                         clienteFinal = actualizado;
                     } else {
+                        // SI ES NUEVO, LO CREA CON EL RANGO ELEGIDO
                         const { data: nuevo } = await _supabase.from('clientes').insert([{ 
                             nombre, 
                             telefono, 
                             saldo: montoAjuste,
-                            tipo_cliente: 'mayorista' // <--- ESTO ES LO QUE AGREGA EL RANGO DESDE ADMIN
+                            tipo_cliente: tipoCliente 
                         }]).select().single();
                         clienteFinal = nuevo;
                         esNuevo = true;
                     }
-                    await _supabase.from('movimientos_cuenta').insert([{ cliente_id: clienteFinal.id, tipo: esNuevo ? 'INICIAL' : 'AJUSTE', monto: montoAjuste, descripcion: esNuevo ? 'Saldo inicial' : 'Ajuste manual', saldo_resultante: clienteFinal.saldo }]);
-                    alert("Cliente procesado");
+                    
+                    await _supabase.from('movimientos_cuenta').insert([{ 
+                        cliente_id: clienteFinal.id, 
+                        tipo: esNuevo ? 'INICIAL' : 'AJUSTE', 
+                        monto: montoAjuste, 
+                        descripcion: esNuevo ? 'Saldo inicial' : 'Ajuste manual', 
+                        saldo_resultante: clienteFinal.saldo 
+                    }]);
+                    
+                    alert("Cliente procesado exitosamente como: " + tipoCliente.toUpperCase());
                     document.getElementById('form-cliente').reset();
                     await cargarClientes();
-                } catch (error) { alert("Error: " + error.message); }
+                } catch (error) { 
+                    alert("Error: " + error.message);
+                }
             });
-
             document.getElementById('form-pago').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const clienteId = document.getElementById('modal-cliente-id').value;
