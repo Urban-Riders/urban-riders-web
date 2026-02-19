@@ -196,55 +196,47 @@
         let _currentCategory = 'TODOS';
         let _itemsShown = 12;
 _client.auth.onAuthStateChange((event, session) => {
-    console.log("Evento de sesión:", event);
-
-    // 1. Reset inmediato de seguridad: por defecto nadie es mayorista
     _isLoggedIn = false; 
     _userEmail = (session && session.user) ? session.user.email : null;
 
-    // 2. Si hay alguien, el Patovica investiga en silencio
     if (_userEmail) {
-        const esAdmin = _userEmail.toLowerCase() === MI_EMAIL_ADMIN.toLowerCase();
-        
-        if (esAdmin) {
-            _isLoggedIn = true; // El admin tiene pase libre
+        // 1. EL ADMIN PASA SIEMPRE
+        if (_userEmail.toLowerCase() === MI_EMAIL_ADMIN.toLowerCase()) {
+            _isLoggedIn = true;
             finalizarCarga();
         } else {
-            // El Patovica chequea al cliente
-            _client.from('clientes').select('id').eq('email', _userEmail).maybeSingle()
+            // 2. VERIFICACIÓN ESTRICTA: Debe existir Y ser mayorista
+            _client.from('clientes')
+                .select('id, tipo_cliente')
+                .eq('email', _userEmail)
+                .eq('tipo_cliente', 'mayorista') // <--- ESTO FALTABA
+                .maybeSingle()
                 .then(({ data: cliente }) => {
                     if (cliente) {
-                        _isLoggedIn = true; // Solo aquí se habilitan los precios
+                        _isLoggedIn = true; // Confirmado como Mayorista
                         finalizarCarga();
                     } else {
-                        // Es un minorista: lo echamos sin piedad
+                        // NO ES MAYORISTA: Lo echamos
                         _client.auth.signOut().then(() => {
-                            alert("Acceso denegado. Sección exclusiva para Mayoristas.");
+                            alert("Acceso Denegado: Tu cuenta no está habilitada como Mayorista.");
                             window.location.replace("index.html");
                         });
                     }
                 });
         }
     } else {
-        // No hay nadie logueado: carga normal modo público
-        finalizarCarga();
+        finalizarCarga(); // Usuario deslogueado
     }
 
-    // Esta pequeña función asegura que los botones y el catálogo se dibujen SIEMPRE
     function finalizarCarga() {
         if (typeof updateAuthUI === "function") updateAuthUI();
         if (typeof init === "function") init();
     }
 });
-
         async function init() {
-            const { data: { session } } = await _client.auth.getSession();
+            // Ya no chequeamos la sesión acá. Dejamos que el 'onAuthStateChange' 
+            // haga el trabajo sucio de verificar el rango del cliente en Supabase.
             
-            if (session) {
-                _isLoggedIn = true;
-                _userEmail = session.user.email;
-            }
-
             updateAuthUI();
 
             try {
@@ -625,7 +617,6 @@ async function generarClaveMayorista() {
                 alert("Error al registrar deuda en cuenta corriente: " + err.message);
             }
         }
-        init();
     </script>
 <script>
     function scrollAContacto() {
