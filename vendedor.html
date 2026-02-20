@@ -511,7 +511,6 @@ async function enviarPedido() {
         // 3. Crear el Pedido en la Base de Datos (Estado 'Pendiente')
         const nuevoPedido = {
             cliente_id: clienteSeleccionado.id,
-            vendedor_id: vendedorId,
             vendedor_nombre: vendedorNombre,
             total: totalPedido,
             estado: 'Pendiente'
