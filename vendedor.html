@@ -386,15 +386,16 @@ document.addEventListener('submit', async (e) => {
         e.preventDefault(); // EVITA RECARGA Y URL CON ?nombre=...
         
         const form = e.target;
+        const formData = new FormData(form); // <--- LA FORMA SEGURA DE LEER
         const btn = document.getElementById('btn-guardar-cliente');
         
         btn.disabled = true;
         btn.innerText = "GUARDANDO...";
 
         const nuevoCliente = {
-            nombre: form.nombre.value,
-            telefono: form.telefono.value,
-            email: form.email.value,
+            nombre: formData.get('nombre'),
+            telefono: formData.get('telefono') || null, // Permite que esté vacío
+            email: formData.get('email') || null, // Permite que esté vacío
             saldo: 0,
             limite_credito: 0,
             tipo_cliente: 'mayorista' // <--- AGREGAMOS ESTO AQUÍ
