@@ -116,34 +116,52 @@
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let clientes = [], productos = [], carrito = [], clienteSeleccionado = null;
-// --- BLOQUE DE SEGURIDAD VENDEDOR ---
-        // --- BLOQUE DE SEGURIDAD VENDEDOR MEJORADO ---
+
+        // Variable para recordar si ya te dejamos pasar
+        let usuarioValidado = false;
+
+        // --- BLOQUE DE SEGURIDAD VENDEDOR BLINDADO ---
         _supabase.auth.onAuthStateChange(async (event, session) => {
             console.log("Evento Auth Vendedor:", event);
 
+            // 1. Si ya te validamos antes, no hacemos nada (te dejamos trabajar tranquilo)
+            if (usuarioValidado && event !== 'SIGNED_OUT') return;
+
+            // 2. Si no hay sesión y tampoco estabas validado -> Afuera
             if (!session) {
+                if (usuarioValidado) return; // Si ya estabas adentro, ignoramos micro-cortes
+                console.log("No hay sesión, redirigiendo...");
                 window.location.replace("acceso.html"); 
                 return;
             }
 
-            // Consultamos a la base de datos usando la columna 'uid' (donde guardaste el código largo)
-            const { data: perfil, error } = await _supabase
-                .from('clientes')
-                .select('tipo_cliente')
-                .eq('auth_id', session.user.id)
-                .single();
+            // 3. Consultamos a la base de datos (SOLO SI NO ESTÁS VALIDADO AÚN)
+            if (!usuarioValidado) {
+                const { data: perfil, error } = await _supabase
+                    .from('clientes')
+                    .select('tipo_cliente')
+                    .eq('auth_id', session.user.id)
+                    .single();
 
-            // Si no encuentra el perfil, o el tipo_cliente NO es vendedor/admin, lo expulsa
-            // Si no encuentra el perfil, o el tipo_cliente NO es vendedor/admin, lo expulsa
-            if (!perfil || (perfil.tipo_cliente !== 'vendedor' && perfil.tipo_cliente !== 'admin')) {
+                // Si falla la verificación -> Afuera
+                if (!perfil || (perfil.tipo_cliente !== 'vendedor' && perfil.tipo_cliente !== 'admin')) {
+                    console.log("Acceso denegado: Rol incorrecto");
+                    window.location.replace("acceso.html"); 
+                    return;
+                }
+
+                // ¡ÉXITO! Marcamos que ya estás adentro para que no te moleste más
+                usuarioValidado = true;
+                console.log("¡Usuario Vendedor Validado!");
                 
-                // TRAMPA PARA CAPTURAR EL ERROR:
-                let mensajeError = error ? error.message : "Sin error técnico";
-                let datosPerfil = perfil ? JSON.stringify(perfil) : "Perfil Vacío (Null)";
-                alert("🔴 MOTIVO DEL RECHAZO:\n\n1. Error Supabase: " + mensajeError + "\n2. Qué leyó en la tabla: " + datosPerfil + "\n3. Tu ID Auth: " + session.user.id);
-                
-                window.location.replace("acceso.html"); 
-                return;
+                // Arrancamos la app
+                init();
+            }
+
+            // 4. Solo te echa si explícitamente tocás el botón de cerrar sesión
+            if (event === 'SIGNED_OUT') {
+                console.log("Sesión cerrada voluntariamente");
+                window.location.replace("acceso.html");
             }
         });
         let vistaActual = 1;
