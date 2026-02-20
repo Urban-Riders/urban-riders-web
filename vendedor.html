@@ -353,11 +353,14 @@
     }
 }
 async function logoutVendedor() {
-            if (confirm("¿Cerrar sesión de vendedor?")) {
-                await _supabase.auth.signOut();
-                // El vigilante de arriba detectará el SIGNED_OUT y mandará a acceso.html
-            }
-        }
+    if (confirm("¿Cerrar sesión de vendedor?")) {
+        // 1. Borramos la sesión en Supabase
+        await _supabase.auth.signOut();
+        
+        // 2. Forzamos la salida nosotros mismos sin esperar a nadie
+        window.location.replace("acceso.html");
+    }
+}
 /* --- INICIO BLOQUE NUEVO CLIENTE --- */
 // Palabra clave: FUNCIONES_MODAL
 function openClientModal() {
@@ -403,7 +406,7 @@ document.addEventListener('submit', async (e) => {
             
             // Limpiar buscador y refrescar lista
             document.getElementById('search-cliente').value = '';
-            await await init(); // Esta función ya existe en tu vendedor.txt
+            await init(); // Esta función ya existe en tu vendedor.txt
             renderClientes(clientes); // Esta función también existe
 
         } catch (err) {
