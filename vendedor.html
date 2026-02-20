@@ -380,44 +380,42 @@ function closeClientModal() {
 }
 
 // Palabra clave: ESCUCHADOR_SUBMIT
-// Escuchamos a nivel documento para evitar el error de "null"
+/* --- BLOQUE GUARDAR CLIENTE: SOLUCIÓN FINAL --- */
 document.addEventListener('submit', async (e) => {
     if (e.target && e.target.id === 'form-nuevo-cliente') {
-        e.preventDefault(); // EVITA RECARGA Y URL CON ?nombre=...
+        e.preventDefault();
         
         const form = e.target;
-        const formData = new FormData(form); // <--- LA FORMA SEGURA DE LEER
         const btn = document.getElementById('btn-guardar-cliente');
         
         btn.disabled = true;
-        btn.innerText = "GUARDANDO...";
+        btn.innerText = "PROCESANDO...";
 
         const nuevoCliente = {
-            nombre: formData.get('nombre'),
-            telefono: formData.get('telefono') || null, // Permite que esté vacío
-            email: formData.get('email') || null, // Permite que esté vacío
+            nombre: form.nombre.value.trim(),
+            telefono: form.telefono.value.trim() || null,
+            email: form.email.value.trim() || null,
+            tipo_cliente: 'mayorista',
             saldo: 0,
-            limite_credito: 0,
-            tipo_cliente: 'mayorista' // <--- AGREGAMOS ESTO AQUÍ
+            limite_credito: 0
+            // NO enviamos auth_id para que Supabase no se confunda
         };
+
         try {
-            // Inserción en Supabase
-            const { data, error } = await _supabase.from('clientes').insert([nuevoCliente]).select();
+            const { error } = await _supabase.from('clientes').insert([nuevoCliente]);
             
             if (error) throw error;
 
-            alert("✅ CLIENTE CREADO EXITOSAMENTE");
+            alert("✅ CLIENTE GUARDADO");
+            form.reset();
             closeClientModal();
-            
-            // Limpiar buscador y refrescar lista
-            document.getElementById('search-cliente').value = '';
-            await init(); // Esta función ya existe en tu vendedor.txt
-            renderClientes(clientes); // Esta función también existe
+            await init(); // Refresca la lista
 
         } catch (err) {
-            console.error("Error detallado:", err);
-            alert("Error al guardar: " + err.message);
+            console.error(err);
+            alert("❌ ERROR AL GUARDAR:\n" + err.message);
         } finally {
+            // El botón SIEMPRE vuelve a la normalidad aquí
             btn.disabled = false;
             btn.innerText = "GUARDAR CLIENTE";
         }
