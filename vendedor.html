@@ -150,9 +150,17 @@ async function verificarSesion_e_iniciar() {
 }
 
 async function init() {
-    const { data: c } = await _supabase.from('clientes').select('*').order('nombre');
+    // Traemos los clientes, pero EXCLUIMOS a los vendedores y administradores
+    const { data: c } = await _supabase
+        .from('clientes')
+        .select('*')
+        .not('tipo_cliente', 'in', '("vendedor","admin")')
+        .order('nombre');
+        
     const { data: p } = await _supabase.from('productos').select('*').order('nombre');
-    clientes = c || []; productos = p || [];
+    
+    clientes = c || []; 
+    productos = p || [];
     renderClientes(clientes);
     renderProductos(productos);
 }
@@ -270,11 +278,25 @@ function renderProductos(lista) {
         let precioMos = (clienteSeleccionado && clienteSeleccionado.tipo_cliente === 'minorista') ? p.precio_minorista : p.precio;
         if (!precioMos) precioMos = 0;
 
+        // Manejo de imagen y stock
+        const imagenHtml = p.imagen_url 
+            ? `<img src="${p.imagen_url}" class="w-full h-full object-cover" alt="${p.nombre}">` 
+            : `<div class="w-full h-full flex items-center justify-center bg-gray-100"><i class="fas fa-image text-gray-300 text-2xl"></i></div>`;
+            
+        const stockDisp = p.stock || 0;
+        const colorStock = stockDisp > 0 ? 'text-green-600' : 'text-red-500';
+
         const div = document.createElement('div');
-        div.className = 'bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex flex-col justify-between h-[180px]';
+        div.className = 'bg-white border border-gray-100 rounded-2xl p-3 shadow-sm flex flex-col justify-between h-full';
         div.innerHTML = `
             <div>
-                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">${p.categoria || 'Genérico'}</p>
+                <div class="w-full h-28 rounded-xl mb-3 overflow-hidden border border-gray-50">
+                    ${imagenHtml}
+                </div>
+                <div class="flex justify-between items-center mb-1">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">${p.categoria || 'Genérico'}</p>
+                    <p class="text-[10px] font-bold ${colorStock} uppercase tracking-widest">Stock: ${stockDisp}</p>
+                </div>
                 <p class="font-black text-sm leading-tight line-clamp-2">${p.nombre}</p>
                 <p class="text-xs font-bold text-yellow-500 mt-2">$${precioMos.toLocaleString('es-AR')}</p>
             </div>
