@@ -380,47 +380,53 @@ function closeClientModal() {
 }
 
 // Palabra clave: ESCUCHADOR_SUBMIT
-/* --- BLOQUE GUARDAR CLIENTE: SOLUCIÓN FINAL --- */
-document.addEventListener('submit', async (e) => {
-    if (e.target && e.target.id === 'form-nuevo-cliente') {
-        e.preventDefault();
-        
-        const form = e.target;
+// ACÁ PEGÁS LA FUNCIÓN NUEVA:
+    async function guardarClienteDirecto() {
         const btn = document.getElementById('btn-guardar-cliente');
-        
+        const nombre = document.getElementById('nuevo-nombre').value.trim();
+        const telefono = document.getElementById('nuevo-telefono').value.trim() || null;
+        const email = document.getElementById('nuevo-email').value.trim() || null;
+
+        if (!nombre) {
+            alert("El nombre es obligatorio");
+            return;
+        }
+
         btn.disabled = true;
         btn.innerText = "PROCESANDO...";
 
         const nuevoCliente = {
-            nombre: form.nombre.value.trim(),
-            telefono: form.telefono.value.trim() || null,
-            email: form.email.value.trim() || null,
+            nombre: nombre,
+            telefono: telefono,
+            email: email,
             tipo_cliente: 'mayorista',
             saldo: 0,
             limite_credito: 0
-            // NO enviamos auth_id para que Supabase no se confunda
         };
 
         try {
             const { error } = await _supabase.from('clientes').insert([nuevoCliente]);
             
-            if (error) throw error;
-
-            alert("✅ CLIENTE GUARDADO");
-            form.reset();
-            closeClientModal();
-            await init(); // Refresca la lista
-
+            if (error) {
+                alert("Error de Supabase: " + error.message);
+            } else {
+                alert("✅ CLIENTE GUARDADO EXITOSAMENTE");
+                document.getElementById('nuevo-nombre').value = '';
+                document.getElementById('nuevo-telefono').value = '';
+                document.getElementById('nuevo-email').value = '';
+                closeClientModal();
+                await init(); 
+            }
         } catch (err) {
-            console.error(err);
-            alert("❌ ERROR AL GUARDAR:\n" + err.message);
+            alert("Error técnico: " + err.message);
         } finally {
-            // El botón SIEMPRE vuelve a la normalidad aquí
             btn.disabled = false;
-            btn.innerText = "GUARDAR CLIENTE";
+            btn.innerText = "Guardar Cliente";
         }
     }
-});
+</script>
+</body>
+</html>
 /* --- FIN BLOQUE NUEVO CLIENTE --- */
 
     </script>
@@ -430,25 +436,25 @@ document.addEventListener('submit', async (e) => {
             <h3 class="font-black uppercase tracking-tighter">Registrar Cliente</h3>
             <button onclick="closeClientModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
         </div>
-        <form id="form-nuevo-cliente" class="p-6 space-y-4">
+       <div id="form-nuevo-cliente" class="p-6 space-y-4">
             <div>
                 <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Nombre Completo</label>
-                <input type="text" name="nombre" required class="w-full border-2 border-gray-100 rounded-xl p-3 focus:border-yellow-500 outline-none transition-all">
+                <input type="text" id="nuevo-nombre" class="w-full border-2 border-gray-100 rounded-xl p-3 focus:border-yellow-500 outline-none transition-all">
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Teléfono</label>
-                    <input type="text" name="telefono" class="w-full border-2 border-gray-100 rounded-xl p-3 focus:border-yellow-500 outline-none transition-all">
+                    <input type="text" id="nuevo-telefono" class="w-full border-2 border-gray-100 rounded-xl p-3 focus:border-yellow-500 outline-none transition-all">
                 </div>
                 <div>
                     <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Email (Opcional)</label>
-                    <input type="email" name="email" class="w-full border-2 border-gray-100 rounded-xl p-3 focus:border-yellow-500 outline-none transition-all">
+                    <input type="email" id="nuevo-email" class="w-full border-2 border-gray-100 rounded-xl p-3 focus:border-yellow-500 outline-none transition-all">
                 </div>
             </div>
-            <button type="submit" id="btn-guardar-cliente" class="w-full bg-black text-white font-black py-4 rounded-2xl uppercase tracking-widest hover:bg-yellow-500 hover:text-black transition-all">
+            <button type="button" id="btn-guardar-cliente" onclick="guardarClienteDirecto()" class="w-full bg-black text-white font-black py-4 rounded-2xl uppercase tracking-widest hover:bg-yellow-500 hover:text-black transition-all">
                 Guardar Cliente
             </button>
-        </form>
+        </div>
     </div>
 </div>
 
