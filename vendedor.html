@@ -485,69 +485,73 @@ async function enviarPedido() {
     document.getElementById('btn-principal').disabled = true;
     document.getElementById('texto-boton').innerText = 'Procesando...';
 
-    const { data: { session }, error: sessionError } = await _supabase.auth.getSession();
-    let vendedorId = null;
-    let vendedorNombre = 'Vendedor';
+    try {
+        // 1. Identificar al Vendedor
+        const { data: { session }, error: sessionError } = await _supabase.auth.getSession();
+        let vendedorId = null;
+        let vendedorNombre = 'Vendedor';
 
-    if (session && session.user) {
-         vendedorId = session.user.id;
-         const { data: perfil } = await _supabase
-            .from('clientes')
-            .select('nombre')
-            .eq('auth_id', vendedorId)
-            .single();
-         if(perfil) vendedorNombre = perfil.nombre;
-    }
+        if (session && session.user) {
+             vendedorId = session.user.id;
+             const { data: perfil } = await _supabase
+                .from('clientes')
+                .select('nombre')
+                .eq('auth_id', vendedorId)
+                .single();
+             if(perfil) vendedorNombre = perfil.nombre;
+        }
 
-    let totalPedido = 0;
-    carrito.forEach(p => {
-        let pr = (clienteSeleccionado && clienteSeleccionado.tipo_cliente === 'minorista') ? p.precio_minorista : p.precio;
-        totalPedido += (pr || 0) * p.cantidad;
-    });
+        // 2. Calcular el Total Exacto del Pedido
+        let totalPedido = 0;
+        carrito.forEach(p => {
+            let pr = (clienteSeleccionado && clienteSeleccionado.tipo_cliente === 'minorista') ? p.precio_minorista : p.precio;
+            totalPedido += (pr || 0) * p.cantidad;
+        });
 
-    const nuevoPedido = {
-        cliente_id: clienteSeleccionado.id,
-        vendedor_id: vendedorId,
-        vendedor_nombre: vendedorNombre,
-        total: totalPedido,
-        estado: 'Pendiente'
-    };
-
-    const { data: pData, error: pError } = await _supabase.from('pedidos').insert([nuevoPedido]).select();
-
-    if (pError) {
-        alert("Error creando pedido: " + pError.message);
-        document.getElementById('btn-principal').disabled = false;
-        document.getElementById('texto-boton').innerText = 'Confirmar Pedido';
-        return;
-    }
-
-    const pedidoId = pData[0].id;
-    const detalles = carrito.map(p => {
-        let pr = (clienteSeleccionado && clienteSeleccionado.tipo_cliente === 'minorista') ? p.precio_minorista : p.precio;
-        return {
-            pedido_id: pedidoId,
-            producto_id: p.id,
-            cantidad: p.cantidad,
-            precio_unitario: pr || 0
+        // 3. Crear el Pedido en la Base de Datos (Estado 'Pendiente')
+        const nuevoPedido = {
+            cliente_id: clienteSeleccionado.id,
+            vendedor_id: vendedorId,
+            vendedor_nombre: vendedorNombre,
+            total: totalPedido,
+            estado: 'Pendiente'
         };
-    });
 
-    const { error: dError } = await _supabase.from('pedido_detalles').insert(detalles);
+        const { data: pData, error: pError } = await _supabase.from('pedidos').insert([nuevoPedido]).select();
+        if (pError) throw new Error("Error creando pedido: " + pError.message);
 
-    if (dError) {
-        alert("Error guardando detalles: " + dError.message);
-    } else {
-        alert("✅ PEDIDO ENVIADO CON ÉXITO");
+        const pedidoId = pData[0].id;
+
+        // 4. Guardar los Detalles (Los artículos del carrito)
+        const detalles = carrito.map(p => {
+            let pr = (clienteSeleccionado && clienteSeleccionado.tipo_cliente === 'minorista') ? p.precio_minorista : p.precio;
+            return {
+                pedido_id: pedidoId,
+                producto_id: p.id,
+                cantidad: p.cantidad,
+                precio_unitario: pr || 0
+            };
+        });
+
+        const { error: dError } = await _supabase.from('pedido_detalles').insert(detalles);
+        if (dError) throw new Error("Error guardando detalles: " + dError.message);
+
+        // 5. Éxito: Limpiar y volver al inicio (El Admin se encarga del resto)
+        alert("✅ PEDIDO ENVIADO A ADMINISTRACIÓN CON ÉXITO");
         carrito = [];
         clienteSeleccionado = null;
         vistaActual = 1;
+        
+        await init(); 
         actualizarVistas();
-        renderProductos(productos); // reset visual counters
-    }
 
-    document.getElementById('btn-principal').disabled = false;
-    document.getElementById('texto-boton').innerText = 'Ver Resumen';
+    } catch (error) {
+        console.error(error);
+        alert("Ocurrió un problema técnico al enviar: " + error.message);
+    } finally {
+        document.getElementById('btn-principal').disabled = false;
+        document.getElementById('texto-boton').innerText = 'Ver Resumen';
+    }
 }
 </script>
 
