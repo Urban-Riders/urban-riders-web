@@ -120,49 +120,47 @@
         // Variable para recordar si ya te dejamos pasar
         let usuarioValidado = false;
 
-        // --- BLOQUE DE SEGURIDAD VENDEDOR BLINDADO ---
+        // --- BLOQUE DE SEGURIDAD VENDEDOR (FINAL) ---
         _supabase.auth.onAuthStateChange(async (event, session) => {
             console.log("Evento Auth Vendedor:", event);
 
-            // 1. Si ya te validamos antes, no hacemos nada (te dejamos trabajar tranquilo)
-            if (usuarioValidado && event !== 'SIGNED_OUT') return;
+            // 1. LA PUERTA DE SALIDA: Si el evento es explícitamente cerrar sesión, te vas.
+            if (event === 'SIGNED_OUT') {
+                console.log("Sesión cerrada voluntariamente");
+                window.location.replace("acceso.html");
+                return;
+            }
 
-            // 2. Si no hay sesión y tampoco estabas validado -> Afuera
+            // 2. Si ya te validamos antes, ignoramos micro-cortes para que no te eche por error
+            if (usuarioValidado) return;
+
+            // 3. Si no hay sesión (y no estabas validado) -> Afuera
             if (!session) {
-                if (usuarioValidado) return; // Si ya estabas adentro, ignoramos micro-cortes
                 console.log("No hay sesión, redirigiendo...");
                 window.location.replace("acceso.html"); 
                 return;
             }
 
-            // 3. Consultamos a la base de datos (SOLO SI NO ESTÁS VALIDADO AÚN)
-            if (!usuarioValidado) {
-                const { data: perfil, error } = await _supabase
-                    .from('clientes')
-                    .select('tipo_cliente')
-                    .eq('auth_id', session.user.id)
-                    .single();
+            // 4. Consultamos a la base de datos (SOLO LA PRIMERA VEZ)
+            const { data: perfil, error } = await _supabase
+                .from('clientes')
+                .select('tipo_cliente')
+                .eq('auth_id', session.user.id)
+                .single();
 
-                // Si falla la verificación -> Afuera
-                if (!perfil || (perfil.tipo_cliente !== 'vendedor' && perfil.tipo_cliente !== 'admin')) {
-                    console.log("Acceso denegado: Rol incorrecto");
-                    window.location.replace("acceso.html"); 
-                    return;
-                }
-
-                // ¡ÉXITO! Marcamos que ya estás adentro para que no te moleste más
-                usuarioValidado = true;
-                console.log("¡Usuario Vendedor Validado!");
-                
-                // Arrancamos la app
-                init();
+            // Si falla la verificación -> Afuera
+            if (!perfil || (perfil.tipo_cliente !== 'vendedor' && perfil.tipo_cliente !== 'admin')) {
+                console.log("Acceso denegado: Rol incorrecto");
+                window.location.replace("acceso.html"); 
+                return;
             }
 
-            // 4. Solo te echa si explícitamente tocás el botón de cerrar sesión
-            if (event === 'SIGNED_OUT') {
-                console.log("Sesión cerrada voluntariamente");
-                window.location.replace("acceso.html");
-            }
+            // ¡ÉXITO! Marcamos que ya estás adentro
+            usuarioValidado = true;
+            console.log("¡Usuario Vendedor Validado!");
+            
+            // Arrancamos la app
+            init();
         });
         let vistaActual = 1;
 
