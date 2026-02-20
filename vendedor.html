@@ -134,19 +134,16 @@
                 .single();
 
             // Si no encuentra el perfil, o el tipo_cliente NO es vendedor/admin, lo expulsa
+            // Si no encuentra el perfil, o el tipo_cliente NO es vendedor/admin, lo expulsa
             if (!perfil || (perfil.tipo_cliente !== 'vendedor' && perfil.tipo_cliente !== 'admin')) {
-                console.log("Acceso denegado: Usuario sin permisos de vendedor.");
+                
+                // TRAMPA PARA CAPTURAR EL ERROR:
+                let mensajeError = error ? error.message : "Sin error técnico";
+                let datosPerfil = perfil ? JSON.stringify(perfil) : "Perfil Vacío (Null)";
+                alert("🔴 MOTIVO DEL RECHAZO:\n\n1. Error Supabase: " + mensajeError + "\n2. Qué leyó en la tabla: " + datosPerfil + "\n3. Tu ID Auth: " + session.user.id);
+                
                 window.location.replace("acceso.html"); 
                 return;
-            }
-
-            // Si llega hasta aquí, es porque la base de datos confirmó que es vendedor
-            if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-                init();
-            }
-
-            if (event === 'SIGNED_OUT') {
-                window.location.replace("acceso.html");
             }
         });
         let vistaActual = 1;
