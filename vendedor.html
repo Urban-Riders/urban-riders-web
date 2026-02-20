@@ -117,19 +117,30 @@
 
         let clientes = [], productos = [], carrito = [], clienteSeleccionado = null;
 // --- BLOQUE DE SEGURIDAD VENDEDOR ---
+        // --- BLOQUE DE SEGURIDAD VENDEDOR MEJORADO ---
         _supabase.auth.onAuthStateChange(async (event, session) => {
             console.log("Evento Auth Vendedor:", event);
 
-            // Emails autorizados para entrar a este panel
-            const autorizados = ['kotur39@gmail.com', 'vendedor@urbanriders.com'];
-
-            if (!session || !autorizados.includes(session.user.email)) {
-                console.log("Acceso no autorizado");
+            if (!session) {
                 window.location.replace("acceso.html"); 
                 return;
             }
 
-            // Si está autorizado, cargamos los datos
+            // Consultamos a la base de datos usando la columna 'uid' (donde guardaste el código largo)
+            const { data: perfil, error } = await _supabase
+                .from('clientes')
+                .select('tipo_cliente')
+                .eq('uid', session.user.id)
+                .single();
+
+            // Si no encuentra el perfil, o el tipo_cliente NO es vendedor/admin, lo expulsa
+            if (!perfil || (perfil.tipo_cliente !== 'vendedor' && perfil.tipo_cliente !== 'admin')) {
+                console.log("Acceso denegado: Usuario sin permisos de vendedor.");
+                window.location.replace("acceso.html"); 
+                return;
+            }
+
+            // Si llega hasta aquí, es porque la base de datos confirmó que es vendedor
             if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
                 init();
             }
