@@ -130,7 +130,7 @@
             const { data: perfil, error } = await _supabase
                 .from('clientes')
                 .select('tipo_cliente')
-                .eq('uid', session.user.id)
+                .eq('auth_id', session.user.id)
                 .single();
 
             // Si no encuentra el perfil, o el tipo_cliente NO es vendedor/admin, lo expulsa
