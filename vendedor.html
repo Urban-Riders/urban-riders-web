@@ -328,10 +328,23 @@ function cambiarCant(id, delta) {
     }
     
     const cantidadFinal = carrito.find(x => x.id === id)?.cantidad || 0;
+    
+    // Actualiza el número en el catálogo (Paso 2)
     const counter = document.getElementById(`cant-${id}`);
     if (counter) counter.innerText = cantidadFinal;
     
+    // Actualiza la barra negra inferior
     actualizarBarra();
+
+    // NUEVO: Si estamos en el resumen (Paso 3), actualizamos la pantalla en tiempo real
+    if (vistaActual === 3) {
+        renderCarrito();
+        
+        // Si al restar nos quedamos sin ningún producto en todo el carrito, volvemos al catálogo
+        if (carrito.length === 0) {
+            irAPaso2();
+        }
+    }
 }
 
 function renderCarrito() {
@@ -350,17 +363,25 @@ function renderCarrito() {
         total += subtotal;
 
         const div = document.createElement('div');
-        div.className = 'flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-2xl mb-3 shadow-sm';
+        div.className = 'flex flex-col gap-3 p-4 bg-gray-50 border border-gray-100 rounded-2xl mb-3 shadow-sm';
         div.innerHTML = `
-            <div class="flex-1">
-                <p class="font-black text-sm leading-tight">${p.nombre}</p>
-                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">${p.cantidad} x $${precioMos.toLocaleString('es-AR')}</p>
-            </div>
-            <div class="flex items-center gap-3 ml-2">
-                <p class="font-black text-sm text-yellow-600">$${subtotal.toLocaleString('es-AR')}</p>
-                <button onclick="eliminarDelCarrito(${p.id})" class="w-8 h-8 bg-red-100 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors shadow-sm">
-                    <i class="fas fa-times"></i>
+            <div class="flex items-start justify-between">
+                <div class="flex-1 pr-2">
+                    <p class="font-black text-sm leading-tight">${p.nombre}</p>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">$${precioMos.toLocaleString('es-AR')} C/U</p>
+                </div>
+                <button onclick="eliminarDelCarrito(${p.id})" class="w-8 h-8 flex-shrink-0 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors shadow-sm">
+                    <i class="fas fa-trash-alt text-xs"></i>
                 </button>
+            </div>
+            
+            <div class="flex items-center justify-between border-t border-gray-200 pt-3">
+                <div class="flex items-center bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
+                    <button onclick="cambiarCant(${p.id}, -1)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-black rounded-lg transition-colors"><i class="fas fa-minus text-xs"></i></button>
+                    <span class="font-black text-sm w-8 text-center">${p.cantidad}</span>
+                    <button onclick="cambiarCant(${p.id}, 1)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-black rounded-lg transition-colors bg-gray-50"><i class="fas fa-plus text-xs"></i></button>
+                </div>
+                <p class="font-black text-base text-yellow-600">$${subtotal.toLocaleString('es-AR')}</p>
             </div>
         `;
         list.appendChild(div);
