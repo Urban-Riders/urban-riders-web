@@ -352,12 +352,16 @@
         }
     }
 }
-async function logoutVendedor() {
+function logoutVendedor() {
     if (confirm("¿Cerrar sesión de vendedor?")) {
-        // 1. Borramos la sesión en Supabase
-        await _supabase.auth.signOut();
+        // 1. Aniquilamos la memoria local por la fuerza bruta (esto mata la sesión sí o sí)
+        localStorage.clear();
+        sessionStorage.clear();
         
-        // 2. Forzamos la salida nosotros mismos sin esperar a nadie
+        // 2. Le avisamos a Supabase, pero SIN la palabra "await" (no nos quedamos a esperar su respuesta)
+        _supabase.auth.signOut();
+        
+        // 3. Te pateamos al login inmediatamente
         window.location.replace("acceso.html");
     }
 }
