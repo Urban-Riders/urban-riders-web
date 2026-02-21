@@ -512,8 +512,10 @@ async function enviarPedido() {
             totalPedido += pr * p.cantidad;
         });
 
+        // ACÁ VOLVEMOS A ENVIAR EL NOMBRE DEL CLIENTE PARA QUE EL ADMIN LO LEA
         const nuevoPedido = {
             cliente_id: clienteSeleccionado.id,
+            cliente_nombre: clienteSeleccionado.nombre, // <-- RESTAURADO
             vendedor_nombre: vendedorNombre,
             total: totalPedido,
             estado: 'Pendiente'
@@ -527,9 +529,13 @@ async function enviarPedido() {
         const detalles = carrito.map(p => {
             // PRECIO FORZADO A MAYORISTA SIEMPRE
             let pr = p.precio || 0;
+            
+            // ACÁ VOLVEMOS A ENVIAR EL NOMBRE DEL PRODUCTO Y EL CÓDIGO
             return {
                 pedido_id: pedidoId,
                 producto_id: p.id,
+                producto_nombre: p.nombre, // <-- RESTAURADO
+                codigo: p.codigo || 'S/C', // <-- RESTAURADO
                 cantidad: p.cantidad,
                 precio_unitario: pr
             };
