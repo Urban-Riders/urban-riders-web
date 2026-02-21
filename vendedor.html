@@ -280,8 +280,8 @@ function renderProductos(lista) {
         const item = carrito.find(x => x.id === p.id);
         const cantidad = item ? item.cantidad : 0;
         
-        let precioMos = (clienteSeleccionado && clienteSeleccionado.tipo_cliente === 'minorista') ? p.precio_minorista : p.precio;
-        if (!precioMos) precioMos = 0;
+        // PRECIO FORZADO A MAYORISTA SIEMPRE
+        let precioMos = p.precio || 0;
 
         // Manejo de imagen y stock
         const imagenHtml = p.imagen_url 
@@ -357,8 +357,8 @@ function renderCarrito() {
     }
 
     carrito.forEach(p => {
-        let precioMos = (clienteSeleccionado && clienteSeleccionado.tipo_cliente === 'minorista') ? p.precio_minorista : p.precio;
-        if (!precioMos) precioMos = 0;
+        // PRECIO FORZADO A MAYORISTA SIEMPRE
+        let precioMos = p.precio || 0;
         const subtotal = precioMos * p.cantidad;
         total += subtotal;
 
@@ -449,8 +449,9 @@ function actualizarVistas() {
         
         let total = 0;
         carrito.forEach(p => {
-            let pr = (clienteSeleccionado && clienteSeleccionado.tipo_cliente === 'minorista') ? p.precio_minorista : p.precio;
-            total += (pr || 0) * p.cantidad;
+            // PRECIO FORZADO A MAYORISTA SIEMPRE
+            let pr = p.precio || 0;
+            total += pr * p.cantidad;
         });
         document.getElementById('monto-barra').innerText = `$${total.toLocaleString('es-AR')}`;
         document.getElementById('items-barra').innerText = 'Finalizar';
@@ -461,8 +462,9 @@ function actualizarBarra() {
     const items = carrito.reduce((sum, p) => sum + p.cantidad, 0);
     let total = 0;
     carrito.forEach(p => {
-        let pr = (clienteSeleccionado && clienteSeleccionado.tipo_cliente === 'minorista') ? p.precio_minorista : p.precio;
-        total += (pr || 0) * p.cantidad;
+        // PRECIO FORZADO A MAYORISTA SIEMPRE
+        let pr = p.precio || 0;
+        total += pr * p.cantidad;
     });
 
     document.getElementById('items-barra').innerText = `${items} Ítems`;
@@ -486,7 +488,6 @@ async function enviarPedido() {
     document.getElementById('texto-boton').innerText = 'Procesando...';
 
     try {
-        // 1. Identificar al Vendedor
         const { data: { session }, error: sessionError } = await _supabase.auth.getSession();
         let vendedorId = null;
         let vendedorNombre = 'Vendedor';
@@ -501,14 +502,13 @@ async function enviarPedido() {
              if(perfil) vendedorNombre = perfil.nombre;
         }
 
-        // 2. Calcular el Total Exacto del Pedido
         let totalPedido = 0;
         carrito.forEach(p => {
-            let pr = (clienteSeleccionado && clienteSeleccionado.tipo_cliente === 'minorista') ? p.precio_minorista : p.precio;
-            totalPedido += (pr || 0) * p.cantidad;
+            // PRECIO FORZADO A MAYORISTA SIEMPRE
+            let pr = p.precio || 0;
+            totalPedido += pr * p.cantidad;
         });
 
-        // 3. Crear el Pedido en la Base de Datos (Estado 'Pendiente')
         const nuevoPedido = {
             cliente_id: clienteSeleccionado.id,
             vendedor_nombre: vendedorNombre,
@@ -521,21 +521,20 @@ async function enviarPedido() {
 
         const pedidoId = pData[0].id;
 
-        // 4. Guardar los Detalles (Los artículos del carrito)
         const detalles = carrito.map(p => {
-            let pr = (clienteSeleccionado && clienteSeleccionado.tipo_cliente === 'minorista') ? p.precio_minorista : p.precio;
+            // PRECIO FORZADO A MAYORISTA SIEMPRE
+            let pr = p.precio || 0;
             return {
                 pedido_id: pedidoId,
                 producto_id: p.id,
                 cantidad: p.cantidad,
-                precio_unitario: pr || 0
+                precio_unitario: pr
             };
         });
 
         const { error: dError } = await _supabase.from('pedido_detalles').insert(detalles);
         if (dError) throw new Error("Error guardando detalles: " + dError.message);
 
-        // 5. Éxito: Limpiar y volver al inicio (El Admin se encarga del resto)
         alert("✅ PEDIDO ENVIADO A ADMINISTRACIÓN CON ÉXITO");
         carrito = [];
         clienteSeleccionado = null;
