@@ -1904,18 +1904,27 @@ async function verDetallePedido(pedidoId) {
             </div>
             <table class="w-full text-left text-xs">
                 <thead>
-                    <tr class="border-b text-gray-400"><th class="py-2">Cant.</th><th>Producto</th><th class="text-right">Total</th></tr>
+                    <tr class="border-b text-gray-400">
+                        <th class="py-2">Cant.</th>
+                        <th>Producto</th>
+                        <th class="text-right">Unitario</th>
+                        <th class="text-right">Total</th>
+                    </tr>
                 </thead>
                 <tbody>
         `;
 
         detalles.forEach(item => {
             const nombre = item.producto_nombre || 'Producto sin registrar';
+            const precioUnidad = Number(item.precio_unitario || 0);
+            const subtotalItem = Number(item.subtotal || (item.cantidad * precioUnidad));
+            
             html += `
                 <tr class="border-b border-gray-50">
                     <td class="py-3 font-bold text-blue-600 text-lg">${item.cantidad}</td>
                     <td class="py-3">${nombre}</td>
-                    <td class="py-3 text-right">$${Number(item.subtotal || 0).toLocaleString()}</td>
+                    <td class="py-3 text-right text-gray-500">$${precioUnidad.toLocaleString('es-AR')}</td>
+                    <td class="py-3 text-right">$${subtotalItem.toLocaleString('es-AR')}</td>
                 </tr>
             `;
         });

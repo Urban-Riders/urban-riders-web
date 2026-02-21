@@ -528,14 +528,13 @@ async function enviarPedido() {
 
         const detalles = carrito.map(p => {
             let pr = p.precio || 0;
-            
-            // Enviamos el detalle SIN la columna "codigo" que no existe en la BD
             return {
                 pedido_id: pedidoId,
                 producto_id: p.id,
-                producto_nombre: p.nombre, // <-- ESENCIAL PARA EL ADMIN
+                producto_nombre: p.nombre,
                 cantidad: p.cantidad,
-                precio_unitario: pr
+                precio_unitario: pr,
+                subtotal: pr * p.cantidad // <-- AGREGÁ ESTA LÍNEA
             };
         });
 
