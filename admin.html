@@ -563,6 +563,9 @@
             <button onclick="generarManifiestoTransporte()" id="btn-pdf-mayorista" class="hidden bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 transition uppercase text-xs shadow-md">
                 <i class="fas fa-file-pdf mr-2"></i>Hoja de Ruta Mayorista
             </button>
+            <button onclick="imprimirPickingListMinoristaLogistica()" id="btn-pdf-minorista" class="hidden bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition uppercase text-xs shadow-md ml-2">
+                <i class="fas fa-print mr-2"></i>Imprimir Minoristas (Depósito)
+            </button>
         </div>
 
         <div id="contenedor-correo" class="mt-8 hidden">
@@ -1909,9 +1912,12 @@ async function verDetallePedido(pedidoId) {
             }))
         };
 
+        // Blindaje Minorista: Si no hay cliente_nombre, ponemos Consumidor Final
+        const nombreCliente = pedido.cliente_nombre || 'Consumidor Final';
+
         let html = `
             <div class="mb-4 bg-gray-50 p-3 rounded border">
-                <p class="text-[10px] font-bold text-gray-400 uppercase">Cliente: ${pedido.cliente_nombre}</p>
+                <p class="text-[10px] font-bold text-gray-400 uppercase">Cliente: ${nombreCliente}</p>
                 ${pedido.direccion_envio ? `<p class="text-xs font-bold text-blue-600"><i class="fas fa-map-marker-alt"></i> ${pedido.direccion_envio}</p>` : ''}
             </div>
             <table class="w-full text-left text-xs">
@@ -2760,8 +2766,19 @@ async function ejecutarLogisticaDual() {
     const mayoristas = pedidos.filter(p => p.cliente_id);
 
     document.getElementById('mensaje-transporte-vacio').classList.add('hidden');
-    if (mayoristas.length > 0) {
-        document.getElementById('btn-pdf-mayorista').classList.remove('hidden');
+    
+    // Control Botón Mayorista
+    const btnMay = document.getElementById('btn-pdf-mayorista');
+    if (btnMay) {
+        if (mayoristas.length > 0) btnMay.classList.remove('hidden');
+        else btnMay.classList.add('hidden');
+    }
+
+    // Control Botón Minorista
+    const btnMin = document.getElementById('btn-pdf-minorista');
+    if (btnMin) {
+        if (minoristas.length > 0) btnMin.classList.remove('hidden');
+        else btnMin.classList.add('hidden');
     }
 
     const body = document.getElementById('tabla-minorista-body');
@@ -2778,13 +2795,12 @@ async function ejecutarLogisticaDual() {
                     <td class="p-3">
                         <div class="flex flex-col">
                             <div class="flex items-center gap-2">
-                                <span class="font-black text-sm">${p.cliente_nombre}</span>
-                               
-<button onclick="verDetallePedido('${p.id}')" class="text-blue-600 hover:text-blue-800 p-1">
-    <i class="fas fa-eye"></i>
-</button>
+                                <span class="font-black text-sm">${p.cliente_nombre || 'Consumidor Final'}</span>
+                                <button onclick="verDetallePedido('${p.id}')" class="text-blue-600 hover:text-blue-800 p-1">
+                                    <i class="fas fa-eye"></i>
+                                </button>
                             </div>
-                            <span class="text-[9px] text-gray-400">Canal: ${p.vendedor_nombre || 'WEB'}</span>
+                            <span class="text-[9px] text-gray-400">Canal: ${p.vendedor_nombre || 'WEB MINORISTA'}</span>
                         </div>
                     </td>
                     <td class="p-3">
@@ -2885,6 +2901,76 @@ async function imprimirPickingListMinorista() {
         const ventanaImpresion = window.open('', '_blank');
         ventanaImpresion.document.write(htmlImpresion);
         ventanaImpresion.document.close();
+    } catch (err) {
+        console.error(err);
+        alert("Error al generar la planilla: " + err.message);
+    }
+}
+async function imprimirPickingListMinoristaLogistica() {
+    const desde = document.getElementById('transporte-desde').value;
+    const hasta = document.getElementById('transporte-hasta').value;
+    if (!desde || !hasta) return alert("Por favor, selecciona el rango de fechas.");
+
+    const desdeISO = new Date(`${desde}T00:00:00-03:00`).toISOString();
+    const hastaISO = new Date(`${hasta}T23:59:59-03:00`).toISOString();
+
+    try {
+        const { data: pedidos, error } = await _supabase
+            .from('pedidos')
+            .select('*')
+            .is('cliente_id', null) 
+            .gte('fecha', desdeISO)
+            .lte('fecha', hastaISO);
+
+        if (error) throw error;
+        if (!pedidos || pedidos.length === 0) return alert("No hay pedidos minoristas en este rango.");
+
+        let htmlImpresion = `
+            <html><head><title>Planilla de Armado - Depósito</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+                h1 { margin: 0; font-size: 22px; text-transform: uppercase; }
+                .pedido-card { border: 2px dashed #666; padding: 10px; margin-bottom: 15px; border-radius: 5px; page-break-inside: avoid; }
+                .pedido-titulo { font-size: 16px; font-weight: bold; background: #eee; padding: 5px; margin: -10px -10px 10px -10px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+                th, td { border: 1px solid #ccc; padding: 5px; text-align: left; font-size: 14px; }
+                th { background-color: #f4f4f4; }
+                .totales { margin-top: 20px; font-size: 18px; font-weight: bold; text-align: right; }
+            </style></head><body>
+            <div class="header"><h1>Planilla Armado - Minoristas</h1><p>Periodo: ${desde} al ${hasta}</p></div>`;
+
+        let totalArticulosGlobal = 0;
+
+        for (const p of pedidos) {
+            const { data: detalles } = await _supabase.from('pedido_detalles').select('*').eq('pedido_id', p.id);
+            
+            htmlImpresion += `
+                <div class="pedido-card">
+                    <div class="pedido-titulo">📦 Pedido #${p.id} - ${p.cliente_nombre || 'Consumidor Final'}</div>
+                    <p style="margin:0; font-size:13px;">
+                        <strong>Envío a:</strong> ${p.direccion_envio || 'Retira'} - ${p.ciudad || ''} (${p.cp || ''}) | 
+                        <strong>DNI/Tel:</strong> ${p.dni_cliente || p.telefono_cliente || '-'}
+                    </p>
+                    <table><tr><th style="width: 80%;">Producto</th><th style="width: 20%; text-align: center;">Cant.</th></tr>`;
+            
+            if (detalles) {
+                detalles.forEach(d => {
+                    htmlImpresion += `<tr><td>${d.producto_nombre || 'S/N'}</td><td style="text-align: center; font-weight: bold;">${d.cantidad}</td></tr>`;
+                    totalArticulosGlobal += Number(d.cantidad);
+                });
+            }
+            htmlImpresion += `</table></div>`;
+        }
+
+        htmlImpresion += `
+            <div class="totales">TOTAL DE ARTÍCULOS A BUSCAR: ${totalArticulosGlobal}</div>
+            <script>setTimeout(() => window.print(), 500);<\/script></body></html>`;
+            
+        const ventanaImpresion = window.open('', '_blank');
+        ventanaImpresion.document.write(htmlImpresion);
+        ventanaImpresion.document.close();
+
     } catch (err) {
         console.error(err);
         alert("Error al generar la planilla: " + err.message);
