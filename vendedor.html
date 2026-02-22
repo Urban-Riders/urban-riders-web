@@ -134,7 +134,7 @@ async function verificarSesion_e_iniciar() {
         if (sessionError) throw sessionError;
 
         if (!session) {
-            console.warn("Rechazo 1: No hay token de sesión en sessionStorage. Redirigiendo...");
+            // Este es el único caso silencioso: si no hay sesión, vas al login directo
             window.location.replace("acceso.html");
             return;
         }
@@ -146,27 +146,27 @@ async function verificarSesion_e_iniciar() {
             .single();
             
         if (perfilError) {
-            console.error("Rechazo 2: Error consultando la tabla clientes:", perfilError.message);
+            alert("RECHAZO 2: Error consultando tu usuario en la base de datos: " + perfilError.message);
             window.location.replace("acceso.html");
             return;
         }
 
         if (!perfil) {
-            console.error("Rechazo 3: El auth_id no existe en la tabla 'clientes'.");
+            alert("RECHAZO 3: Tu cuenta no está registrada en la tabla 'clientes'. Falta el auth_id.");
             window.location.replace("acceso.html");
             return;
         }
 
         if (perfil.tipo_cliente !== 'vendedor' && perfil.tipo_cliente !== 'admin') {
-            console.error("Rechazo 4: Rol incorrecto. Tiene '" + perfil.tipo_cliente + "'.");
+            alert("RECHAZO 4: No tenés permisos. Tu rol actual es: " + perfil.tipo_cliente);
             window.location.replace("acceso.html");
             return;
         }
 
-        console.log("Acceso validado correctamente. Iniciando app...");
+        // Si pasa todos los controles, arranca la app
         init();
     } catch (error) {
-        console.error("Error crítico validando la sesión:", error);
+        alert("RECHAZO CRÍTICO: " + error.message);
         window.location.replace("acceso.html");
     }
 }
