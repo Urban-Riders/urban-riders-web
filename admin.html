@@ -393,28 +393,7 @@
             </table>
         </div>
     </div>
-<div id="modal-detalle-pedido" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
-        <div class="bg-black text-white p-4 flex justify-between items-center">
-            <h3 class="font-black uppercase text-sm">Detalle del Pedido</h3>
-            <button onclick="imprimirPedidoDeposito()" 
-        class="bg-white text-black px-3 py-1 rounded flex items-center gap-2 hover:bg-gray-200 transition">
-    <i class="fas fa-print text-xs"></i>
-    <span class="text-[10px] font-black uppercase">Imprimir para Depósito</span>
-</button>
-            <button onclick="cerrarModalDetalle()" class="text-white hover:text-gray-400">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <div class="p-6">
-            <div id="contenido-detalle-pedido">
-                </div>
-            <button onclick="cerrarModalDetalle()" class="w-full mt-6 bg-gray-200 py-3 rounded-lg font-black uppercase text-xs hover:bg-gray-300 transition">
-                Cerrar
-            </button>
-        </div>
-    </div>
-</div>
+
 </section>
 <section id="tab-gastos" class="tab-content p-6">
     <div class="flex justify-between items-center mb-6">
@@ -3035,6 +3014,28 @@ async function imprimirPickingListMinoristaLogistica() {
                 </button>
             </div>
         </form>
+    </div>
+</div>
+<div id="modal-detalle-pedido" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+        <div class="bg-black text-white p-4 flex justify-between items-center">
+            <h3 class="font-black uppercase text-sm">Detalle del Pedido</h3>
+            <button onclick="imprimirPedidoDeposito()" 
+        class="bg-white text-black px-3 py-1 rounded flex items-center gap-2 hover:bg-gray-200 transition">
+    <i class="fas fa-print text-xs"></i>
+    <span class="text-[10px] font-black uppercase">Imprimir para Depósito</span>
+</button>
+            <button onclick="cerrarModalDetalle()" class="text-white hover:text-gray-400">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="p-6">
+            <div id="contenido-detalle-pedido">
+                </div>
+            <button onclick="cerrarModalDetalle()" class="w-full mt-6 bg-gray-200 py-3 rounded-lg font-black uppercase text-xs hover:bg-gray-300 transition">
+                Cerrar
+            </button>
+        </div>
     </div>
 </div>
 </body>
