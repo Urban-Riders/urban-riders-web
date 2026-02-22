@@ -170,11 +170,12 @@ async function verificarSesion_e_iniciar() {
     }
 }
 async function init() {
-    // Traemos los clientes, pero EXCLUIMOS a los vendedores y administradores
+    // Traemos los clientes, pero EXCLUIMOS a los vendedores, administradores y minoristas
     const { data: c } = await _supabase
         .from('clientes')
         .select('*')
         .not('tipo_cliente', 'in', '("vendedor","admin")')
+        .neq('tipo_cliente', 'minorista')
         .order('nombre');
         
     const { data: p } = await _supabase.from('productos').select('*').order('nombre');
