@@ -117,8 +117,7 @@ const SUPABASE_URL = 'https://dsexvmstfjadjdbptmzn.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI... (acá sigue tu clave)'; // ¡Restaura tu key original!
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: {
-        storage: window.sessionStorage, // <-- ESTO AISLA LA SESIÓN POR PESTAÑA
-        storageKey: 'ur-vendedor-session',
+        storage: window.sessionStorage,
         persistSession: true
     }
 });

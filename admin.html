@@ -717,7 +717,8 @@
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI... (acá sigue tu clave larga)';
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: {
-        storageKey: 'ur-admin-session'
+        storage: window.sessionStorage,
+        persistSession: true
     }
 });
 
