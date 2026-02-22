@@ -117,7 +117,9 @@ const SUPABASE_URL = 'https://dsexvmstfjadjdbptmzn.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI... (acá sigue tu clave)'; // ¡Restaura tu key original!
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: {
-        storageKey: 'ur-vendedor-session'
+        storage: window.sessionStorage, // <-- ESTO AISLA LA SESIÓN POR PESTAÑA
+        storageKey: 'ur-vendedor-session',
+        persistSession: true
     }
 });
 
@@ -129,11 +131,10 @@ document.addEventListener('DOMContentLoaded', verificarSesion_e_iniciar);
 async function verificarSesion_e_iniciar() {
     try {
         const { data: { session }, error: sessionError } = await _supabase.auth.getSession();
-
         if (sessionError) throw sessionError;
 
         if (!session) {
-            console.warn("No hay sesión activa. Redirigiendo al login.");
+            console.warn("Rechazo 1: No hay token de sesión en sessionStorage. Redirigiendo...");
             window.location.replace("acceso.html");
             return;
         }
@@ -143,24 +144,32 @@ async function verificarSesion_e_iniciar() {
             .select('tipo_cliente')
             .eq('auth_id', session.user.id)
             .single();
-
-        if (perfilError) throw perfilError;
-
-        if (!perfil || (perfil.tipo_cliente !== 'vendedor' && perfil.tipo_cliente !== 'admin')) {
-            console.warn("Acceso denegado: Rol incorrecto.");
+            
+        if (perfilError) {
+            console.error("Rechazo 2: Error consultando la tabla clientes:", perfilError.message);
             window.location.replace("acceso.html");
             return;
         }
 
-        console.log("Acceso concedido. Iniciando app...");
-        init(); 
+        if (!perfil) {
+            console.error("Rechazo 3: El auth_id no existe en la tabla 'clientes'.");
+            window.location.replace("acceso.html");
+            return;
+        }
 
+        if (perfil.tipo_cliente !== 'vendedor' && perfil.tipo_cliente !== 'admin') {
+            console.error("Rechazo 4: Rol incorrecto. Tiene '" + perfil.tipo_cliente + "'.");
+            window.location.replace("acceso.html");
+            return;
+        }
+
+        console.log("Acceso validado correctamente. Iniciando app...");
+        init();
     } catch (error) {
-        console.error("Error validando la sesión:", error);
+        console.error("Error crítico validando la sesión:", error);
         window.location.replace("acceso.html");
     }
 }
-
 async function init() {
     // Traemos los clientes, pero EXCLUIMOS a los vendedores y administradores
     const { data: c } = await _supabase
