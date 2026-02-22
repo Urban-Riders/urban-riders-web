@@ -1168,12 +1168,13 @@ async function generarListaPrecios() {
         }
 
         async function cargarClientes() {
-            // Le indicamos a Supabase que excluya a los usuarios del sistema (.neq = "Not Equal")
+            // Le indicamos a Supabase que excluya a los usuarios del sistema y a los minoristas (.neq = "Not Equal")
             const { data } = await _supabase
                 .from('clientes')
                 .select('*')
                 .neq('tipo_cliente', 'vendedor')
                 .neq('tipo_cliente', 'admin')
+                .neq('tipo_cliente', 'minorista')
                 .order('nombre');
                 
             _clientesLocales = data || [];
