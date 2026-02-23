@@ -334,16 +334,14 @@ async function loadProducts() {
         // 1. Obtenemos el conteo total
         const { count, error: countError } = await _supabase
             .from('productos_publicos')
-            .select('*', { count: 'exact', head: true })
-            .gt('stock', 0);
+            .select('*', { count: 'exact', head: true });
 
         if (countError) throw countError;
 
-        // 2. Traemos los productos (del 0 al límite actual)
+       // 2. Traemos los productos (del 0 al límite actual)
         const { data, error } = await _supabase
             .from('productos_publicos')
             .select('*')
-            .gt('stock', 0)
             .order('nombre', { ascending: true })
             .range(0, productosLimite - 1);
 
@@ -675,10 +673,9 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
 
             try {
                 // Iniciamos la consulta base a la tabla 'productos'
-                let query = _supabase
-                    .from('productos_publicos')
-                    .select('*')
-                    .gt('stock', 0); // Solo productos con stock [cite: 167, 168]
+            let query = _supabase
+                .from('productos_publicos')
+                .select('*'); [cite: 167, 168]
 
                 // Si la categoría no es 'TODOS', aplicamos el filtro específico
                 if (cat !== 'TODOS') {
@@ -719,11 +716,10 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
 
             try {
                 // Buscamos en toda la tabla 'productos' por coincidencia de nombre
-                const { data, error } = await _supabase
-                    .from('productos_publicos')
-                    .select('*')
-                    .gt('stock', 0)
-                    .ilike('nombre', `%${term}%`) // No distingue mayúsculas/minúsculas
+            const { data, error } = await _supabase
+                .from('productos_publicos')
+                .select('*')
+                .ilike('nombre', `%${term}%`) // No distingue mayúsculas/minúsculas
                     .order('nombre', { ascending: true });
 
                 if (error) throw error;
@@ -740,31 +736,42 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
             }
         });
         
-       function renderProducts(list) {
+      function renderProducts(list) {
     const container = document.getElementById('grid-productos');
     if (!container) return;
 
     container.innerHTML = list.map(p => {
-        // --- BLINDAJE DE IMAGEN ---
-        // Si es null o "undefined", ponemos el logo para evitar errores visuales
         let imgClean = (p.imagen_url && p.imagen_url !== "undefined") ? p.imagen_url : 'img/logo-ur.png';
-        
-        // --- BLINDAJE DE PRECIO ---
         let precio = Number(p.precio_minorista) || Number(p.precio) || 0;
+        
+        // --- LÓGICA DE STOCK (AGOTADO) ---
+        const sinStock = p.stock <= 0;
+        
+        // Cartel flotante rojo si no hay stock
+        const badgeAgotado = sinStock 
+            ? `<div class="absolute top-2 right-2 bg-red-600 text-white text-[9px] font-black px-2 py-1 rounded shadow-lg uppercase tracking-widest z-10">Agotado</div>` 
+            : '';
+        
+        // Botón gris anulado si no hay stock, botón negro normal si hay stock
+        const botonAccion = sinStock 
+            ? `<button disabled class="bg-slate-800 text-slate-600 w-8 h-8 rounded-full flex items-center justify-center cursor-not-allowed border border-slate-700">
+                    <i class="fas fa-times text-xs"></i>
+               </button>`
+            : `<button onclick="addToCart('${p.id}')" class="bg-black text-white w-8 h-8 rounded-full hover:bg-yellow-500 hover:text-black transition flex items-center justify-center shadow-lg">
+                    <i class="fas fa-plus text-xs"></i>
+               </button>`;
 
         return `
-            <div class="product-card bg-slate-500/50 backdrop-blur-sm rounded-2xl overflow-hidden shadow-xl border border-white/10 p-3">
+            <div class="product-card bg-slate-500/50 backdrop-blur-sm rounded-2xl overflow-hidden shadow-xl border border-white/10 p-3 relative ${sinStock ? 'opacity-80' : ''}">
+                ${badgeAgotado}
                 <div class="relative mb-2 cursor-zoom-in flex justify-center" onclick="openZoom('${imgClean}')">
-                    <img src="${imgClean}" class="w-full h-32 object-contain" onerror="this.src='img/logo-ur.png'">
+                    <img src="${imgClean}" class="w-full h-32 object-contain ${sinStock ? 'grayscale opacity-60' : ''}" onerror="this.src='img/logo-ur.png'">
                 </div>
                 <div class="text-[9px] text-yellow-600 font-bold uppercase mb-1">${p.categoria || 'Varios'}</div>
                 <h3 class="font-bold text-white leading-tight h-8 mb-2 uppercase text-[12px] line-clamp-2">${p.nombre}</h3>
                 <div class="flex items-end justify-between">
                     <div class="text-lg font-black text-white">$${precio.toLocaleString()}</div>
-                    
-                    <button onclick="addToCart('${p.id}')" class="bg-black text-white w-8 h-8 rounded-full hover:bg-yellow-500 hover:text-black transition flex items-center justify-center">
-                        <i class="fas fa-plus text-xs"></i>
-                    </button>
+                    ${botonAccion}
                 </div>
             </div>`;
     }).join('');
