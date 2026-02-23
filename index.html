@@ -400,10 +400,12 @@ async function addToCart(id) {
    // 3. AGREGAR AL CARRITO (Ahora que seguro tenemos 'p')
     const item = cart.find(i => i.id == id);
     
-    // --- LÍMITE DE STOCK ESTRICTO ---
+    // --- LÍMITE DE STOCK ESTRICTO Y BLINDADO ---
+    const stockReal = Number(p.stock) || 0;
     const cantidadEnCarrito = item ? item.quantity : 0;
-    if (cantidadEnCarrito >= p.stock) {
-        alert(`¡Lo sentimos! Solo nos quedan ${p.stock} unidades en stock.`);
+    
+    if (cantidadEnCarrito >= stockReal) {
+        alert(`¡Lo sentimos! Solo nos quedan ${stockReal} unidades en stock.`);
         return; // Cortamos la ejecución, no se agrega nada
     }
     // --------------------------------
@@ -420,7 +422,7 @@ async function addToCart(id) {
             precio_minorista: Number(p.precio_minorista || p.precio || 0),
             imagen_url: imgClean,
             quantity: 1,
-            stock_maximo: p.stock // Guardamos el tope en el carrito
+            stock_maximo: stockReal // Guardamos el tope blindado en el carrito
         });
     }
 
@@ -777,13 +779,15 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
     }).join('');
 }
         function changeQty(id, delta) {
-            const item = cart.find(i => i.id === id);
+            // Usamos == para que no falle si el ID viene como texto o número
+            const item = cart.find(i => i.id == id);
+            if (!item) return;
 
-            // Si intenta sumar (delta > 0), validamos contra el stock
+            // Si intenta sumar (delta > 0), validamos contra el stock blindado
             if (delta > 0) {
                 // Buscamos el stock real en el catálogo global
                 let productoReal = (window.catalogo || []).find(prod => prod.id == id);
-                let limite = productoReal ? productoReal.stock : (item.stock_maximo || 99);
+                let limite = productoReal ? (Number(productoReal.stock) || 0) : (Number(item.stock_maximo) || 99);
 
                 if (item.quantity >= limite) {
                     alert(`Has alcanzado el límite de stock disponible (${limite} unidades).`);
@@ -792,7 +796,7 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
             }
 
             item.quantity += delta;
-            if (item.quantity <= 0) cart = cart.filter(i => i.id !== id);
+            if (item.quantity <= 0) cart = cart.filter(i => i.id != id);
             updateCart();
         }
         function clearCart() { if (confirm("¿Vaciar?")) { cart = []; updateCart(); toggleCart(); } }
