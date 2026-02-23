@@ -369,8 +369,7 @@ async function loadProducts() {
         console.error("Error cargando catálogo:", err);
     }
 }
-     // --- REEMPLAZA TU FUNCIÓN addToCart POR ESTA ---
-
+     
 // --- REEMPLAZA TU FUNCIÓN addToCart POR ESTA ---
 
 async function addToCart(id) {
@@ -400,8 +399,16 @@ async function addToCart(id) {
         }
     }
 
-    // 3. AGREGAR AL CARRITO (Ahora que seguro tenemos 'p')
-    const item = cart.find(i => i.id == id); // Aquí también usamos '==' implícito del sistema o asegurate de que cart use ids consistentes.
+   // 3. AGREGAR AL CARRITO (Ahora que seguro tenemos 'p')
+    const item = cart.find(i => i.id == id);
+    
+    // --- LÍMITE DE STOCK ESTRICTO ---
+    const cantidadEnCarrito = item ? item.quantity : 0;
+    if (cantidadEnCarrito >= p.stock) {
+        alert(`¡Lo sentimos! Solo nos quedan ${p.stock} unidades en stock.`);
+        return; // Cortamos la ejecución, no se agrega nada
+    }
+    // --------------------------------
 
     if (item) {
         item.quantity++;
@@ -414,7 +421,8 @@ async function addToCart(id) {
             nombre: p.nombre,
             precio_minorista: Number(p.precio_minorista || p.precio || 0),
             imagen_url: imgClean,
-            quantity: 1
+            quantity: 1,
+            stock_maximo: p.stock // Guardamos el tope en el carrito
         });
     }
 
@@ -763,6 +771,19 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
 }
         function changeQty(id, delta) {
             const item = cart.find(i => i.id === id);
+
+            // Si intenta sumar (delta > 0), validamos contra el stock
+            if (delta > 0) {
+                // Buscamos el stock real en el catálogo global
+                let productoReal = (window.catalogo || []).find(prod => prod.id == id);
+                let limite = productoReal ? productoReal.stock : (item.stock_maximo || 99);
+
+                if (item.quantity >= limite) {
+                    alert(`Has alcanzado el límite de stock disponible (${limite} unidades).`);
+                    return; // Frenamos la suma
+                }
+            }
+
             item.quantity += delta;
             if (item.quantity <= 0) cart = cart.filter(i => i.id !== id);
             updateCart();
