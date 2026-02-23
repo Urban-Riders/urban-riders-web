@@ -36,9 +36,10 @@
         <img id="zoom-img" src="" class="max-w-[90%] max-h-[90vh] rounded-lg shadow-2xl border border-white/10 object-contain">
     </div>
 
-    <div id="login-modal" class="login-overlay fixed inset-0 bg-black/80 z-[60] items-center justify-center p-4">
+   <div id="login-modal" class="login-overlay fixed inset-0 bg-black/80 z-[60] items-center justify-center p-4">
         <div class="bg-gray-900 p-8 rounded-2xl border border-gray-800 w-full max-w-md text-center shadow-2xl">
-            <h2 class="text-3xl font-black italic mb-6 text-yellow-500 uppercase">Acceso</h2>
+            <h2 class="text-3xl font-black italic mb-1 text-yellow-500 uppercase">Acceso</h2>
+            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-6 italic">⚡ Estamos en tu camino.</p>
             <form id="login-form" onsubmit="handleLogin(event)">
                 <div class="mb-4">
                     <label class="block text-left text-[10px] font-bold text-gray-500 uppercase ml-1 mb-1">Correo Electrónico</label>
@@ -65,8 +66,11 @@
     <nav class="sticky top-0 z-50 bg-black/95 border-b border-gray-800 backdrop-blur-md">
         <div class="flex justify-between items-center p-4 md:px-8">
             <div class="flex items-center gap-2">
-                <div class="bg-yellow-500 text-black p-1.5 rounded-lg font-black text-lg italic">UR</div>
-                <span class="text-xl md:text-2xl font-black italic uppercase">Urban<span class="text-yellow-500">Riders</span></span>
+                <div class="bg-yellow-500 text-black p-1.5 rounded-lg font-black text-lg italic leading-none">UR</div>
+                <div class="flex flex-col">
+                    <span class="text-xl md:text-2xl font-black italic uppercase leading-none">Urban<span class="text-yellow-500">Riders</span></span>
+                    <span class="text-[9px] text-yellow-500 font-black italic uppercase tracking-widest mt-0.5">⚡ Estamos en tu camino.</span>
+                </div>
             </div>
             <div class="flex items-center gap-3">
                 <div id="auth-buttons" class="flex gap-2"></div>
