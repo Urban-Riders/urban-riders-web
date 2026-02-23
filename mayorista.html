@@ -182,8 +182,15 @@
         const SUPABASE_URL = 'https://dsexvmstfjadjdbptmzn.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzZXh2bXN0ZmphZGpkYnB0bXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2OTc3MzUsImV4cCI6MjA4MjI3MzczNX0.L0Wz3hwZOarNLqkYH5-RAzz2Y6iwI4uaE_rlkcKkgyg';
         
+        // Detectamos si hay una sesión de administrador abierta en esta pestaña
+        let configuracionAuth = { persistSession: true, autoRefreshToken: true };
+        if (window.sessionStorage.getItem('urban-admin-session')) {
+            configuracionAuth.storage = window.sessionStorage;
+            configuracionAuth.storageKey = 'urban-admin-session';
+        }
+
         const _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-            auth: { persistSession: true, autoRefreshToken: true }
+            auth: configuracionAuth
         });
 
         const MI_EMAIL_ADMIN = 'kotur39@gmail.com'; 
