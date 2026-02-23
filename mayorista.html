@@ -469,8 +469,8 @@ async function generarClaveMayorista() {
                         ${!hasStock ? '<div class="absolute inset-0 bg-black/70 flex items-center justify-center text-red-500 font-black italic text-xs">SIN STOCK</div>' : ''}
                     </div>
                     <div class="flex justify-between text-[8px] font-bold uppercase mb-1">
-                        <span class="text-gray-500">${p.categoria}</span>
-                        <span class="text-yellow-600">${p.codigo}</span>
+                        <span class="text-gray-500">${p.categoria || 'VARIOS'}</span>
+                        <span class="text-yellow-600">${p.codigo || 'S/N'}</span>
                     </div>
                     <h3 class="text-[11px] font-black uppercase italic mb-3 h-8 overflow-hidden">${p.nombre}</h3>
                     <div class="mt-auto">
