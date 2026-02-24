@@ -456,8 +456,8 @@ function actualizarVistas() {
         document.getElementById('paso-3').classList.remove('hidden');
         renderCarrito();
         document.getElementById('btn-principal').onclick = manejarBotonPrincipal;
-        document.getElementById('texto-boton').innerText = 'Confirmar Pedido';
-        document.getElementById('icono-boton').className = 'fas fa-check text-[10px]';
+        document.getElementById('texto-boton').innerText = 'ENVIAR';
+        document.getElementById('icono-boton').className = 'fas fa-paper-plane text-[10px]';
         
         let total = 0;
         carrito.forEach(p => {
