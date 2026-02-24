@@ -396,10 +396,8 @@ function renderCarrito() {
                 <p class="font-black text-base text-yellow-600">$${subtotal.toLocaleString('es-AR')}</p>
             </div>
         `;
-        list.appendChild(div);
+      list.appendChild(div);
     });
-
-    document.getElementById('total-carrito').innerText = `$${total.toLocaleString('es-AR')}`;
 }
 function eliminarDelCarrito(id) {
     if(confirm("¿Quitar este producto del pedido?")) {
@@ -563,7 +561,7 @@ async function enviarPedido() {
         alert("Ocurrió un problema técnico al enviar: " + error.message);
     } finally {
         document.getElementById('btn-principal').disabled = false;
-        document.getElementById('texto-boton').innerText = 'Ver Resumen';
+        document.getElementById('texto-boton').innerText = 'ENVIAR';
     }
 }
 // --- FILTROS EN TIEMPO REAL PARA BUSCADORES ---
