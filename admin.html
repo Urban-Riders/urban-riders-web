@@ -704,12 +704,11 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 });
         let _productosLocales = [];
         let _clientesLocales = [];
-        // --- BLOQUE DE SEGURIDAD ADMIN ---
+       // --- BLOQUE DE SEGURIDAD ADMIN ---
         _supabase.auth.onAuthStateChange(async (event, session) => {
-            // Filtro estricto: Si no hay sesión o el email NO es el tuyo, afuera al index.
+            // Filtro estricto: Si no hay sesión o el email NO es el tuyo, afuera.
             if (!session || session.user.email !== 'kotur39@gmail.com') {
-                window.location.replace("index.html"); 
-           
+                window.location.replace("acceso.html"); 
                 return;
             }
 
@@ -718,7 +717,7 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
             }
 
             if (event === 'SIGNED_OUT') {
-                window.location.replace("index.html");
+                window.location.replace("acceso.html");
             }
         });
 
@@ -954,12 +953,11 @@ async function generarListaPrecios() {
     }
 }
 
-        window.addEventListener('DOMContentLoaded', async () => {
+       window.addEventListener('DOMContentLoaded', async () => {
             const { data: { session } } = await _supabase.auth.getSession();
             // Refuerzo: verificamos también tu email acá por seguridad
             if (!session || session.user.email !== 'kotur39@gmail.com') { 
-                window.location.replace('index.html'); 
-    
+                window.location.replace('acceso.html'); 
                 return; 
             }
             await cargarTodo();
@@ -2537,11 +2535,11 @@ window.onload = function() {
     }
 };
 async function handleLogout() {
-    if (confirm("¿Cerrar sesión de administrador?")) {
-        await _supabase.auth.signOut();
-        // El "Vigilante" se encargará del resto.
-    }
-}
+            if (confirm("¿Cerrar sesión de administrador?")) {
+                await _supabase.auth.signOut();
+                window.location.replace("acceso.html");
+            }
+        }
 // --- FUNCIONES PARA INGRESO DE MERCADERÍA ---
 let productoSeleccionadoIngreso = null;
 
