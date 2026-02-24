@@ -702,7 +702,6 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
         storage: window.sessionStorage
     }
 });
-
         let _productosLocales = [];
         let _clientesLocales = [];
         // --- BLOQUE DE SEGURIDAD ADMIN ---
@@ -710,6 +709,7 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
             // Filtro estricto: Si no hay sesión o el email NO es el tuyo, afuera al index.
             if (!session || session.user.email !== 'kotur39@gmail.com') {
                 window.location.replace("index.html"); 
+           
                 return;
             }
 
@@ -959,6 +959,7 @@ async function generarListaPrecios() {
             // Refuerzo: verificamos también tu email acá por seguridad
             if (!session || session.user.email !== 'kotur39@gmail.com') { 
                 window.location.replace('index.html'); 
+    
                 return; 
             }
             await cargarTodo();
