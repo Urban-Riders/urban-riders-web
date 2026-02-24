@@ -63,12 +63,9 @@
             const password = document.getElementById('password').value;
 
             // --- INICIO DEL CAMBIO MÍNIMO ---
-            const llaveAislamiento = (email === 'kotur39@gmail.com') ? 'urban-admin-session' : 'urban-vendedor-session';
             const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
                 auth: {
-                    storage: window.sessionStorage,
-                    storageKey: llaveAislamiento,
-                    persistSession: true
+                    storage: window.sessionStorage
                 }
             });
             // --- FIN DEL CAMBIO MÍNIMO ---
@@ -92,9 +89,8 @@
 
                 if (userEmail === adminEmail) {
                     // Es el administrador
-                    localStorage.setItem('isLoggedIn', 'true');
                     window.location.replace("admin.html");
-                } 
+                }
                 else if (userEmail === vendedorEmail) {
                     // Es el vendedor
                     // No hace falta el localStorage de admin para no mezclar sesiones

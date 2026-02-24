@@ -187,14 +187,10 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzZXh2bXN0ZmphZGpkYnB0bXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2OTc3MzUsImV4cCI6MjA4MjI3MzczNX0.L0Wz3hwZOarNLqkYH5-RAzz2Y6iwI4uaE_rlkcKkgyg';
         
         // Detectamos si hay una sesión de administrador abierta en esta pestaña
-        let configuracionAuth = { persistSession: true, autoRefreshToken: true };
-        if (window.sessionStorage.getItem('urban-admin-session')) {
-            configuracionAuth.storage = window.sessionStorage;
-            configuracionAuth.storageKey = 'urban-admin-session';
-        }
-
         const _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-            auth: configuracionAuth
+            auth: {
+                storage: window.sessionStorage
+            }
         });
 
         const MI_EMAIL_ADMIN = 'kotur39@gmail.com'; 
@@ -280,17 +276,15 @@ _client.auth.onAuthStateChange((event, session) => {
             btn.disabled = true;
             btn.innerText = "ACCEDIENDO...";
 
-            try {
+           try {
                 const { data, error } = await _client.auth.signInWithPassword({
                     email: email,
                     password: pass
                 });
-
                 if (error) throw error;
-                
-                localStorage.setItem('isLoggedIn', 'true');
 
-                if (email.toLowerCase() === MI_EMAIL_ADMIN.toLowerCase()) {
+                // Reemplazamos la variable por tu mail directo
+                if (email.toLowerCase() === 'kotur39@gmail.com') {
                     window.location.href = 'admin.html';
                 } else {
                     window.location.reload();
@@ -356,16 +350,11 @@ async function generarClaveMayorista() {
         }
 
         async function handleLogout() {
-    if (confirm("¿Cerrar sesión?")) {
-        await _client.auth.signOut();
-        // Borramos el localStorage si lo usás
-        localStorage.removeItem('isLoggedIn'); 
-        
-        // BORRAMOS la línea de window.location.href
-        // Al no haber redirección, el "Vigilante" (onAuthStateChange)
-        // se activará solo y ejecutará init() para mostrar los precios públicos.
-    }
-}
+            if (confirm("¿Cerrar sesión?")) {
+                await _client.auth.signOut();
+                window.location.reload();
+            }
+        }
 
         function updateAuthUI() {
             const container = document.getElementById('auth-buttons');

@@ -117,9 +117,7 @@ const SUPABASE_URL = 'https://dsexvmstfjadjdbptmzn.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzZXh2bXN0ZmphZGpkYnB0bXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2OTc3MzUsImV4cCI6MjA4MjI3MzczNX0.L0Wz3hwZOarNLqkYH5-RAzz2Y6iwI4uaE_rlkcKkgyg'; // ¡Restaura tu key original!
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: {
-        storage: window.sessionStorage,
-        storageKey: 'urban-vendedor-session', // <-- SOLO AGREGAR ESTA LÍNEA
-        persistSession: true
+        storage: window.sessionStorage
     }
 });
 
@@ -196,9 +194,6 @@ async function logoutVendedor() {
 
             const { error } = await _supabase.auth.signOut();
             if (error) throw error;
-            
-            localStorage.clear();
-            sessionStorage.clear();
 
             window.location.replace("acceso.html");
             

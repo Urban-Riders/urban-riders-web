@@ -699,9 +699,7 @@
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzZXh2bXN0ZmphZGpkYnB0bXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2OTc3MzUsImV4cCI6MjA4MjI3MzczNX0.L0Wz3hwZOarNLqkYH5-RAzz2Y6iwI4uaE_rlkcKkgyg';
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: {
-        storage: window.sessionStorage,
-        storageKey: 'urban-admin-session', // <-- SOLO AGREGAR ESTA LÍNEA
-        persistSession: true
+        storage: window.sessionStorage
     }
 });
 
@@ -709,24 +707,28 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
         let _clientesLocales = [];
         // --- BLOQUE DE SEGURIDAD ADMIN ---
         _supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log("Evento de Auth:", event);
-
-            // Filtro estricto: Si no hay sesión o el email no es el tuyo, afuera.
+            // Filtro estricto: Si no hay sesión o el email NO es el tuyo, afuera al index.
             if (!session || session.user.email !== 'kotur39@gmail.com') {
-                console.log("Acceso no autorizado detectado");
-                window.location.replace("acceso.html"); // Usa acceso.html que es tu nuevo login
+                window.location.replace("index.html"); 
                 return;
             }
 
-            // Si pasó el filtro, significa que sos vos (Admin)
             if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-                cargarTodo(); // Cargamos los datos de la base
+                cargarTodo(); 
             }
 
             if (event === 'SIGNED_OUT') {
-                window.location.replace("acceso.html");
+                window.location.replace("index.html");
             }
         });
+
+        // Agregamos la función del botón "Cerrar Sesión" que faltaba en tu código
+        async function handleLogout() {
+            if (confirm("¿Cerrar sesión de administrador?")) {
+                await _supabase.auth.signOut();
+                window.location.replace("index.html");
+            }
+        }
 async function calcularGanancias() {
     const desde = document.getElementById('fecha-desde').value;
     const hasta = document.getElementById('fecha-hasta').value;
@@ -954,7 +956,11 @@ async function generarListaPrecios() {
 
         window.addEventListener('DOMContentLoaded', async () => {
             const { data: { session } } = await _supabase.auth.getSession();
-            if (!session) { window.location.href = 'index.html'; return; }
+            // Refuerzo: verificamos también tu email acá por seguridad
+            if (!session || session.user.email !== 'kotur39@gmail.com') { 
+                window.location.replace('index.html'); 
+                return; 
+            }
             await cargarTodo();
 
             document.getElementById('form-producto').addEventListener('submit', async (e) => {
