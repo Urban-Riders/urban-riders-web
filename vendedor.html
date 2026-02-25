@@ -110,6 +110,7 @@
         </button>
     </div>
 </div>
+<div id="toast-container" class="fixed top-20 left-1/2 transform -translate-x-1/2 z-[200] flex flex-col gap-3 pointer-events-none w-[90%] max-w-[400px]"></div>
 
 <script>
 // RECUERDA PONER TUS CREDENCIALES AQUÍ
@@ -125,6 +126,41 @@ let clientes = [], productos = [], carrito = [], clienteSeleccionado = null;
 let vistaActual = 1;
 
 document.addEventListener('DOMContentLoaded', verificarSesion_e_iniciar);
+// --- FUNCIÓN PARA NOTIFICACIONES TOAST (MÓVIL) ---
+function mostrarToast(mensaje, tipo = 'alerta') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    
+    const toast = document.createElement('div');
+    
+    let borderClass = 'border-yellow-500';
+    let icon = '<i class="fas fa-info-circle text-yellow-500 text-xl"></i>';
+    if (tipo === 'exito') {
+        borderClass = 'border-green-500';
+        icon = '<i class="fas fa-check-circle text-green-500 text-xl"></i>';
+    } else if (tipo === 'error') {
+        borderClass = 'border-red-500';
+        icon = '<i class="fas fa-times-circle text-red-500 text-xl"></i>';
+    }
+
+    toast.className = `bg-gray-900 border-b-4 ${borderClass} text-white px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-3 transform -translate-y-full opacity-0 transition-all duration-300 ease-out pointer-events-auto`;
+    toast.innerHTML = `${icon} <span class="text-xs font-bold uppercase tracking-wide leading-tight flex-1">${mensaje}</span>`;
+    
+    container.appendChild(toast);
+
+    // Animación de caída y aparición
+    setTimeout(() => {
+        toast.classList.remove('-translate-y-full', 'opacity-0');
+        toast.classList.add('translate-y-0', 'opacity-100');
+    }, 10);
+
+    // Salida hacia arriba
+    setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('-translate-y-full', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
 
 async function verificarSesion_e_iniciar() {
     try {
@@ -199,7 +235,7 @@ async function logoutVendedor() {
             
         } catch (error) {
             console.error("Error al cerrar sesión:", error);
-            alert("Hubo un problema al cerrar sesión.");
+            mostrarToast("Hubo un problema al cerrar sesión.", "error");
             const btnSalir = document.querySelector('button[onclick="logoutVendedor()"]');
             if(btnSalir) btnSalir.disabled = false;
         }
@@ -227,7 +263,7 @@ async function guardarClienteDirecto() {
     const email = document.getElementById('nuevo-email').value.trim() || null;
 
     if (!nombre) {
-        alert("El nombre es obligatorio");
+        mostrarToast("El nombre es obligatorio", "alerta");
         return;
     }
 
@@ -247,14 +283,14 @@ async function guardarClienteDirecto() {
         const { error } = await _supabase.from('clientes').insert([nuevoCliente]);
         
         if (error) {
-            alert("Error de Supabase: " + error.message);
+            mostrarToast("Error: " + error.message, "error");
         } else {
-            alert("✅ CLIENTE GUARDADO EXITOSAMENTE");
+            mostrarToast("Cliente guardado exitosamente", "exito");
             closeClientModal();
             await init(); 
         }
     } catch (err) {
-        alert("Error técnico: " + err.message);
+        mostrarToast("Error técnico: " + err.message, "error");
     } finally {
         btn.disabled = false;
         btn.innerText = "Guardar Cliente";
@@ -419,7 +455,7 @@ function eliminarDelCarrito(id) {
 function manejarBotonPrincipal() {
     if (vistaActual === 2) {
         if (carrito.length === 0) {
-            alert("Agrega productos al carrito primero");
+            mostrarToast("Agregá productos al pedido primero", "alerta");
             return;
         }
         vistaActual = 3;
@@ -548,7 +584,7 @@ async function enviarPedido() {
         const { error: dError } = await _supabase.from('pedido_detalles').insert(detalles);
         if (dError) throw new Error("Error guardando detalles: " + dError.message);
 
-        alert("✅ PEDIDO ENVIADO A ADMINISTRACIÓN CON ÉXITO");
+        mostrarToast("Pedido enviado a administración", "exito");
         carrito = [];
         clienteSeleccionado = null;
         vistaActual = 1;
@@ -558,7 +594,7 @@ async function enviarPedido() {
 
     } catch (error) {
         console.error(error);
-        alert("Ocurrió un problema técnico al enviar: " + error.message);
+        mostrarToast("Error al enviar: " + error.message, "error");
     } finally {
         document.getElementById('btn-principal').disabled = false;
         document.getElementById('texto-boton').innerText = 'ENVIAR';
