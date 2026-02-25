@@ -280,7 +280,7 @@
             </div>
         </div>
     </div>
-
+     <div id="toast-container" class="fixed bottom-5 right-5 z-[200] flex flex-col gap-3 pointer-events-none"></div>
     <script>
         const SUPABASE_URL = 'https://dsexvmstfjadjdbptmzn.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzZXh2bXN0ZmphZGpkYnB0bXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2OTc3MzUsImV4cCI6MjA4MjI3MzczNX0.L0Wz3hwZOarNLqkYH5-RAzz2Y6iwI4uaE_rlkcKkgyg';
@@ -317,6 +317,37 @@ _supabase.auth.onAuthStateChange((event, session) => {
         let productosLimite = 15;
         let currentCategory = 'TODOS';
         const CATEGORIAS_LIST = ['TODOS', 'CICLISMO', 'CASCOS', 'INDUMENTARIA', 'ACCESORIOS', 'REPUESTOS'];
+// --- FUNCIÓN PARA NOTIFICACIONES TOAST ---
+        function mostrarToast(mensaje, tipo = 'alerta') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            
+            const toast = document.createElement('div');
+            
+            // Colores e íconos
+            let borderClass = 'border-yellow-500';
+            let icon = '<i class="fas fa-info-circle text-yellow-500 text-lg"></i>';
+            if (tipo === 'exito') {
+                borderClass = 'border-green-500';
+                icon = '<i class="fas fa-check-circle text-green-500 text-lg"></i>';
+            } else if (tipo === 'error') {
+                borderClass = 'border-red-500';
+                icon = '<i class="fas fa-times-circle text-red-500 text-lg"></i>';
+            }
+
+            // Usamos colores de Tailwind que combinen con tu index (slate-900)
+            toast.className = `bg-slate-900 border-l-4 ${borderClass} text-white px-4 py-3 rounded shadow-2xl flex items-center gap-3 transform translate-x-full transition-transform duration-300 ease-out z-[200] pointer-events-auto max-w-sm`;
+            toast.innerHTML = `${icon} <span class="text-xs font-bold uppercase italic tracking-wide">${mensaje}</span>`;
+            
+            container.appendChild(toast);
+
+            // Animar entrada y salida
+            setTimeout(() => toast.classList.remove('translate-x-full'), 10);
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
 
        // Variable global para que no falle la memoria
 window.catalogo = []; 
@@ -379,7 +410,7 @@ async function addToCart(id) {
             
             if (error || !data) {
                 console.error("Error: El producto no existe ni en la base de datos.");
-                alert("Hubo un error al agregar el producto. Intente recargar.");
+                mostrarToast("Hubo un error al agregar el producto. Intente recargar.", "error");
                 return;
             }
             p = data; // ¡Lo encontramos!
@@ -397,7 +428,7 @@ async function addToCart(id) {
     const cantidadEnCarrito = item ? item.quantity : 0;
     
     if (cantidadEnCarrito >= stockReal) {
-        alert(`¡Lo sentimos! Solo nos quedan ${stockReal} unidades en stock.`);
+        mostrarToast(`¡Lo sentimos! Solo nos quedan ${stockReal} unidades en stock.`, "alerta");`
         return; // Cortamos la ejecución, no se agrega nada
     }
     // --------------------------------
@@ -466,7 +497,7 @@ function toggleCheckoutModal() {
 }
 
 async function preCheckout() { 
-    if (cart.length === 0) return alert("Carrito vacío");
+    if (cart.length === 0) return mostrarToast("Carrito vacío", "alerta");
     toggleCart(); 
     
     // Si ya está logueado, pre-llenamos sus datos y ocultamos la contraseña
@@ -642,7 +673,7 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
 
     } catch (err) {
         console.error("Error al procesar:", err);
-        alert(err.message || "Hubo un error al procesar la operación. Intenta nuevamente.");
+        mostrarToast(err.message || "Hubo un error al procesar la operación. Intenta nuevamente.", "error");
         btn.innerHTML = originalText;
         btn.disabled = false;
     }
@@ -777,7 +808,7 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
                 let limite = productoReal ? (Number(productoReal.stock) || 0) : (Number(item.stock_maximo) || 99);
 
                 if (item.quantity >= limite) {
-                    alert(`Has alcanzado el límite de stock disponible (${limite} unidades).`);
+                    ${limite} unidades).\`);`[cite: 333] Por:`mostrarToast(\`Has alcanzado el límite de stock disponible (${limite} unidades).`, "alerta");`
                     return; // Frenamos la suma
                 }
             }
@@ -793,7 +824,7 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
     const pedidoId = sessionStorage.getItem('ultimo_pedido_pago');
     
     if (!pedidoId) {
-        alert("Debes completar el pago antes de enviar el pedido.");
+        mostrarToast("Debes completar el pago antes de enviar el pedido.", "alerta");
         return;
     }
 
@@ -842,11 +873,11 @@ function toggleContactModal() {
                 });
 
                 if (response.ok) {
-                    alert("¡Consulta enviada con éxito! Te responderemos a la brevedad.");
+                    mostrarToast("¡Consulta enviada con éxito!", "exito");
                     form.reset();
                     toggleContactModal();
                 } else {
-                    alert("Hubo un error al enviar el mensaje.");
+                    mostrarToast("Hubo un error al enviar el mensaje.", "error");
                 }
             } catch (error) {
                 alert("Error de conexión con el servidor.");
@@ -879,12 +910,12 @@ document.getElementById('newsletter-form').addEventListener('submit', async (e) 
         if (error) {
             // Si el email ya existe, Supabase devolverá un error por el constraint 'unique'
             if (error.code === '23505') {
-                alert("Este correo ya forma parte del Club Urban Riders.");
+                mostrarToast("Este correo ya forma parte del Club Urban Riders.", "alerta");
             } else {
                 throw error;
             }
         } else {
-            alert("¡Te uniste al Club con éxito! Pronto recibirás novedades.");
+            mostrarToast("¡Te uniste al Club con éxito! Pronto recibirás novedades.", "exito");
             emailInput.value = ""; // Limpiamos el campo
         }
     } catch (err) {
@@ -938,7 +969,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         // Actualizamos Supabase a 'pago'
         await _supabase.from('pedidos').update({ estado_pago: 'pago' }).eq('id', pedidoId);
 
-        alert("¡Pago exitoso! El botón de WhatsApp ya está listo en tu carrito.");
+        mostrarToast("¡Pago exitoso! El botón de WhatsApp ya está listo en tu carrito.", "exito");
 
         // --- LINEA DE LIMPIEZA DE URL ---
         // Esto borra los parámetros de la URL sin recargar la página para evitar el alert infinito al refrescar
