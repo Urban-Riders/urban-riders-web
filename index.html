@@ -428,7 +428,7 @@ async function addToCart(id) {
     const cantidadEnCarrito = item ? item.quantity : 0;
     
     if (cantidadEnCarrito >= stockReal) {
-        mostrarToast(`¡Lo sentimos! Solo nos quedan ${stockReal} unidades en stock.`, "alerta");`
+        mostrarToast(`¡Lo sentimos! Solo nos quedan ${stockReal} unidades en stock.`, "alerta");
         return; // Cortamos la ejecución, no se agrega nada
     }
     // --------------------------------
@@ -808,8 +808,8 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
                 let limite = productoReal ? (Number(productoReal.stock) || 0) : (Number(item.stock_maximo) || 99);
 
                 if (item.quantity >= limite) {
-                    ${limite} unidades).\`);`[cite: 333] Por:`mostrarToast(\`Has alcanzado el límite de stock disponible (${limite} unidades).`, "alerta");`
-                    return; // Frenamos la suma
+                mostrarToast(`Has alcanzado el límite de stock disponible (${limite} unidades).`, "alerta");
+                return; // Frenamos la suma
                 }
             }
 
