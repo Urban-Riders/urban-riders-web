@@ -743,33 +743,28 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
         let precio = Number(p.precio_minorista) || Number(p.precio) || 0;
         
         // --- LÓGICA DE STOCK (AGOTADO) ---
-        const sinStock = p.stock <= 0;
+        const hasStock = p.stock > 0;
         
-        // Cartel flotante rojo si no hay stock
-        const badgeAgotado = sinStock 
-            ? `<div class="absolute top-2 right-2 bg-red-600 text-white text-[9px] font-black px-2 py-1 rounded shadow-lg uppercase tracking-widest z-10">Agotado</div>` 
-            : '';
-        
-        // Botón gris anulado si no hay stock, botón negro normal si hay stock
-        const botonAccion = sinStock 
-            ? `<button disabled class="bg-slate-800 text-slate-600 w-8 h-8 rounded-full flex items-center justify-center cursor-not-allowed border border-slate-700">
-                    <i class="fas fa-times text-xs"></i>
-               </button>`
-            : `<button onclick="addToCart('${p.id}')" class="bg-black text-white w-8 h-8 rounded-full hover:bg-yellow-500 hover:text-black transition flex items-center justify-center shadow-lg">
-                    <i class="fas fa-plus text-xs"></i>
-               </button>`;
-
+        // Estética copiada de mayorista, manteniendo la lógica minorista (addToCart con p.id y precios correctos)
         return `
-            <div class="product-card bg-slate-500/50 backdrop-blur-sm rounded-2xl overflow-hidden shadow-xl border border-white/10 p-3 relative ${sinStock ? 'opacity-80' : ''}">
-                ${badgeAgotado}
-                <div class="relative mb-2 cursor-zoom-in flex justify-center" onclick="openZoom('${imgClean}')">
-                    <img src="${imgClean}" class="w-full h-32 object-contain ${sinStock ? 'grayscale opacity-60' : ''}" onerror="this.src='img/logo-ur.png'">
+            <div class="bg-gray-900 rounded-xl overflow-hidden border ${hasStock ? 'border-gray-800' : 'border-red-900/30'} p-3 flex flex-col hover:border-yellow-500 transition">
+                <div class="relative h-32 -mx-3 -mt-3 mb-3 bg-black flex items-center justify-center overflow-hidden cursor-zoom-in" onclick="openZoom('${imgClean}')">
+                    <img src="${imgClean}" class="product-img ${!hasStock ? 'grayscale opacity-60' : ''}" onerror="this.src='img/logo-ur.png'">
+                    ${!hasStock ? '<div class="absolute inset-0 bg-black/70 flex items-center justify-center text-red-500 font-black italic text-xs">SIN STOCK</div>' : ''}
                 </div>
-                <div class="text-[9px] text-yellow-600 font-bold uppercase mb-1">${p.categoria || 'Varios'}</div>
-                <h3 class="font-bold text-white leading-tight h-8 mb-2 uppercase text-[12px] line-clamp-2">${p.nombre}</h3>
-                <div class="flex items-end justify-between">
-                    <div class="text-lg font-black text-white">$${precio.toLocaleString()}</div>
-                    ${botonAccion}
+                <div class="flex justify-between text-[8px] font-bold uppercase mb-1">
+                    <span class="text-gray-500">${p.categoria || 'VARIOS'}</span>
+                    <span class="text-yellow-600">${p.codigo || 'S/N'}</span>
+                </div>
+                <h3 class="text-[11px] font-black text-white uppercase italic mb-3 h-8 overflow-hidden">${p.nombre}</h3>
+                <div class="mt-auto">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-white text-lg">$${precio.toLocaleString()}</span>
+                        <span class="text-[9px] ${hasStock ? 'text-green-500' : 'text-red-500'} font-bold">${hasStock ? 'Disponible' : 'Agotado'}</span>
+                    </div>
+                    <button onclick="addToCart('${p.id}')" ${!hasStock ? 'disabled' : ''} class="w-full py-2 rounded-lg font-black uppercase italic text-[10px] border ${hasStock ? 'border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-black' : 'border-gray-800 text-gray-700 cursor-not-allowed'} transition shadow-lg">
+                        ${hasStock ? 'Añadir al Carrito' : 'Agotado'}
+                    </button>
                 </div>
             </div>`;
     }).join('');
