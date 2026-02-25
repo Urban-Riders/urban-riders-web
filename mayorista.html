@@ -181,7 +181,7 @@
             </div>
         </div>
     </div>
-
+<div id="toast-container" class="fixed bottom-5 right-5 z-[200] flex flex-col gap-3 pointer-events-none"></div>
     <script>
         const SUPABASE_URL = 'https://dsexvmstfjadjdbptmzn.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzZXh2bXN0ZmphZGpkYnB0bXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2OTc3MzUsImV4cCI6MjA4MjI3MzczNX0.L0Wz3hwZOarNLqkYH5-RAzz2Y6iwI4uaE_rlkcKkgyg';
@@ -202,6 +202,34 @@
         let _userEmail = null;
         let _currentCategory = 'TODOS';
         let _itemsShown = 12;
+// --- FUNCIÓN PARA NOTIFICACIONES TOAST ---
+        function mostrarToast(mensaje, tipo = 'alerta') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            
+            const toast = document.createElement('div');
+            
+            let borderClass = 'border-yellow-500';
+            let icon = '<i class="fas fa-info-circle text-yellow-500 text-lg"></i>';
+            if (tipo === 'exito') {
+                borderClass = 'border-green-500';
+                icon = '<i class="fas fa-check-circle text-green-500 text-lg"></i>';
+            } else if (tipo === 'error') {
+                borderClass = 'border-red-500';
+                icon = '<i class="fas fa-times-circle text-red-500 text-lg"></i>';
+            }
+
+            toast.className = `bg-gray-900 border-l-4 ${borderClass} text-white px-4 py-3 rounded shadow-2xl flex items-center gap-3 transform translate-x-full transition-transform duration-300 ease-out z-[200] pointer-events-auto max-w-sm`;
+            toast.innerHTML = `${icon} <span class="text-xs font-bold uppercase italic tracking-wide">${mensaje}</span>`;
+            
+            container.appendChild(toast);
+
+            setTimeout(() => toast.classList.remove('translate-x-full'), 10);
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
 _client.auth.onAuthStateChange((event, session) => {
     _isLoggedIn = false; 
     _userEmail = (session && session.user) ? session.user.email : null;
@@ -230,7 +258,7 @@ _client.auth.onAuthStateChange((event, session) => {
                         // Si está intentando loguearse a la fuerza en esta pantalla, le avisamos
                         if (event === 'SIGNED_IN') {
                             _client.auth.signOut().then(() => {
-                                alert("Tu cuenta es Minorista. Puedes ver el catálogo, pero para ver precios mayoristas necesitas pedir una cuenta comercial.");
+                                mostrarToast("Cuenta Minorista. Necesitás una comercial para ver precios.", "alerta");
                                 finalizarCarga();
                             });
                         } else {
@@ -291,7 +319,7 @@ _client.auth.onAuthStateChange((event, session) => {
                 }
 
             } catch (error) {
-                alert("Error: Credenciales no válidas.");
+                mostrarToast("Error: Credenciales no válidas.", "error");
                 btn.disabled = false;
                 btn.innerText = "ENTRAR AL SISTEMA";
             }
@@ -301,12 +329,12 @@ async function generarClaveMayorista() {
             const pass = document.getElementById('user-pass').value.trim();
 
             if (!email || !pass) {
-                alert("Por favor, escribí tu correo y elegí una contraseña en los casilleros de arriba, y luego volvé a presionar 'Genera tu clave acá'.");
+               mostrarToast("Escribí tu correo y elegí una contraseña arriba.", "alerta");
                 return;
             }
 
             if (pass.length < 6) {
-                alert("Por seguridad, la contraseña debe tener al menos 6 caracteres.");
+                mostrarToast("La contraseña debe tener al menos 6 caracteres.", "alerta");
                 return;
             }
 
@@ -321,7 +349,7 @@ async function generarClaveMayorista() {
                 if (errCli) throw errCli;
 
                 if (!cliente) {
-                    alert("Acceso denegado.\n\nEste correo no figura como cliente mayorista habilitado. Si ya tenés cuenta, verificá no haber escrito mal el correo.");
+                    mostrarToast("Acceso denegado. El correo no figura como mayorista.", "error");
                     return; 
                 }
 
@@ -333,19 +361,19 @@ async function generarClaveMayorista() {
 
                 if (errAuth) {
                     if (errAuth.message.includes("already registered") || errAuth.message.includes("User already registered")) {
-                        alert("Este correo ya tiene una clave generada. Ingresá directamente presionando el botón amarillo 'ENTRAR AL SISTEMA'.");
+                        mostrarToast("Este correo ya tiene clave. Usá 'ENTRAR AL SISTEMA'.", "alerta");
                     } else {
-                        alert("Error al generar la clave: " + errAuth.message);
+                        mostrarToast("Error al generar la clave: " + errAuth.message, "error");
                     }
                     return;
                 }
 
-                alert("¡Clave generada con éxito! Ya podés ver el catálogo y hacer tu pedido.");
+                mostrarToast("¡Clave generada con éxito!", "exito");
                 window.location.reload();
 
             } catch (err) {
                 console.error("Error al generar clave:", err);
-                alert("Ocurrió un error de conexión, intentá de nuevo.");
+                mostrarToast("Ocurrió un error de conexión, intentá de nuevo.", "error");
             }
         }
 
@@ -419,7 +447,7 @@ async function generarClaveMayorista() {
                     btn.innerHTML = '<span>Enviar Solicitud de Alta</span> <i class="fas fa-paper-plane text-yellow-500"></i>';
                 }, 5000);
             } catch (err) {
-                alert("Error al enviar la solicitud: " + err.message);
+                mostrarToast("Error al enviar la solicitud: " + err.message, "error");
                 btn.disabled = false;
                 btn.innerHTML = '<span>Enviar Solicitud de Alta</span> <i class="fas fa-paper-plane text-yellow-500"></i>';
             }
@@ -484,7 +512,7 @@ async function generarClaveMayorista() {
             const found = _cart.find(i => i.id === item.id);
             if (found) {
                 if (found.cantidad < item.stock) found.cantidad++;
-                else return alert("Sin más stock disponible");
+                else return mostrarToast("Sin más stock disponible", "error");
             } else {
                 _cart.push({ ...item, cantidad: 1 });
             }
@@ -531,7 +559,7 @@ async function generarClaveMayorista() {
 
         function changeQty(idx, delta) {
             const item = _cart[idx];
-            if (delta > 0 && item.cantidad >= item.stock) return alert("Máximo stock alcanzado");
+            if (delta > 0 && item.cantidad >= item.stock) return mostrarToast("Máximo stock alcanzado", "error");
             item.cantidad += delta;
             if (item.cantidad <= 0) _cart.splice(idx, 1);
             updateCartUI();
@@ -540,7 +568,7 @@ async function generarClaveMayorista() {
         function toggleCart() { document.getElementById('cart-modal').classList.toggle('active'); }
 
         async function sendOrder() {
-            if (_cart.length === 0) return alert("Carrito vacío");
+            if (_cart.length === 0) return mostrarToast("Carrito vacío", "alerta");
 
             try {
                 const totalPedido = _cart.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
@@ -624,7 +652,7 @@ async function generarClaveMayorista() {
 
             } catch (err) {
                 console.error("Error completo:", err);
-                alert("Error al registrar deuda en cuenta corriente: " + err.message);
+                mostrarToast("Error al registrar el pedido: " + err.message, "error");
             }
         }
     </script>
