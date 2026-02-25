@@ -2365,14 +2365,17 @@ async function descargarRespaldoTotal() {
     const confirmar = confirm("¿Deseas descargar el respaldo de seguridad de todas las tablas?");
     if (!confirmar) return;
 
+    // Lista exacta de 10 tablas confirmadas
     const tablas = [
-        'clientes', 
-        'historial_ventas', 
-        'movimientos_cuenta', 
-        'pedido_detalles', 
-        'pedidos', 
-        'productos', 
-        'solicitudes_alta', 
+        'clientes',
+        'gastos',
+        'historial_ventas',
+        'movimientos_cuenta',
+        'movimientos_stock',
+        'pedido_detalles',
+        'pedidos',
+        'productos',
+        'solicitudes_alta',
         'suscriptores'
     ];
     
