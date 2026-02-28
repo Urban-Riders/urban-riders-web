@@ -3145,10 +3145,19 @@ async function confirmarVentaPOS() {
             const subtotal = item.precio_venta * item.cantidad;
             totalVenta += subtotal;
 
-            // Descontar de 'productos'
-            await _supabase.rpc('decrementar_stock', { producto_id: item.id, cantidad: item.cantidad });
+            // --- CORRECCIÓN 1: Descontar stock directo ---
+            const { data: prodDB } = await _supabase
+                .from('productos')
+                .select('stock')
+                .eq('id', item.id)
+                .single();
+            
+            if (prodDB) {
+                const nuevoStock = (prodDB.stock || 0) - item.cantidad;
+                await _supabase.from('productos').update({ stock: nuevoStock }).eq('id', item.id);
+            }
 
-            // Anotar en 'historial_ventas'
+            // Anotar en 'historial_ventas' (Esto suma a tus ganancias si es mostrador)
             await _supabase.from('historial_ventas').insert([{
                 producto_nombre: item.nombre,
                 cantidad: item.cantidad,
@@ -3159,22 +3168,13 @@ async function confirmarVentaPOS() {
             }]);
         }
 
-        // 2. Movimiento Financiero
-        if (esMostrador) {
-            // Venta Mostrador (Cobro Inmediato) -> Queda registrado creando un pedido cerrado
-            await _supabase.from('pedidos').insert([{
-                cliente_nombre: "Venta Mostrador (Depósito)",
-                total: totalVenta,
-                estado: "entregado",
-                estado_pago: "pago",
-                metodo_envio: "retiro",
-                fecha: new Date().toISOString()
-            }]);
-        } else {
-            // Venta a Cuenta Corriente (Genera Deuda al Cliente Mayorista)
-            // Traemos el saldo actual
+        // 2. Movimiento Financiero (Solo si es a Cuenta Corriente)
+        if (!esMostrador) {
+            // --- CORRECCIÓN 2: Generar Deuda al Cliente Mayorista ---
             const { data: cliData } = await _supabase.from('clientes').select('saldo, nombre').eq('id', clienteSeleccionado).single();
-            const nuevoSaldo = (cliData.saldo || 0) - totalVenta; // Restamos porque la deuda es negativa en tu sistema
+            
+            // Restamos el total para aumentar la deuda (porque tus saldos son negativos)
+            const nuevoSaldo = (parseFloat(cliData.saldo) || 0) - totalVenta;
 
             // Actualizamos saldo del cliente
             await _supabase.from('clientes').update({ saldo: nuevoSaldo }).eq('id', clienteSeleccionado);
@@ -3189,14 +3189,15 @@ async function confirmarVentaPOS() {
             }]);
         }
 
-        alert("¡Venta registrada con éxito!");
+        alert("✅ ¡Venta registrada con éxito!");
         cerrarModalPOS();
-        // Si tenés una función que recarga las tablas (como cargarProductos()), llamala acá
-        if(typeof cargarProductos === "function") cargarProductos();
+        
+        // Recargar el panel entero para ver los cambios de stock y saldos al instante
+        if (typeof cargarTodo === "function") await cargarTodo();
 
     } catch (error) {
-        console.error(error);
-        alert("Ocurrió un error al procesar la venta.");
+        console.error("Error POS:", error);
+        alert("Ocurrió un error al procesar la venta: " + error.message);
     } finally {
         btn.innerHTML = '<i class="fas fa-check-circle"></i> Confirmar Venta';
         btn.disabled = false;
