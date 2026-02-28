@@ -521,13 +521,14 @@ async function generarClaveMayorista() {
         }
 
         // FUNCION PARA VACIAR CARRITO
-        function clearCart() {
-            if (_cart.length === 0) return;
-            if (confirm("¿Estás seguro de que quieres vaciar el pedido?")) {
-                _cart = [];
-                updateCartUI();
-            }
-        }
+function clearCart() {
+    if (_cart.length === 0) return;
+    if (confirm("¿Estás seguro de que quieres vaciar el pedido?")) {
+        _cart = [];
+        updateCartUI();
+        toggleCart(); // <-- Esta es la orden que cierra el panel automáticamente
+    }
+}
 
         function updateCartUI() {
             const container = document.getElementById('cart-items');
