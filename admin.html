@@ -49,6 +49,9 @@
     <div class="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 p-4">
         <aside class="w-full lg:w-64 flex flex-col gap-4">
             <nav class="bg-white p-2 rounded-2xl shadow-sm border border-gray-200 flex lg:flex-col overflow-x-auto lg:overflow-visible gap-1">
+<button onclick="abrirModalPOS()" class="flex-1 lg:flex-none flex items-center gap-3 px-4 py-3 font-black uppercase text-[10px] transition whitespace-nowrap bg-green-600 text-white rounded-xl hover:bg-green-500 shadow-sm">
+    <i class="fas fa-store w-4 text-center"></i> Venta Depósito
+</button>
                 <button onclick="switchTab('tab-inventario')" class="tab-btn active flex-1 lg:flex-none flex items-center gap-3 px-4 py-3 font-bold uppercase text-[10px] transition whitespace-nowrap">
                     <i class="fas fa-boxes w-4"></i> Inventario
                 </button>
@@ -692,6 +695,50 @@
                 <button type="submit" class="flex-1 bg-black text-white py-3 rounded-xl font-black uppercase text-xs hover:bg-red-600 transition">Guardar Gasto</button>
             </div>
         </form>
+    </div>
+</div>
+<div id="modal-pos" class="hidden fixed inset-0 bg-black bg-opacity-80 z-[60] flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row h-[85vh]">
+        
+        <div class="w-full md:w-1/2 p-6 bg-gray-50 flex flex-col h-full border-r border-gray-200">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-black uppercase text-xl text-gray-800"><i class="fas fa-search text-yellow-500"></i> Buscar Producto</h3>
+                <button onclick="cerrarModalPOS()" class="md:hidden text-gray-500 hover:text-red-500"><i class="fas fa-times text-2xl"></i></button>
+            </div>
+            
+            <input type="text" id="pos-buscador" oninput="buscarProductoPOS()" placeholder="Nombre o Código..." class="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-yellow-500 focus:outline-none uppercase text-sm font-bold">
+            
+            <div id="pos-resultados" class="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                </div>
+        </div>
+
+        <div class="w-full md:w-1/2 p-6 flex flex-col h-full bg-white relative">
+            <button onclick="cerrarModalPOS()" class="hidden md:block absolute top-4 right-6 text-gray-400 hover:text-red-500 transition"><i class="fas fa-times text-2xl"></i></button>
+            
+            <h3 class="font-black uppercase text-xl text-gray-800 mb-4"><i class="fas fa-shopping-cart text-yellow-500"></i> Detalle de Venta</h3>
+            
+            <div id="pos-carrito" class="flex-1 overflow-y-auto space-y-3 pr-2 mb-4 custom-scrollbar border-b border-gray-100 pb-4">
+                <p class="text-gray-400 text-sm text-center italic mt-10 font-bold">El carrito está vacío</p>
+            </div>
+
+            <div class="bg-gray-100 p-4 rounded-xl border border-gray-200">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-gray-600 font-bold uppercase text-sm">Total a cobrar:</span>
+                    <span id="pos-total" class="text-3xl font-black text-green-600">$0</span>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-xs font-black uppercase text-gray-500 mb-1">Seleccionar Cliente / Tipo de Venta</label>
+                    <select id="pos-cliente" class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-yellow-500 outline-none text-sm font-bold">
+                        <option value="mostrador">🛒 VENTA MOSTRADOR (Efectivo/Tarjeta)</option>
+                        </select>
+                </div>
+
+                <button onclick="confirmarVentaPOS()" id="btn-confirmar-pos" class="w-full bg-black text-yellow-500 font-black uppercase tracking-widest py-3 rounded-lg hover:bg-gray-900 transition shadow-lg flex justify-center items-center gap-2">
+                    <i class="fas fa-check-circle"></i> Confirmar Venta
+                </button>
+            </div>
+        </div>
     </div>
 </div>
     <script>
@@ -2963,6 +3010,196 @@ async function imprimirPickingListMinoristaLogistica() {
     } catch (err) {
         console.error(err);
         alert("Error al generar la planilla: " + err.message);
+    }
+}
+// ==========================================
+// MÓDULO: PUNTO DE VENTA (POS) - DEPOSITO
+// ==========================================
+let posCart = [];
+let posProductosCache = [];
+
+async function abrirModalPOS() {
+    posCart = [];
+    document.getElementById('pos-buscador').value = '';
+    document.getElementById('pos-resultados').innerHTML = '';
+    renderizarCarritoPOS();
+    
+    // Cargar productos para búsqueda rápida
+    const { data: prods } = await _supabase.from('productos').select('*').order('nombre');
+    if(prods) posProductosCache = prods;
+
+    // Cargar clientes en el selector
+    const { data: clientes } = await _supabase.from('clientes').select('id, nombre').order('nombre');
+    const select = document.getElementById('pos-cliente');
+    select.innerHTML = '<option value="mostrador">🛒 VENTA MOSTRADOR (Pago Contado)</option>';
+    if(clientes) {
+        clientes.forEach(c => {
+            select.innerHTML += `<option value="${c.id}">👤 A Cta. Cte: ${c.nombre}</option>`;
+        });
+    }
+
+    document.getElementById('modal-pos').classList.remove('hidden');
+    document.getElementById('pos-buscador').focus();
+}
+
+function cerrarModalPOS() {
+    document.getElementById('modal-pos').classList.add('hidden');
+}
+
+function buscarProductoPOS() {
+    const term = document.getElementById('pos-buscador').value.toLowerCase();
+    const contenedor = document.getElementById('pos-resultados');
+    
+    if (term.length < 2) {
+        contenedor.innerHTML = '';
+        return;
+    }
+
+    const filtrados = posProductosCache.filter(p => 
+        (p.nombre && p.nombre.toLowerCase().includes(term)) || 
+        (p.codigo && p.codigo.toLowerCase().includes(term))
+    );
+
+    contenedor.innerHTML = filtrados.map(p => `
+        <div class="bg-white p-3 rounded shadow-sm border border-gray-200 flex justify-between items-center hover:border-yellow-500 transition cursor-pointer" onclick="agregarAlCarritoPOS(${p.id})">
+            <div>
+                <p class="font-bold text-sm uppercase">${p.nombre}</p>
+                <p class="text-xs text-gray-500">Stock: ${p.stock || 0} | Cod: ${p.codigo || 'N/A'}</p>
+            </div>
+            <div class="text-right">
+                <p class="font-black text-green-600">$${(p.precio || p.precio_minorista || 0).toLocaleString('es-AR')}</p>
+                <button class="mt-1 bg-black text-yellow-500 text-[10px] px-2 py-1 rounded font-bold uppercase"><i class="fas fa-plus"></i> Añadir</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function agregarAlCarritoPOS(id) {
+    const prod = posProductosCache.find(p => p.id === id);
+    if (!prod) return;
+
+    // Usamos el precio que esté disponible (Mayorista o Minorista)
+    const precio = prod.precio || prod.precio_minorista || 0;
+
+    const existe = posCart.find(item => item.id === id);
+    if (existe) {
+        if(existe.cantidad < prod.stock) existe.cantidad++;
+        else alert("Stock máximo alcanzado para este producto.");
+    } else {
+        if(prod.stock > 0) posCart.push({ ...prod, precio_venta: precio, cantidad: 1 });
+        else alert("Producto sin stock.");
+    }
+    renderizarCarritoPOS();
+}
+
+function eliminarDelCarritoPOS(id) {
+    posCart = posCart.filter(item => item.id !== id);
+    renderizarCarritoPOS();
+}
+
+function renderizarCarritoPOS() {
+    const contenedor = document.getElementById('pos-carrito');
+    const totalSpan = document.getElementById('pos-total');
+    
+    if (posCart.length === 0) {
+        contenedor.innerHTML = '<p class="text-gray-400 text-sm text-center italic mt-10 font-bold">El carrito está vacío</p>';
+        totalSpan.innerText = '$0';
+        return;
+    }
+
+    let total = 0;
+    contenedor.innerHTML = posCart.map(item => {
+        const subtotal = item.precio_venta * item.cantidad;
+        total += subtotal;
+        return `
+            <div class="flex justify-between items-center bg-gray-50 p-2 rounded border border-gray-200">
+                <div class="flex-1">
+                    <p class="font-bold text-xs uppercase">${item.nombre}</p>
+                    <p class="text-[10px] text-gray-500">${item.cantidad} x $${item.precio_venta.toLocaleString('es-AR')}</p>
+                </div>
+                <div class="text-right flex items-center gap-3">
+                    <span class="font-black text-sm">$${subtotal.toLocaleString('es-AR')}</span>
+                    <button onclick="eliminarDelCarritoPOS(${item.id})" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    totalSpan.innerText = `$${total.toLocaleString('es-AR')}`;
+}
+
+async function confirmarVentaPOS() {
+    if (posCart.length === 0) return alert("El carrito está vacío.");
+    
+    const btn = document.getElementById('btn-confirmar-pos');
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+    btn.disabled = true;
+
+    try {
+        const clienteSeleccionado = document.getElementById('pos-cliente').value;
+        const esMostrador = clienteSeleccionado === 'mostrador';
+        let totalVenta = 0;
+
+        // 1. Descontar Stock y Anotar en Historial de Ventas
+        for (const item of posCart) {
+            const subtotal = item.precio_venta * item.cantidad;
+            totalVenta += subtotal;
+
+            // Descontar de 'productos'
+            await _supabase.rpc('decrementar_stock', { producto_id: item.id, cantidad: item.cantidad });
+
+            // Anotar en 'historial_ventas'
+            await _supabase.from('historial_ventas').insert([{
+                producto_nombre: item.nombre,
+                cantidad: item.cantidad,
+                codigo: item.codigo,
+                precio_unitario: item.precio_venta,
+                fecha: new Date().toISOString(),
+                cliente_id: esMostrador ? null : clienteSeleccionado
+            }]);
+        }
+
+        // 2. Movimiento Financiero
+        if (esMostrador) {
+            // Venta Mostrador (Cobro Inmediato) -> Queda registrado creando un pedido cerrado
+            await _supabase.from('pedidos').insert([{
+                cliente_nombre: "Venta Mostrador (Depósito)",
+                total: totalVenta,
+                estado: "entregado",
+                estado_pago: "pago",
+                metodo_envio: "retiro",
+                fecha: new Date().toISOString()
+            }]);
+        } else {
+            // Venta a Cuenta Corriente (Genera Deuda al Cliente Mayorista)
+            // Traemos el saldo actual
+            const { data: cliData } = await _supabase.from('clientes').select('saldo, nombre').eq('id', clienteSeleccionado).single();
+            const nuevoSaldo = (cliData.saldo || 0) - totalVenta; // Restamos porque la deuda es negativa en tu sistema
+
+            // Actualizamos saldo del cliente
+            await _supabase.from('clientes').update({ saldo: nuevoSaldo }).eq('id', clienteSeleccionado);
+
+            // Anotamos en movimientos_cuenta
+            await _supabase.from('movimientos_cuenta').insert([{
+                cliente_id: clienteSeleccionado,
+                tipo: 'DEUDA',
+                monto: totalVenta,
+                descripcion: 'Venta Depósito (POS)',
+                saldo_resultante: nuevoSaldo
+            }]);
+        }
+
+        alert("¡Venta registrada con éxito!");
+        cerrarModalPOS();
+        // Si tenés una función que recarga las tablas (como cargarProductos()), llamala acá
+        if(typeof cargarProductos === "function") cargarProductos();
+
+    } catch (error) {
+        console.error(error);
+        alert("Ocurrió un error al procesar la venta.");
+    } finally {
+        btn.innerHTML = '<i class="fas fa-check-circle"></i> Confirmar Venta';
+        btn.disabled = false;
     }
 }
     </script>
