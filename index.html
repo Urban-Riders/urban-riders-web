@@ -449,10 +449,12 @@ async function addToCart(id) {
         });
     }
 
-    // 4. ACTUALIZAR INTERFAZ
+   // 4. ACTUALIZAR INTERFAZ
     updateCart();
-    if(cart.length === 1) toggleCart();
     
+    // ESTA ES LA MAGIA: Forzamos a que el panel se abra siempre, sin importar la cantidad
+    document.getElementById('cart-panel').classList.remove('translate-x-full');
+
     // Feedback visual opcional
     console.log(`Agregado: ${p.nombre}`);
 }
