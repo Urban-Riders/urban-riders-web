@@ -90,6 +90,10 @@
         </div>
 
         <div class="p-4">
+            <button onclick="enviarPresupuestoWhatsAppVendedor()" class="w-full mb-4 bg-[#25D366] text-white font-black py-3 rounded-2xl uppercase tracking-widest hover:bg-green-600 transition-colors shadow-md flex items-center justify-center gap-2">
+                <i class="fab fa-whatsapp text-xl"></i> Enviar por WhatsApp
+            </button>
+
             <div id="lista-carrito" class="space-y-3 mb-24">
                 </div>
         </div>
@@ -616,6 +620,45 @@ document.getElementById('buscador-productos').addEventListener('input', function
     );
     renderProductos(filtrados);
 });
+function enviarPresupuestoWhatsAppVendedor() {
+    if (!clienteSeleccionado || carrito.length === 0) {
+        return mostrarToast("El pedido está vacío", "alerta");
+    }
+
+    const nombreCliente = clienteSeleccionado.nombre || 'Cliente';
+    
+    // 1. Armamos la plantilla del mensaje
+    let mensaje = `🏍️ *¡Hola ${nombreCliente}!*\n`;
+    mensaje += `Acá te pasamos el detalle de tu pedido en *Urban Riders*:\n\n`;
+    
+    let totalFactura = 0;
+    
+    carrito.forEach(item => {
+        // En la app vendedor usamos siempre el precio mayorista (que guardamos en item.precio)
+        let precioMos = item.precio || 0;
+        const subtotal = item.cantidad * precioMos;
+        totalFactura += subtotal;
+        
+        mensaje += `▪️ ${item.cantidad} x ${item.nombre} - $${subtotal.toLocaleString('es-AR')}\n`;
+    });
+    
+    mensaje += `\n💰 *Total: $${totalFactura.toLocaleString('es-AR')}*\n\n`;
+    mensaje += `¡Gracias por confiar en nosotros! 🏁`;
+
+    // 2. Codificamos el texto para la URL
+    const textoCodificado = encodeURIComponent(mensaje);
+    
+    // 3. Generamos el enlace inteligente
+    let urlWA = `https://wa.me/?text=${textoCodificado}`;
+    
+    if (clienteSeleccionado.telefono && clienteSeleccionado.telefono.trim() !== '') {
+        const telLimpio = clienteSeleccionado.telefono.replace(/\D/g, ''); // Deja solo números
+        urlWA = `https://wa.me/${telLimpio}?text=${textoCodificado}`;
+    }
+
+    // 4. Abrimos WhatsApp (En celulares abrirá la app nativa automáticamente)
+    window.open(urlWA, '_blank');
+}
 </script>
 
 <div id="client-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4">
