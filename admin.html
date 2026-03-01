@@ -1941,7 +1941,8 @@ async function verDetallePedido(pedidoId) {
             items: detalles.map(item => ({
                 cantidad: item.cantidad,
                 nombre: item.producto_nombre || 'Producto sin registrar',
-                codigo: item.codigo || 'S/C'
+                codigo: item.codigo || 'S/C',
+                precio_unitario: Number(item.precio_unitario || 0)
             }))
         };
 
@@ -3203,6 +3204,40 @@ async function confirmarVentaPOS() {
         btn.disabled = false;
     }
 }
+function enviarPresupuestoWhatsApp() {
+    if (!pedidoActualParaImprimir) return alert("Primero abre un pedido");
+
+    const { info, items } = pedidoActualParaImprimir;
+    const nombreCliente = info.cliente_nombre || 'Consumidor Final';
+    
+    // 1. Armamos la plantilla del mensaje
+    let mensaje = `🏍️ *¡Hola ${nombreCliente}!*\n`;
+    mensaje += `Acá te pasamos el detalle de tu pedido en *Urban Riders*:\n\n`;
+    
+    items.forEach(item => {
+        const subtotal = item.cantidad * item.precio_unitario;
+        mensaje += `▪️ ${item.cantidad} x ${item.nombre} - $${subtotal.toLocaleString('es-AR')}\n`;
+    });
+    
+    mensaje += `\n💰 *Total: $${Number(info.total || 0).toLocaleString('es-AR')}*\n\n`;
+    mensaje += `¡Gracias por confiar en nosotros! 🏁`;
+
+    // 2. Codificamos el texto para que los espacios y saltos de línea funcionen en la URL
+    const textoCodificado = encodeURIComponent(mensaje);
+    
+    // 3. Generamos el enlace. 
+    // Si el cliente tiene teléfono registrado en el pedido, intenta abrir ese chat directo. 
+    // Si no, abre la ventana general para que elijas a quién enviarlo.
+    let urlWA = `https://wa.me/?text=${textoCodificado}`;
+    
+    if (info.telefono_cliente && info.telefono_cliente.trim() !== '') {
+        const telLimpio = info.telefono_cliente.replace(/\D/g, ''); // Deja solo los números
+        urlWA = `https://wa.me/${telLimpio}?text=${textoCodificado}`;
+    }
+
+    // 4. Abrimos WhatsApp en una pestaña nueva
+    window.open(urlWA, '_blank');
+}
     </script>
 
 <div id="modal-movimientos" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]">
@@ -3268,11 +3303,16 @@ async function confirmarVentaPOS() {
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
         <div class="bg-black text-white p-4 flex justify-between items-center">
             <h3 class="font-black uppercase text-sm">Detalle del Pedido</h3>
-            <button onclick="imprimirPedidoDeposito()" 
-        class="bg-white text-black px-3 py-1 rounded flex items-center gap-2 hover:bg-gray-200 transition">
-    <i class="fas fa-print text-xs"></i>
-    <span class="text-[10px] font-black uppercase">Imprimir para Depósito</span>
-</button>
+            <div class="flex gap-2">
+                <button onclick="enviarPresupuestoWhatsApp()" class="bg-green-500 text-white px-3 py-1 rounded flex items-center gap-2 hover:bg-green-600 transition shadow-lg">
+                    <i class="fab fa-whatsapp text-sm"></i>
+                    <span class="text-[10px] font-black uppercase">WhatsApp</span>
+                </button>
+                <button onclick="imprimirPedidoDeposito()" class="bg-white text-black px-3 py-1 rounded flex items-center gap-2 hover:bg-gray-200 transition shadow-lg">
+                    <i class="fas fa-print text-xs"></i>
+                    <span class="text-[10px] font-black uppercase">Imprimir</span>
+                </button>
+            </div>
             <button onclick="cerrarModalDetalle()" class="text-white hover:text-gray-400">
                 <i class="fas fa-times"></i>
             </button>
