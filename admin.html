@@ -130,7 +130,7 @@
                                     <label class="text-[9px] font-bold uppercase text-gray-400 tracking-wider">Nombre</label>
                                     <input type="text" id="p-nombre" class="w-full bg-gray-50 border rounded-lg p-2 text-xs outline-none focus:border-yellow-500" required>
                                 </div>
-                                <div class="grid grid-cols-2 gap-2">
+                               <div class="grid grid-cols-3 gap-2">
                                     <div>
                                         <label class="text-[9px] font-bold uppercase text-gray-400">Categoría</label>
                                         <select id="p-categoria" class="w-full bg-gray-50 border rounded-lg p-2 text-xs" required>
@@ -144,6 +144,10 @@
                                     <div>
                                         <label class="text-[9px] font-bold uppercase text-gray-400">Código</label>
                                         <input type="text" id="p-codigo" class="w-full bg-gray-50 border rounded-lg p-2 text-xs" required>
+                                    </div>
+                                    <div>
+                                        <label class="text-[9px] font-bold uppercase text-blue-500">Proveedor</label>
+                                        <input type="text" id="p-proveedor" class="w-full bg-blue-50 border border-blue-200 rounded-lg p-2 text-xs outline-none focus:border-blue-500" placeholder="Ej: Motul">
                                     </div>
                                 </div>
                                 <div class="bg-yellow-50 p-2 rounded-xl border border-yellow-100 space-y-2">
@@ -216,6 +220,21 @@
     <span class="text-[10px] font-black uppercase italic text-orange-600">Meli %</span>
     <input type="number" id="porc-meli" placeholder="0" class="w-16 p-1 text-xs border rounded outline-none focus:border-orange-500">
     <button onclick="prepararCambio('precio_meli', 'porc-meli')" class="bg-orange-600 text-white px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-orange-700 transition">Aplicar</button>
+</div>
+<div class="flex flex-wrap items-center gap-4 p-3 bg-yellow-50 rounded-xl border border-yellow-300 mb-4 shadow-sm">
+    <div class="flex items-center gap-2 w-full md:w-auto">
+        <span class="text-[10px] font-black uppercase italic text-yellow-700"><i class="fas fa-bolt"></i> Aumento x Proveedor:</span>
+        <select id="update-proveedor-select" class="p-2 text-xs border border-yellow-400 rounded-lg outline-none font-bold bg-white flex-1 cursor-pointer">
+            <option value="">Seleccione Proveedor...</option>
+        </select>
+    </div>
+    <div class="flex items-center gap-2">
+        <span class="text-[10px] font-black uppercase text-gray-600">% Aumento</span>
+        <input type="number" id="update-proveedor-porc" placeholder="Ej: 15" class="w-16 p-2 text-xs border rounded-lg outline-none focus:border-yellow-500 bg-white">
+    </div>
+    <button onclick="aplicarAumentoProveedor()" class="bg-black text-yellow-500 px-4 py-2 rounded-lg text-[10px] font-black uppercase hover:bg-gray-800 transition shadow-md flex items-center gap-2">
+        <i class="fas fa-sync-alt"></i> Aplicar a Todo
+    </button>
 </div>
 </div>
 
@@ -1032,6 +1051,7 @@ async function generarListaPrecios() {
     nombre: document.getElementById('p-nombre').value,
     categoria: document.getElementById('p-categoria').value,
     codigo: document.getElementById('p-codigo').value,
+    proveedor: document.getElementById('p-proveedor').value.trim().toUpperCase() || '',
     costo: parseFloat(document.getElementById('p-costo').value) || 0,
     precio: parseFloat(document.getElementById('p-precio').value) || 0,
     precio_minorista: parseFloat(document.getElementById('p-precio-minorista').value) || 0,
@@ -1296,7 +1316,7 @@ async function generarListaPrecios() {
                     <td class="py-2"><img src="${p.imagen_url || 'https://via.placeholder.com/40'}" class="w-10 h-10 object-cover rounded-lg shadow-sm"></td>
                     <td>
                         <div class="font-black uppercase">${p.nombre}</div>
-                        <div class="text-[9px] text-gray-400 font-bold tracking-tighter">${p.codigo} | ${p.categoria}</div>
+                        <div class="text-[9px] text-gray-400 font-bold tracking-tighter">${p.codigo} | ${p.categoria} | <span class="text-blue-500">${p.proveedor || 'S/Prov'}</span></div>
                     </td>
                     <td class="p-3 text-[11px] font-bold">
     <div class="flex items-center gap-1">
@@ -1338,6 +1358,7 @@ async function generarListaPrecios() {
             document.getElementById('p-nombre').value = p.nombre;
             document.getElementById('p-categoria').value = p.categoria;
             document.getElementById('p-codigo').value = p.codigo;
+            document.getElementById('p-proveedor').value = p.proveedor || '';
             document.getElementById('p-precio').value = p.precio;
             document.getElementById('p-precio-minorista').value = p.precio_minorista;
             document.getElementById('p-precio-meli').value = p.precio_meli || 0;
@@ -3237,6 +3258,75 @@ function enviarPresupuestoWhatsApp() {
 
     // 4. Abrimos WhatsApp en una pestaña nueva
     window.open(urlWA, '_blank');
+}
+// --- FUNCIONES DE AUMENTO POR PROVEEDOR ---
+
+// Esta función lee todos los proveedores que tenés y los mete en el desplegable
+function actualizarSelectProveedores() {
+    const select = document.getElementById('update-proveedor-select');
+    if (!select) return;
+    const proveedores = [...new Set(_productosLocales.map(p => p.proveedor).filter(Boolean))].sort();
+    select.innerHTML = '<option value="">Seleccione Proveedor...</option>' + 
+                       proveedores.map(prov => `<option value="${prov}">${prov}</option>`).join('');
+}
+
+// Inyectamos esta llamada al final de renderizarProductos para que se actualice siempre:
+const oldRenderizar = renderizarProductos;
+renderizarProductos = function(lista) {
+    oldRenderizar(lista);
+    actualizarSelectProveedores();
+}
+
+// La función que aplica el aumento a la base de datos
+async function aplicarAumentoProveedor() {
+    const proveedor = document.getElementById('update-proveedor-select').value;
+    const porcentaje = parseFloat(document.getElementById('update-proveedor-porc').value);
+    
+    if (!proveedor) return alert("Por favor, selecciona un proveedor de la lista.");
+    if (!porcentaje || isNaN(porcentaje) || porcentaje <= 0) return alert("Ingresa un porcentaje de aumento válido.");
+    
+    const conf = confirm(`⚠️ ¡ATENCIÓN!\n\nVas a aumentar el costo y TODOS los precios finales (Mayorista, Minorista, Meli) de los productos del proveedor "${proveedor}" en un ${porcentaje}%.\n\n¿Deseas continuar?`);
+    if (!conf) return;
+    
+    try {
+        // Mostramos que está cargando
+        document.getElementById('update-proveedor-select').disabled = true;
+        document.body.style.cursor = 'wait';
+
+        const factor = 1 + (porcentaje / 100);
+        const productosDelProveedor = _productosLocales.filter(p => p.proveedor === proveedor);
+        
+        if (productosDelProveedor.length === 0) throw new Error("No hay productos asignados a este proveedor.");
+        
+        // Procesar cada producto matemáticamente (multiplicamos TODO por el factor para mantener los porcentajes de margen de ganancia idénticos)
+        for (const p of productosDelProveedor) {
+            const nCosto = parseFloat(p.costo || 0) * factor;
+            const nMay = Math.round(parseFloat(p.precio || 0) * factor);
+            const nMin = Math.round((parseFloat(p.precio_minorista || 0) * factor) / 100) * 100; // Redondea a centena
+            const nMeli = Math.round((parseFloat(p.precio_meli || 0) * factor) / 100) * 100; // Redondea a centena
+            
+            await _supabase.from('productos').update({
+                costo: nCosto,
+                precio: nMay,
+                precio_minorista: nMin,
+                precio_meli: nMeli
+            }).eq('id', p.id);
+        }
+        
+        alert(`✅ Precios del proveedor ${proveedor} actualizados correctamente.`);
+        document.getElementById('update-proveedor-select').value = "";
+        document.getElementById('update-proveedor-porc').value = "";
+        
+        // Recargamos el sistema
+        await cargarTodo();
+        
+    } catch (err) {
+        console.error(err);
+        alert("Error al actualizar: " + err.message);
+    } finally {
+        document.getElementById('update-proveedor-select').disabled = false;
+        document.body.style.cursor = 'default';
+    }
 }
     </script>
 
