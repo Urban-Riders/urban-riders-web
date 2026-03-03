@@ -175,16 +175,20 @@
     <input type="number" step="0.01" id="p-precio-meli" class="w-full bg-orange-50 border border-orange-100 rounded-lg p-2 text-xs font-black">
 </div>
                                 </div>
-                                <div class="grid grid-cols-2 gap-2">
+                               <div class="grid grid-cols-4 gap-2">
                                     <div>
                                         <label class="text-[9px] font-bold uppercase text-gray-400">Stock</label>
                                         <input type="number" id="p-stock" class="w-full bg-gray-50 border rounded-lg p-2 text-xs" required>
                                     </div>
-<div>
-    <label class="text-[9px] font-bold uppercase text-red-400">Stock Mínimo</label>
-    <input type="number" id="p-stock-minimo" class="w-full bg-red-50 border border-red-100 rounded-lg p-2 text-xs font-bold text-red-700" placeholder="0">
-</div>
                                     <div>
+                                        <label class="text-[9px] font-bold uppercase text-red-400">Stock Mín.</label>
+                                        <input type="number" id="p-stock-minimo" class="w-full bg-red-50 border border-red-100 rounded-lg p-2 text-xs font-bold text-red-700" placeholder="0">
+                                    </div>
+                                    <div>
+                                        <label class="text-[9px] font-bold uppercase text-purple-600">Peso (Kg)</label>
+                                        <input type="number" step="0.01" id="p-peso" class="w-full bg-purple-50 border border-purple-200 rounded-lg p-2 text-xs font-bold outline-none focus:border-purple-500" placeholder="Ej: 0.5">
+                                    </div>
+                                     <div>
                                         <label class="text-[9px] font-bold uppercase text-gray-400">Imagen</label>
                                         <input type="file" id="p-foto" accept="image/*" class="w-full text-[9px] file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-gray-900 file:text-yellow-500 cursor-pointer">
                                     </div>
@@ -1047,7 +1051,7 @@ async function generarListaPrecios() {
                         const { data: urlData } = _supabase.storage.from('imagenes-productos').getPublicUrl(fileName);
                         imageUrl = urlData.publicUrl;
                     }
-                   const productData = {
+                  const productData = {
     nombre: document.getElementById('p-nombre').value,
     categoria: document.getElementById('p-categoria').value,
     codigo: document.getElementById('p-codigo').value,
@@ -1055,7 +1059,8 @@ async function generarListaPrecios() {
     costo: parseFloat(document.getElementById('p-costo').value) || 0,
     precio: parseFloat(document.getElementById('p-precio').value) || 0,
     precio_minorista: parseFloat(document.getElementById('p-precio-minorista').value) || 0,
-    precio_meli: parseFloat(document.getElementById('p-precio-meli').value) || 0, // <--- ASÍ SE PONE, SIN EL "CONST"
+    precio_meli: parseFloat(document.getElementById('p-precio-meli').value) || 0, 
+    peso: parseFloat(document.getElementById('p-peso').value) || 0, // NUEVA LÍNEA DE PESO
     stock: parseInt(document.getElementById('p-stock').value) || 0,
     stock_minimo: parseInt(document.getElementById('p-stock-minimo').value) || 0,
     imagen_url: imageUrl
@@ -1364,6 +1369,7 @@ async function generarListaPrecios() {
             document.getElementById('p-precio-meli').value = p.precio_meli || 0;
             document.getElementById('p-stock').value = p.stock;
             document.getElementById('p-stock-minimo').value = p.stock_minimo || 0;
+            document.getElementById('p-peso').value = p.peso || ''; // AGREGAR ESTA LÍNEA
             document.getElementById('p-imagen-url').value = p.imagen_url;
             document.getElementById('form-title').innerText = "Editando Producto";
             document.getElementById('txt-submit').innerText = "Actualizar Cambios";
@@ -1386,6 +1392,7 @@ async function generarListaPrecios() {
             document.getElementById('txt-submit').innerText = "Guardar Producto";
             document.getElementById('btn-cancelar').classList.add('hidden');
             document.getElementById('p-stock-minimo').value = '';
+            document.getElementById('p-peso').value = ''; // AGREGAR ESTA LÍNEA
             document.getElementById('p-precio-meli').value = '';
             document.getElementById('p-margen-meli').value = '';
         }
