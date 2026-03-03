@@ -87,10 +87,28 @@
                             <input type="text" id="cust-city" class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
                         </div>
                         <div>
+                            <div>
                             <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Código Postal</label>
-                            <input type="text" id="cust-zip" class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+                            <div class="flex gap-2">
+                                <input type="number" id="cust-zip" placeholder="Ej: 2820" class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+                                <button type="button" onclick="cotizarEnvioAPI()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 rounded-lg text-xs font-black uppercase transition shadow-lg flex items-center gap-2">
+                                    <i class="fas fa-calculator"></i> Calcular
+                                </button>
+                            </div>
                         </div>
                     </div>
+
+                    <div id="caja-resultado-envio" class="hidden mt-4 p-3 bg-slate-800 border border-slate-600 rounded-lg flex justify-between items-center transition-all">
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-truck text-yellow-500 text-xl"></i>
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-300 uppercase">Correo Argentino</p>
+                                <p id="peso-paquete-display" class="text-[9px] text-slate-500">Paquete: 0 kg</p>
+                            </div>
+                        </div>
+                        <span id="costo-envio-display" class="font-black text-white text-sm">$0</span>
+                    </div>
+
                 </div>
                 
                 <button type="submit" id="btn-confirmar-pago" class="w-full bg-yellow-500 text-black font-black uppercase py-4 rounded-xl shadow-lg hover:bg-yellow-400 transition flex items-center justify-center gap-2">
@@ -314,6 +332,7 @@ _supabase.auth.onAuthStateChange((event, session) => {
         let products = [];
         // Intentamos recuperar el carrito guardado; si no hay nada, empezamos con []
         let cart = JSON.parse(localStorage.getItem('cart_urban')) || [];
+        let costoEnvioActual = 0; // NUEVA VARIABLE PARA EL SIMULADOR
         let productosLimite = 15;
         let currentCategory = 'TODOS';
         const CATEGORIAS_LIST = ['TODOS', 'CICLISMO', 'CASCOS', 'INDUMENTARIA', 'ACCESORIOS', 'REPUESTOS'];
@@ -484,8 +503,11 @@ async function addToCart(id) {
     }).join('');
 
     document.getElementById('cart-count').innerText = items;
-    total.innerText = `$${sum.toLocaleString()}`;
-    document.getElementById('checkout-total-btn').innerText = sum.toLocaleString();
+    total.innerText = `$${sum.toLocaleString()}`; // Mantiene el subtotal de repuestos
+    
+    // Sumamos el envío al botón negro final
+    const totalFinalConEnvio = sum + costoEnvioActual;
+    document.getElementById('checkout-total-btn').innerText = totalFinalConEnvio.toLocaleString('es-AR');
 
     // --- LAS DOS LÍNEAS QUE SALVAN EL PROYECTO ---
     localStorage.setItem('cart_urban', JSON.stringify(cart)); // Guarda el carrito para que no desaparezca
@@ -645,14 +667,16 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
             }).eq('auth_id', currentUser.id);
         }
 
-        // 2. GUARDAR EL PEDIDO
-        const totalCalculado = cart.reduce((sum, item) => sum + (item.precio_minorista * item.quantity), 0);
-        
+       // 2. GUARDAR EL PEDIDO CON ENVÍO INCLUIDO
+        const totalCarrito = cart.reduce((sum, item) => sum + ((item.precio_minorista || 0) * item.quantity), 0);
+        const totalCalculado = totalCarrito + costoEnvioActual;
+        const metodoEnvioFinal = costoEnvioActual > 0 ? 'Correo Argentino' : 'A convenir';
+
         const { data: pedidoData, error: pedidoError } = await _supabase.from('pedidos').insert([{
             cliente_nombre: clienteNombre, dni_cliente: clienteDni,           
             direccion_envio: clienteDir, ciudad: clienteCiudad, cp: clienteCp,                     
-            metodo_envio: 'correo', total: totalCalculado, estado: 'pendiente',        
-            estado_pago: 'pendiente', vendedor_nombre: null
+            metodo_envio: metodoEnvioFinal, total: totalCalculado, estado: 'pendiente',        
+             estado_pago: 'pendiente', vendedor_nombre: null
         }]).select();
 
         if (pedidoError) throw pedidoError;
@@ -982,6 +1006,45 @@ window.addEventListener('DOMContentLoaded', async () => {
     // 5. REFRESCO DE VISTA (Esto activa el botón si corresponde)
     updateCart(); 
 });
+// --- SIMULADOR DE API CORREO ARGENTINO ---
+function cotizarEnvioAPI() {
+    const cp = document.getElementById('cust-zip').value;
+    if (!cp || cp.length < 4) return alert("Por favor, ingresá un Código Postal válido.");
+
+    // 1. Calculamos el peso total del carrito. Si un repuesto no tiene peso cargado, asume 0.5kg
+    let pesoTotalKg = cart.reduce((sum, item) => sum + ((parseFloat(item.peso) || 0.5) * item.quantity), 0);
+    
+    // Mostramos la cajita y ponemos el spinner de carga
+    document.getElementById('caja-resultado-envio').classList.remove('hidden');
+    document.getElementById('costo-envio-display').innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    // 2. Simulamos la demora de Internet (1 segundo) para que parezca una conexión real
+    setTimeout(() => {
+        let costoCalculado = 0;
+
+        // FÓRMULA LOGÍSTICA (Podés ajustar estos valores)
+        if (cp === '2820') {
+            costoCalculado = 2500; // Tarifa local Gualeguaychú
+        } else if (cp.startsWith('3') || cp.startsWith('2') || cp.startsWith('1')) {
+            costoCalculado = 6500 + (pesoTotalKg * 800); // Zona Centro/Litoral
+        } else if (cp.startsWith('9')) {
+            costoCalculado = 12500 + (pesoTotalKg * 1500); // Patagonia
+        } else {
+            costoCalculado = 9500 + (pesoTotalKg * 1200); // Resto del Norte/Cuyo
+        }
+
+        costoEnvioActual = Math.round(costoCalculado);
+        
+        // 3. Imprimimos el resultado en pantalla
+        document.getElementById('costo-envio-display').innerText = `$${costoEnvioActual.toLocaleString('es-AR')}`;
+        document.getElementById('peso-paquete-display').innerText = `Paquete: ${pesoTotalKg.toFixed(2)} kg`;
+        
+        // Actualizamos el botón de pago sumando este nuevo costo
+        updateCart(); 
+        
+    }, 1000); 
+}
+// ------------------------------------------
     </script>
 </body>
 </html>
