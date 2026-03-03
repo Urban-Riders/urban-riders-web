@@ -798,7 +798,7 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
         // --- LÓGICA DE STOCK (AGOTADO) ---
         const hasStock = p.stock > 0;
         
-        // Estética copiada de mayorista, manteniendo la lógica minorista (addToCart con p.id y precios correctos)
+        // Estética copiada de mayorista, manteniendo la lógica minorista
         return `
             <div class="bg-gray-900 rounded-xl overflow-hidden border ${hasStock ? 'border-gray-800' : 'border-red-900/30'} p-3 flex flex-col hover:border-yellow-500 transition">
                 <div class="relative h-32 -mx-3 -mt-3 mb-3 bg-black flex items-center justify-center overflow-hidden cursor-zoom-in" onclick="openZoom('${imgClean}')">
@@ -873,7 +873,7 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
     localStorage.removeItem('cart_urban');
     cart = [];
     updateCart(); // El carrito se vacía y el botón vuelve a gris aquí
-    closeCart();
+    toggleCart();
 }
 function loadMore() {
             productosLimite += 12; // Aumentamos la cantidad a mostrar
