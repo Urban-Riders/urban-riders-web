@@ -330,7 +330,7 @@ _supabase.auth.onAuthStateChange((event, session) => {
 });
 
         let products = [];
-        // Intentamos recuperar el carrito guardado; si no hay nada, empezamos con []
+        // Intentamos recuperar el carrito guardado;// si no hay nada, empezamos con []
         let cart = JSON.parse(localStorage.getItem('cart_urban')) || [];
         let costoEnvioActual = 0; // NUEVA VARIABLE PARA EL SIMULADOR
         let productosLimite = 15;
@@ -561,7 +561,6 @@ function setAuthMode(mode) {
     const btnAction = document.getElementById('btn-text-action');
     
     authModeInput.value = mode;
-    
     if (mode === 'login') {
         regFields.style.display = 'none';
         btnToggle.innerText = '¿No tenés cuenta? Registrate acá';
@@ -798,7 +797,7 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
         // --- LÓGICA DE STOCK (AGOTADO) ---
         const hasStock = p.stock > 0;
         
-        // Estética copiada de mayorista, manteniendo la lógica minorista
+        // Estética copiada de mayorista, manteniendo la lógica // minorista
         return `
             <div class="bg-gray-900 rounded-xl overflow-hidden border ${hasStock ? 'border-gray-800' : 'border-red-900/30'} p-3 flex flex-col hover:border-yellow-500 transition">
                 <div class="relative h-32 -mx-3 -mt-3 mb-3 bg-black flex items-center justify-center overflow-hidden cursor-zoom-in" onclick="openZoom('${imgClean}')">
@@ -934,7 +933,7 @@ document.getElementById('newsletter-form').addEventListener('submit', async (e) 
             }]);
 
         if (error) {
-            // Si el email ya existe, Supabase devolverá un error por el constraint 'unique'
+            // Si el email ya existe, Supabase // devolverá un error por el constraint 'unique'
             if (error.code === '23505') {
                 mostrarToast("Este correo ya forma parte del Club Urban Riders.", "alerta");
             } else {
