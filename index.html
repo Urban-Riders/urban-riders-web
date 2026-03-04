@@ -89,7 +89,7 @@
                         <div>
                             <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Código Postal</label>
                             <div class="flex gap-2">
-                                <input type="number" id="cust-zip" placeholder="Ej: 2820" class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
+                                <input type="number" id="cust-zip" oninput="resetCostoEnvio()" placeholder="Ej: 2820" class="w-full bg-slate-700 border-2 border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500 transition">
                                 <button type="button" onclick="cotizarEnvioAPI()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 rounded-lg text-xs font-black uppercase transition shadow-lg flex items-center gap-2">
                                     <i class="fas fa-calculator"></i> Calcular
                                 </button>
@@ -534,6 +534,8 @@ function toggleCheckoutModal() {
     const chkDomicilio = document.getElementById('chk-confirmar-domicilio');
     if(chkDomicilio) chkDomicilio.checked = false;
     
+     resetCostoEnvio();
+    
     // Si ya está logueado, pre-llenamos sus datos y ocultamos la contraseña
     if (currentUser) {
         document.getElementById('auth-mode').value = 'logged_in';
@@ -595,8 +597,15 @@ function toggleAuthMode() {
 // --- NUEVA LÓGICA DE PEDIDO INTEGRADA (CON LOGÍSTICA Y WHATSAPP) ---
 
 document.getElementById('form-datos-cliente').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (cart.length === 0) return alert("El carrito está vacío.");
+            e.preventDefault();
+            if (cart.length === 0) return alert("El carrito está vacío.");
+            
+            // NUEVO CANDADO: ¿Calculó el envío?
+            const cajaEnvio = document.getElementById('caja-resultado-envio');
+            if (cajaEnvio.classList.contains('hidden')) {
+                mostrarToast("⚠️ Por favor, hacé clic en 'Calcular' para cotizar tu envío antes de pagar.", "alerta");
+                return; // Corta la ejecución y no cobra nada
+            }
     
     const btn = document.getElementById('btn-confirmar-pago');
     const originalText = btn.innerHTML;
@@ -1053,6 +1062,15 @@ function cotizarEnvioAPI() {
         
     }, 1000); 
 }
+// --- REINICIAR ENVÍO SI EL CLIENTE CAMBIA EL CÓDIGO POSTAL ---
+        function resetCostoEnvio() {
+            const caja = document.getElementById('caja-resultado-envio');
+            if (caja && !caja.classList.contains('hidden')) {
+                caja.classList.add('hidden'); // Escondemos el resultado visual
+                costoEnvioActual = 0; // Ponemos el costo matemático en cero
+                updateCart(); // Actualizamos el botón de pago para que reste la plata
+            }
+        }
     </script>
 </body>
 </html>
