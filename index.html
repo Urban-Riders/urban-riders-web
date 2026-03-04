@@ -106,7 +106,15 @@
                         <span id="costo-envio-display" class="font-black text-white text-sm">$0</span>
                     </div>
 
-                </div> <button type="submit" id="btn-confirmar-pago" class="w-full mt-6 bg-yellow-500 text-black font-black uppercase italic py-3 rounded-lg hover:bg-yellow-400 transition shadow-lg shadow-yellow-500/20 flex justify-center items-center gap-2">
+               </div> 
+
+                <div class="mt-6 p-4 bg-yellow-500/10 border-2 border-yellow-500/50 rounded-xl flex items-start gap-3">
+                    <input type="checkbox" id="chk-confirmar-domicilio" required class="mt-1 w-5 h-5 accent-yellow-500 cursor-pointer">
+                    <label for="chk-confirmar-domicilio" class="text-[11px] font-black text-yellow-500 uppercase leading-tight cursor-pointer">
+                        ⚠️ Verifiqué mi código postal, ciudad y dirección. Confirmo que mis datos de envío son actuales y correctos.
+                    </label>
+                </div>
+                <button type="submit" id="btn-confirmar-pago" class="w-full mt-4 bg-yellow-500 text-black font-black uppercase italic py-3 rounded-lg hover:bg-yellow-400 transition shadow-lg shadow-yellow-500/20 flex justify-center items-center gap-2">
                     <span id="btn-text-action">Confirmar y Pagar $</span>
                     <span id="checkout-total-btn" class="text-lg">0</span>
                 </button>
@@ -517,10 +525,14 @@ function toggleCart() { document.getElementById('cart-panel').classList.toggle('
 function toggleCheckoutModal() { 
     document.getElementById('checkout-modal').classList.toggle('hidden');
 }
-
-async function preCheckout() { 
+ 
+   async function preCheckout() { 
     if (cart.length === 0) return mostrarToast("Carrito vacío", "alerta");
     toggleCart(); 
+    
+    // Forzamos a que el cliente tenga que tildar la casilla manualmente cada vez
+    const chkDomicilio = document.getElementById('chk-confirmar-domicilio');
+    if(chkDomicilio) chkDomicilio.checked = false;
     
     // Si ya está logueado, pre-llenamos sus datos y ocultamos la contraseña
     if (currentUser) {
