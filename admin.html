@@ -1345,7 +1345,6 @@ async function generarListaPrecios() {
                     <td class="text-right font-black text-orange-600">$${Number(p.precio_meli || 0).toLocaleString()}</td>
                     <td class="text-right px-2">
                         <div class="flex justify-end gap-1">
-                            <button onclick='analizarCompetencia(`${p.nombre}`, ${p.precio_meli || p.precio})' class="text-yellow-600 hover:bg-yellow-50 p-2 rounded-lg transition" title="Analizar en MeLi"><i class="fas fa-search-dollar"></i></button>
                             <button onclick="editarProducto(${p.id})" class="text-blue-500 hover:bg-blue-50 p-2 rounded-lg transition"><i class="fas fa-edit"></i></button>
                             <button onclick="eliminarProducto(${p.id})" class="text-red-400 hover:bg-red-50 p-2 rounded-lg transition"><i class="fas fa-trash"></i></button>
                         </div>
@@ -3339,83 +3338,6 @@ async function aplicarAumentoProveedor() {
         document.body.style.cursor = 'default';
     }
 }
-// --- FUNCIONES DEL COMPARADOR DE PRECIOS MELI ---
-// --- FUNCIONES DEL COMPARADOR DE PRECIOS MELI ---
-async function analizarCompetencia(nombre, precioBase) {
-    const modal = document.getElementById('modal-analisis');
-    const loading = document.getElementById('loading-analisis');
-    const resultados = document.getElementById('resultados-analisis');
-
-    modal.classList.remove('hidden');
-    loading.classList.remove('hidden');
-    resultados.classList.add('hidden');
-
-    // Limpiamos el nombre: quitamos "Urban Riders" y caracteres raros
-    const queryLimpia = nombre.replace(/Urban Riders/gi, '').replace(/[^\w\s]/gi, '').trim();
-    const miPrecioMeli = precioBase > 0 ? precioBase : Math.round(precioBase * 1.25);
-
-    try {
-        const url = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(queryLimpia)}&limit=15`;
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (!data.results || data.results.length === 0) {
-            throw new Error("Sin resultados");
-        }
-
-        const precios = data.results.map(r => r.price).sort((a, b) => a - b);
-        const promedio = precios.reduce((a, b) => a + b, 0) / precios.length;
-        const masBarato = precios[0];
-
-        let estado = "COMPETITIVO";
-        let color = "bg-yellow-100 text-yellow-800 border-yellow-400";
-        
-        if (miPrecioMeli < promedio * 0.9) {
-            estado = "MUY BARATO";
-            color = "bg-green-100 text-green-800 border-green-400";
-        } else if (miPrecioMeli > promedio * 1.1) {
-            estado = "CARO / REVISAR";
-            color = "bg-red-100 text-red-800 border-red-400";
-        }
-
-        loading.classList.add('hidden');
-        resultados.classList.remove('hidden');
-        resultados.innerHTML = `
-            <div class="text-center mb-4">
-                <span class="${color} border px-3 py-1 rounded-full text-[10px] font-black uppercase italic">${estado}</span>
-                <h4 class="text-2xl font-black mt-2">$${miPrecioMeli.toLocaleString('es-AR')}</h4>
-                <p class="text-[9px] text-gray-400 uppercase font-bold">Tu precio proyectado</p>
-            </div>
-            <div class="grid grid-cols-2 gap-2 mb-4">
-                <div class="bg-gray-50 p-2 rounded-lg text-center border border-gray-100">
-                    <p class="text-[8px] uppercase text-gray-400">Promedio</p>
-                    <p class="text-sm font-black">$${Math.round(promedio).toLocaleString('es-AR')}</p>
-                </div>
-                <div class="bg-gray-50 p-2 rounded-lg text-center border border-gray-100">
-                    <p class="text-[8px] uppercase text-gray-400">Más bajo</p>
-                    <p class="text-sm font-black">$${masBarato.toLocaleString('es-AR')}</p>
-                </div>
-            </div>
-            <div class="space-y-1">
-                <p class="text-[9px] font-black uppercase text-gray-500 mb-1">Competencia directa:</p>
-                ${data.results.slice(0, 3).map(r => `
-                    <div class="flex justify-between items-center bg-white p-2 rounded border border-gray-100 text-[10px]">
-                        <span class="truncate pr-2 font-bold uppercase">${r.title}</span>
-                        <span class="font-black italic">$${r.price.toLocaleString('es-AR')}</span>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    } catch (err) {
-        loading.classList.add('hidden');
-        resultados.classList.remove('hidden');
-        resultados.innerHTML = `<div class="text-center py-4 text-red-500 font-black text-xs uppercase">No se encontraron productos similares para comparar.</div>`;
-    }
-}
-
-function cerrarModalAnalisis() {
-    document.getElementById('modal-analisis').classList.add('hidden');
-}
     </script>
 
 <div id="modal-movimientos" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]">
@@ -3503,26 +3425,6 @@ function cerrarModalAnalisis() {
             </button>
         </div>
     </div>
-<div id="modal-analisis" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[120] flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
-        <div class="bg-black text-white p-4 flex justify-between items-center">
-            <h3 class="font-black uppercase text-sm">Competencia MeLi</h3>
-            <button onclick="cerrarModalAnalisis()" class="text-white hover:text-gray-400 transition">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <div class="p-6">
-            <div id="loading-analisis" class="flex flex-col items-center justify-center py-8">
-                <div class="w-10 h-10 border-4 border-gray-200 border-t-yellow-500 rounded-full animate-spin mb-4"></div>
-                <p class="text-[10px] font-black uppercase italic text-gray-500">Buscando precios...</p>
-            </div>
-            <div id="resultados-analisis" class="hidden"></div>
-            <button onclick="cerrarModalAnalisis()" class="w-full mt-6 bg-gray-200 py-3 rounded-lg font-black uppercase text-xs hover:bg-gray-300 transition">
-                Cerrar
-            </button>
-        </div>
-    </div>
-</div>
 </div>
 </body>
 </html>
