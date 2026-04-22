@@ -3342,13 +3342,9 @@ async function aplicarAumentoProveedor() {
 // --- FUNCIÓN COMPARADOR DE PRECIOS MERCADO LIBRE ---
 // --- FUNCIÓN COMPARADOR DE PRECIOS MERCADO LIBRE (VERSIÓN CORREGIDA) ---
 async function analizarCompetencia(id) {
-    // 1. Usamos == para que no importe si el ID es número o texto
+    // 1. Buscamos el producto (usando == para evitar líos de tipo de dato)
     const p = _productosLocales.find(prod => prod.id == id);
-    
-    if (!p) {
-        alert("Error: Producto no encontrado en el listado local.");
-        return;
-    }
+    if (!p) return;
 
     const modal = document.getElementById('modal-analisis');
     const loading = document.getElementById('loading-analisis');
@@ -3358,28 +3354,25 @@ async function analizarCompetencia(id) {
     loading.classList.remove('hidden');
     resultados.classList.add('hidden');
 
-    // Limpiamos el nombre: quitamos 'Urban Riders' y caracteres raros
     let query = p.nombre.replace(/Urban Riders/gi, '').replace(/[^\w\s]/gi, ' ').trim();
-    
-    // Si el nombre quedó muy corto, usamos el nombre original
     if (query.length < 3) query = p.nombre;
 
-    // Aseguramos que el precio sea un número válido
     const miPrecio = parseFloat(p.precio_meli || p.precio) || 0;
+    const urlMeli = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=15`;
+    const linkManual = `https://listado.mercadolibre.com.ar/${encodeURIComponent(query)}`;
 
     try {
-        const res = await fetch(`https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=15`);
+        // --- EL TRUCO DEL PROXY ---
+        // Envolvemos la URL de MeLi en el proxy AllOrigins para evitar el 403
+        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(urlMeli)}`);
         
-        if (!res.ok) throw new Error("Error de conexión con MeLi");
+        if (!res.ok) throw new Error("Error en el servidor puente");
         
-        const data = await res.json();
+        const proxyData = await res.json();
+        // AllOrigins devuelve la respuesta de MeLi dentro de una propiedad llamada 'contents'
+        const data = JSON.parse(proxyData.contents);
 
-        if (!data.results || data.results.length === 0) {
-            loading.classList.add('hidden');
-            resultados.classList.remove('hidden');
-            resultados.innerHTML = `<div class="text-center py-8 text-gray-500 font-black text-xs uppercase italic">MeLi no encontró resultados para:<br>"${query}"</div>`;
-            return;
-        }
+        if (!data.results || data.results.length === 0) throw new Error("Sin resultados en MeLi");
 
         const precios = data.results.map(r => r.price).sort((a, b) => a - b);
         const promedio = precios.reduce((a, b) => a + b, 0) / precios.length;
@@ -3399,17 +3392,19 @@ async function analizarCompetencia(id) {
                 <p class="text-[9px] text-gray-400 uppercase font-bold tracking-tighter">Tu Precio Actual</p>
             </div>
             <div class="grid grid-cols-2 gap-3 mb-6">
-                <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 text-center">
-                    <p class="text-[8px] uppercase text-gray-400 font-black">Promedio MeLi</p>
-                    <p class="text-sm font-black italic">$${Math.round(promedio).toLocaleString('es-AR')}</p>
+                <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 text-center font-bold">
+                    <p class="text-[8px] uppercase text-gray-400">Promedio MeLi</p>
+                    <p class="text-sm italic">$${Math.round(promedio).toLocaleString('es-AR')}</p>
                 </div>
-                <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 text-center">
-                    <p class="text-[8px] uppercase text-gray-400 font-black">El más bajo</p>
-                    <p class="text-sm font-black italic">$${masBarato.toLocaleString('es-AR')}</p>
+                <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 text-center font-bold">
+                    <p class="text-[8px] uppercase text-gray-400">El más bajo</p>
+                    <p class="text-sm italic">$${masBarato.toLocaleString('es-AR')}</p>
                 </div>
             </div>
+            <a href="${linkManual}" target="_blank" class="block w-full bg-yellow-400 hover:bg-yellow-500 text-black text-center py-2 rounded-lg font-black uppercase text-[10px] mb-4 transition shadow-md">
+                <i class="fas fa-external-link-alt mr-2"></i>Ver todo en MeLi
+            </a>
             <div class="space-y-2 max-h-40 overflow-y-auto pr-1">
-                <p class="text-[9px] font-black uppercase text-gray-500 italic mb-2">Referencia de Mercado:</p>
                 ${data.results.slice(0, 5).map(r => `
                     <div class="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100 text-[9px] shadow-sm">
                         <span class="truncate pr-4 font-bold uppercase text-gray-600">${r.title}</span>
@@ -3419,17 +3414,21 @@ async function analizarCompetencia(id) {
             </div>
         `;
     } catch (err) {
-        console.error("Error en comparación:", err);
+        console.error("Error detallado:", err);
         loading.classList.add('hidden');
         resultados.classList.remove('hidden');
         resultados.innerHTML = `
-            <div class="text-center py-8">
-                <p class="text-red-500 font-black text-xs uppercase italic">Error técnico al buscar</p>
-                <p class="text-[8px] text-gray-400 mt-2">${err.message}</p>
+            <div class="text-center py-4">
+                <div class="bg-gray-50 text-gray-600 p-4 rounded-xl border border-gray-100 mb-4">
+                    <p class="font-black uppercase text-[10px]">No se pudo cargar la comparación</p>
+                    <p class="text-[8px] mt-1">MeLi no respondió a la consulta automática.</p>
+                </div>
+                <a href="${linkManual}" target="_blank" class="block w-full bg-yellow-400 hover:bg-yellow-500 text-black text-center py-4 rounded-xl font-black uppercase text-xs transition shadow-lg">
+                    <i class="fas fa-search-dollar mr-2"></i>Investigar manualmente
+                </a>
             </div>`;
     }
 }
-
 function cerrarModalAnalisis() { document.getElementById('modal-analisis').classList.add('hidden'); }
     </script>
 
