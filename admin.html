@@ -3341,8 +3341,12 @@ async function aplicarAumentoProveedor() {
 }
 // --- FUNCIÓN COMPARADOR DE PRECIOS MERCADO LIBRE ---
 async function analizarCompetencia(id) {
-    const p = _productosLocales.find(prod => prod.id === id);
-    if (!p) return;
+    const p = _productosLocales.find(prod => prod.id == id);
+    if (!p) {
+        console.error("Producto no encontrado. ID recibido:", id);
+        alert("No se encontró el producto en la lista local.");
+        return;
+    }
 
     const modal = document.getElementById('modal-analisis');
     const loading = document.getElementById('loading-analisis');
