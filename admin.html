@@ -3340,11 +3340,13 @@ async function aplicarAumentoProveedor() {
     }
 }
 // --- FUNCIÓN COMPARADOR DE PRECIOS MERCADO LIBRE ---
+// --- FUNCIÓN COMPARADOR DE PRECIOS MERCADO LIBRE (VERSIÓN CORREGIDA) ---
 async function analizarCompetencia(id) {
+    // 1. Usamos == para que no importe si el ID es número o texto
     const p = _productosLocales.find(prod => prod.id == id);
+    
     if (!p) {
-        console.error("Producto no encontrado. ID recibido:", id);
-        alert("No se encontró el producto en la lista local.");
+        alert("Error: Producto no encontrado en el listado local.");
         return;
     }
 
@@ -3356,15 +3358,28 @@ async function analizarCompetencia(id) {
     loading.classList.remove('hidden');
     resultados.classList.add('hidden');
 
-    // Limpiamos el nombre para que la búsqueda sea efectiva
-    const query = p.nombre.replace(/Urban Riders/gi, '').replace(/[^\w\s]/gi, ' ').trim();
-    const miPrecio = p.precio_meli || p.precio;
+    // Limpiamos el nombre: quitamos 'Urban Riders' y caracteres raros
+    let query = p.nombre.replace(/Urban Riders/gi, '').replace(/[^\w\s]/gi, ' ').trim();
+    
+    // Si el nombre quedó muy corto, usamos el nombre original
+    if (query.length < 3) query = p.nombre;
+
+    // Aseguramos que el precio sea un número válido
+    const miPrecio = parseFloat(p.precio_meli || p.precio) || 0;
 
     try {
         const res = await fetch(`https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=15`);
+        
+        if (!res.ok) throw new Error("Error de conexión con MeLi");
+        
         const data = await res.json();
 
-        if (!data.results || data.results.length === 0) throw new Error("No hay resultados");
+        if (!data.results || data.results.length === 0) {
+            loading.classList.add('hidden');
+            resultados.classList.remove('hidden');
+            resultados.innerHTML = `<div class="text-center py-8 text-gray-500 font-black text-xs uppercase italic">MeLi no encontró resultados para:<br>"${query}"</div>`;
+            return;
+        }
 
         const precios = data.results.map(r => r.price).sort((a, b) => a - b);
         const promedio = precios.reduce((a, b) => a + b, 0) / precios.length;
@@ -3404,9 +3419,14 @@ async function analizarCompetencia(id) {
             </div>
         `;
     } catch (err) {
+        console.error("Error en comparación:", err);
         loading.classList.add('hidden');
         resultados.classList.remove('hidden');
-        resultados.innerHTML = `<div class="text-center py-8 text-red-500 font-black text-xs uppercase italic">No se pudo comparar este producto.</div>`;
+        resultados.innerHTML = `
+            <div class="text-center py-8">
+                <p class="text-red-500 font-black text-xs uppercase italic">Error técnico al buscar</p>
+                <p class="text-[8px] text-gray-400 mt-2">${err.message}</p>
+            </div>`;
     }
 }
 
