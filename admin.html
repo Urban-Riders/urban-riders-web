@@ -3341,7 +3341,7 @@ async function aplicarAumentoProveedor() {
 }
 // --- FUNCIÓN COMPARADOR DE PRECIOS MERCADO LIBRE ---
 async function analizarCompetencia(id) {
-    const p = productos.find(prod => prod.id === id);
+    const p = _productosLocales.find(prod => prod.id === id);
     if (!p) return;
 
     const modal = document.getElementById('modal-analisis');
