@@ -307,8 +307,12 @@
                         <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-200">
                             <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
                                 <h2 class="text-lg font-black uppercase italic">Estado de Cuentas</h2>
-                                <input type="text" id="buscador-clientes" onkeyup="filtrarClientes()" placeholder="Buscar cliente..." class="w-full md:w-80 pl-4 py-2 bg-gray-50 border rounded-full text-xs outline-none focus:border-blue-500">
-                            </div>
+                                <div class="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
+                                <button onclick="imprimirAgendaMayorista()" class="bg-yellow-500 text-black px-4 py-2 rounded-full font-bold hover:bg-yellow-600 transition flex items-center gap-2 text-xs uppercase shadow-sm whitespace-nowrap">
+                                  <i class="fas fa-address-book"></i> Agenda
+                                   </button>
+                                  <input type="text" id="buscador-clientes" onkeyup="filtrarClientes()" placeholder="Buscar cliente..." class="w-full md:w-80 pl-4 py-2 bg-gray-50 border rounded-full text-xs outline-none focus:border-blue-500">
+                             </div>
                             <div class="table-container">
                                 <table class="w-full text-left">
                                     <thead>
@@ -3430,6 +3434,89 @@ async function analizarCompetencia(id) {
     }
 }
 function cerrarModalAnalisis() { document.getElementById('modal-analisis').classList.add('hidden'); }
+// --- FUNCIÓN PARA GENERAR AGENDA DE MAYORISTAS ---
+async function imprimirAgendaMayorista() {
+    try {
+        // Filtramos para asegurarnos de traer a los mayoristas
+        const mayoristas = _clientesLocales.filter(c => c.tipo_cliente === 'mayorista' || !c.tipo_cliente);
+
+        if (mayoristas.length === 0) return alert("No hay clientes mayoristas registrados para armar la agenda.");
+
+        // Ordenamos alfabéticamente por nombre para que sea fácil buscar
+        mayoristas.sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+        let contenido = `
+            <html>
+            <head>
+                <title>Agenda Mayoristas - Urban Riders</title>
+                <style>
+                    body { font-family: sans-serif; padding: 40px; color: #000; background: #fff; }
+                    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+                    .logo { font-size: 28px; font-weight: 900; font-style: italic; text-transform: uppercase; }
+                    .logo span { color: #eab308; }
+                    h1 { margin: 0; font-size: 20px; text-transform: uppercase; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th { text-align: left; background-color: #000; color: #fff; padding: 10px; font-size: 13px; text-transform: uppercase; }
+                    td { padding: 12px 10px; border-bottom: 1px dashed #ccc; font-size: 14px; }
+                    .nombre { font-weight: 900; text-transform: uppercase; }
+                    .telefono { font-weight: bold; color: #333; }
+                    .notas { color: #aaa; font-style: italic; font-size: 12px; letter-spacing: 2px; }
+                    @media print { .no-print { display: none; } }
+                </style>
+            </head>
+            <body>
+                <div class="no-print" style="text-align:right; margin-bottom:20px;">
+                    <button onclick="window.print()" style="padding:12px 24px; cursor:pointer; background:#eab308; border:none; font-weight:bold; border-radius:50px; text-transform:uppercase; font-size:12px;">🖨️ Imprimir Agenda</button>
+                </div>
+                <div class="header">
+                    <div class="logo">URBAN <span>RIDERS</span></div>
+                    <div style="text-align: right;">
+                        <h1>Agenda de Mayoristas</h1>
+                        <p style="margin:0; font-size:12px;">Actualizada: ${new Date().toLocaleDateString('es-AR')}</p>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th width="35%">CLIENTE / COMERCIO</th>
+                            <th width="25%">TELÉFONO</th>
+                            <th width="40%">NOTAS / DIRECCIÓN</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        // Generamos una fila por cada cliente
+        mayoristas.forEach(c => {
+            contenido += `
+                <tr>
+                    <td class="nombre">${c.nombre}</td>
+                    <td class="telefono">${c.telefono || 'Sin registrar'}</td>
+                    <td class="notas">................................................</td>
+                </tr>
+            `;
+        });
+
+        contenido += `
+                    </tbody>
+                </table>
+                <div style="margin-top: 50px; text-align: center; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 20px;">
+                    Documento de uso interno - Urban Riders
+                </div>
+            </body>
+            </html>
+        `;
+
+        // Abrimos la ventana nueva y escribimos el contenido
+        const win = window.open('', '_blank');
+        win.document.write(contenido);
+        win.document.close();
+
+    } catch (err) {
+        console.error("Error al generar agenda:", err);
+        alert("Error al generar la agenda: " + err.message);
+    }
+}
     </script>
 
 <div id="modal-movimientos" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]">
