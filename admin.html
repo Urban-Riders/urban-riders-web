@@ -3264,28 +3264,35 @@ async function confirmarVentaPOS() {
         // 2. Movimiento Financiero (Solo si es a Cuenta Corriente)
 // --- VINCULACIÓN CON INFORME DE GANANCIAS (SOLO MAYORISTAS) ---
         if (!esMostrador) {
-            const { data: clienteInfo } = await _supabase.from('clientes').select('tipo_cliente, nombre').eq('id', clienteSeleccionado).single();
+            const idParaDB = parseInt(clienteSeleccionado);
+            const { data: cInfo } = await _supabase.from('clientes').select('nombre, tipo_cliente').eq('id', idParaDB).single();
             
-            if (clienteInfo && clienteInfo.tipo_cliente === 'mayorista') {
-                // Creamos el pedido para que figure en la lista de ganancias
-                const { data: nuevoP } = await _supabase.from('pedidos').insert([{
-                    cliente_id: clienteSeleccionado,
-                    cliente_nombre: clienteInfo.nombre,
+            // Si el cliente existe y NO es consumidor final (el filtro lo hacemos por ID para no fallar)
+            if (cInfo) {
+                const { data: nPed, error: ePed } = await _supabase.from('pedidos').insert([{
+                    cliente_id: idParaDB,
+                    cliente_nombre: cInfo.nombre,
                     total: totalVenta,
                     estado: 'COMPLETADO',
-                    metodo_pago: 'EFECTIVO',
                     fecha: new Date().toISOString()
                 }]).select().single();
 
-                if (nuevoP) {
-                    const detalles = posCart.map(item => ({
-                        pedido_id: nuevoP.id,
-                        producto_id: item.id,
-                        producto_nombre: item.nombre,
-                        cantidad: item.cantidad,
-                        precio_unitario: item.precio_venta
-                    }));
+                if (nPed) {
+                    const detalles = posCart.map(item => {
+                        const precio = Number(item.precio_venta || 0);
+                        const cant = Number(item.cantidad || 0);
+                        return {
+                            pedido_id: nPed.id,
+                            producto_id: item.id,
+                            producto_nombre: item.nombre,
+                            cantidad: cant,
+                            precio_unitario: precio,
+                            subtotal: precio * cant
+                        };
+                    });
                     await _supabase.from('pedido_detalles').insert(detalles);
+                } else if (ePed) {
+                    console.error("Error crítico en Pedidos:", ePed.message);
                 }
             }
         }
@@ -3654,41 +3661,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function cargarOperacionesMayoristas() {
     try {
-        // 1. Buscamos los IDs de todos tus clientes mayoristas
-        const { data: mayoristas, error: errC } = await _supabase.from('clientes').select('id, nombre').eq('tipo_cliente', 'mayorista');
-        if (errC) throw errC;
-        
-        const idsMayoristas = mayoristas.map(m => m.id);
-        if (idsMayoristas.length === 0) return; // Si no hay mayoristas, sale
-
-        // 2. Buscamos los pedidos que pertenezcan a esos IDs (A prueba de fallos)
-        const { data: pedidos, error: errP } = await _supabase
+        const { data: vtas, error: errV } = await _supabase
             .from('pedidos')
             .select('*')
-            .in('cliente_id', idsMayoristas)
+            .not('cliente_id', 'is', null) // Trae todo lo que tenga un cliente asignado
             .order('fecha', { ascending: false })
             .limit(15);
             
-        if (errP) throw errP;
+        if (errV) throw errV;
 
-        const tbody = document.getElementById('lista-operaciones-mayoristas');
-        if(!tbody) return;
+        const lista = document.getElementById('lista-operaciones-mayoristas');
+        if(!lista) return;
         
-        tbody.innerHTML = pedidos.map(p => `
-            <tr class="hover:bg-gray-50 transition">
-                <td class="py-3">
-                    <div class="font-bold uppercase text-zinc-800">${p.cliente_nombre}</div>
-                    <div class="text-[9px] text-gray-400">${new Date(p.fecha).toLocaleDateString()}</div>
+        lista.innerHTML = vtas.map(v => `
+            <tr class="hover:bg-zinc-50 border-b border-zinc-100 transition">
+                <td class="py-3 px-2">
+                    <div class="font-black uppercase text-zinc-800 text-[11px]">${v.cliente_nombre || 'S/N'}</div>
+                    <div class="text-[9px] text-gray-400 font-bold">${new Date(v.fecha).toLocaleString()}</div>
                 </td>
                 <td class="py-3 text-right">
-                    <button onclick="verAnalisisGanancia('${p.id}')" class="bg-zinc-900 text-white px-3 py-1.5 rounded-lg font-bold uppercase text-[9px] hover:bg-orange-600 transition shadow-md">
-                        <i class="fas fa-search-dollar mr-1"></i> Ver Análisis
+                    <button onclick="verAnalisisGanancia('${v.id}')" class="bg-zinc-900 text-white px-4 py-2 rounded-xl font-black uppercase text-[10px] hover:bg-yellow-500 hover:text-black transition-all shadow-sm">
+                        <i class="fas fa-chart-line mr-1"></i> Analizar
                     </button>
                 </td>
             </tr>
         `).join('');
-    } catch (error) {
-        console.error("Error al cargar operaciones mayoristas:", error);
+    } catch (error) { 
+        console.error("Error cargando lista de ganancias:", error); 
     }
 }
 
