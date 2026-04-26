@@ -3262,6 +3262,33 @@ async function confirmarVentaPOS() {
         }
 
         // 2. Movimiento Financiero (Solo si es a Cuenta Corriente)
+// --- VINCULACIÓN CON INFORME DE GANANCIAS (SOLO MAYORISTAS) ---
+        if (!esMostrador) {
+            const { data: clienteInfo } = await _supabase.from('clientes').select('tipo_cliente, nombre').eq('id', clienteSeleccionado).single();
+            
+            if (clienteInfo && clienteInfo.tipo_cliente === 'mayorista') {
+                // Creamos el pedido para que figure en la lista de ganancias
+                const { data: nuevoP } = await _supabase.from('pedidos').insert([{
+                    cliente_id: clienteSeleccionado,
+                    cliente_nombre: clienteInfo.nombre,
+                    total: totalVenta,
+                    estado: 'COMPLETADO',
+                    metodo_pago: 'EFECTIVO',
+                    fecha: new Date().toISOString()
+                }]).select().single();
+
+                if (nuevoP) {
+                    const detalles = posCart.map(item => ({
+                        pedido_id: nuevoP.id,
+                        producto_id: item.id,
+                        producto_nombre: item.nombre,
+                        cantidad: item.cantidad,
+                        precio_unitario: item.precio_venta
+                    }));
+                    await _supabase.from('pedido_detalles').insert(detalles);
+                }
+            }
+        }
         if (!esMostrador) {
             // --- CORRECCIÓN 2: Generar Deuda al Cliente Mayorista ---
             const { data: cliData } = await _supabase.from('clientes').select('saldo, nombre').eq('id', clienteSeleccionado).single();
@@ -3630,7 +3657,7 @@ async function cargarOperacionesMayoristas() {
     const { data: pedidos, error } = await _supabase
         .from('pedidos')
         .select(`*, clientes!inner(tipo_cliente)`)
-        .eq('clientes.tipo_cliente', 'Mayorista')
+        .eq('clientes.tipo_cliente', 'mayorista')
         .order('fecha', { ascending: false })
         .limit(10);
 
