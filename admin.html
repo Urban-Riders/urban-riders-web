@@ -588,6 +588,23 @@
         </button>
     </div>
 </div>
+<div class="mt-12 bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+    <h3 class="text-sm font-black uppercase italic mb-4 text-gray-800 flex items-center gap-2">
+        <i class="fas fa-file-invoice-dollar text-orange-500"></i> Últimas Operaciones Mayoristas
+    </h3>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead>
+                <tr class="text-[9px] uppercase text-gray-400 border-b">
+                    <th class="pb-2">Cliente / Fecha</th>
+                    <th class="pb-2 text-right">Acción</th>
+                </tr>
+            </thead>
+            <tbody id="lista-operaciones-mayoristas" class="divide-y text-[11px]">
+                </tbody>
+        </table>
+    </div>
+</div>
         </section>
 <section id="tab-transporte" class="tab-content hidden">
     <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
@@ -1223,6 +1240,10 @@ async function generarListaPrecios() {
     }
     if (target === 'tab-gastos') {
         if (typeof cargarGastos === 'function') cargarGastos();
+    }
+    
+    if (target === 'tab-ganancias') {
+        if (typeof cargarOperacionesMayoristas === 'function') cargarOperacionesMayoristas();
     }
 }
         async function cargarTodo() {
@@ -3602,6 +3623,123 @@ async function nuevoProveedor() {
 document.addEventListener('DOMContentLoaded', () => {
     cargarProveedores();
 });
+// --- ANÁLISIS DE GANANCIA MAYORISTA ---
+
+async function cargarOperacionesMayoristas() {
+    // Buscamos pedidos de clientes tipo 'Mayorista'
+    const { data: pedidos, error } = await _supabase
+        .from('pedidos')
+        .select(`*, clientes!inner(tipo_cliente)`)
+        .eq('clientes.tipo_cliente', 'Mayorista')
+        .order('fecha', { ascending: false })
+        .limit(10);
+
+    if (error) return;
+
+    const tbody = document.getElementById('lista-operaciones-mayoristas');
+    tbody.innerHTML = pedidos.map(p => `
+        <tr class="hover:bg-gray-50 transition">
+            <td class="py-3">
+                <div class="font-bold uppercase text-zinc-800">${p.cliente_nombre}</div>
+                <div class="text-[9px] text-gray-400">${new Date(p.fecha).toLocaleDateString()}</div>
+            </td>
+            <td class="py-3 text-right">
+                <button onclick="verAnalisisGanancia('${p.id}')" class="bg-zinc-900 text-white px-3 py-1.5 rounded-lg font-bold uppercase text-[9px] hover:bg-orange-600 transition">
+                    Ver Análisis
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function verAnalisisGanancia(pedidoId) {
+    const modal = document.getElementById('modal-remito-ganancia');
+    const contenido = document.getElementById('contenido-remito');
+    modal.classList.remove('hidden');
+    contenido.innerHTML = '<p class="text-center py-10 uppercase font-black italic animate-pulse">Calculando Márgenes...</p>';
+
+    // 1. Traer detalles del pedido
+    const { data: detalles } = await _supabase.from('pedido_detalles').select('*').eq('pedido_id', pedidoId);
+    // 2. Traer info del pedido para el encabezado
+    const { data: pedido } = await _supabase.from('pedidos').select('*').eq('id', pedidoId).single();
+
+    let totalCosto = 0;
+    let totalVenta = 0;
+
+    let htmlTabla = `
+        <div class="mb-6 border-b pb-4 text-[11px]">
+            <p><strong>CLIENTE:</strong> ${pedido.cliente_nombre}</p>
+            <p><strong>FECHA:</strong> ${new Date(pedido.fecha).toLocaleString()}</p>
+            <p><strong>OPERACIÓN:</strong> #ORD-${pedido.id}</p>
+        </div>
+        <table class="w-full text-[10px]">
+            <thead class="border-b-2 border-black">
+                <tr class="uppercase font-black">
+                    <th class="py-2">Artículo</th>
+                    <th class="text-center">Cant</th>
+                    <th class="text-right">Costo U.</th>
+                    <th class="text-right">Venta U.</th>
+                    <th class="text-right">Ganancia</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y">
+    `;
+
+    detalles.forEach(item => {
+        // Buscamos el costo actual en nuestra variable global de productos
+        const prodInfo = _productos.find(prod => prod.id == item.producto_id || prod.nombre === item.producto_nombre);
+        const costoUnit = prodInfo ? prodInfo.costo : 0;
+        const gananciaUnit = item.precio_unitario - costoUnit;
+        const gananciaTotalItem = gananciaUnit * item.cantidad;
+
+        totalCosto += (costoUnit * item.cantidad);
+        totalVenta += (item.precio_unitario * item.cantidad);
+
+        htmlTabla += `
+            <tr>
+                <td class="py-2 uppercase font-medium">${item.producto_nombre}</td>
+                <td class="text-center">${item.cantidad}</td>
+                <td class="text-right">$${costoUnit.toLocaleString()}</td>
+                <td class="text-right font-bold text-blue-600">$${item.precio_unitario.toLocaleString()}</td>
+                <td class="text-right font-black text-green-600">$${gananciaTotalItem.toLocaleString()}</td>
+            </tr>
+        `;
+    });
+
+    const gananciaNeta = totalVenta - totalCosto;
+    const margenPorcentaje = ((gananciaNeta / totalVenta) * 100).toFixed(1);
+
+    htmlTabla += `
+            </tbody>
+        </table>
+        <div class="mt-8 bg-zinc-900 text-white p-6 rounded-2xl">
+            <div class="flex justify-between text-[10px] uppercase opacity-60 mb-2">
+                <span>Inversión (Costo)</span>
+                <span>Venta Total</span>
+            </div>
+            <div class="flex justify-between font-bold mb-4 border-b border-white/10 pb-4 text-sm">
+                <span>$${totalCosto.toLocaleString()}</span>
+                <span>$${totalVenta.toLocaleString()}</span>
+            </div>
+            <div class="flex justify-between items-end">
+                <div>
+                    <p class="text-[9px] uppercase font-black text-yellow-500">Utilidad Neta</p>
+                    <p class="text-2xl font-black italic">$${gananciaNeta.toLocaleString()}</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-[9px] uppercase font-black opacity-60">Margen</p>
+                    <p class="text-lg font-black">${margenPorcentaje}%</p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    contenido.innerHTML = htmlTabla;
+}
+
+function cerrarModalRemito() {
+    document.getElementById('modal-remito-ganancia').classList.add('hidden');
+}
     </script>
 
 <div id="modal-movimientos" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]">
@@ -3705,6 +3843,22 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div id="resultados-analisis" class="hidden"></div>
             <button onclick="cerrarModalAnalisis()" class="w-full mt-6 bg-gray-100 py-3 rounded-lg font-black uppercase text-xs hover:bg-gray-200 transition">Cerrar</button>
+        </div>
+    </div>
+</div>
+<div id="modal-remito-ganancia" class="hidden fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl font-sans">
+        <div class="bg-zinc-900 text-white p-6 flex justify-between items-center">
+            <div>
+                <h2 class="font-black uppercase italic text-lg leading-none">Remito de Ganancia</h2>
+                <p class="text-[10px] uppercase tracking-widest text-yellow-500 mt-1">Uso Interno - Urban Riders</p>
+            </div>
+            <button onclick="cerrarModalRemito()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="contenido-remito" class="p-6 max-h-[70vh] overflow-y-auto">
+            </div>
+        <div class="p-6 bg-gray-50 border-t flex justify-end">
+            <button onclick="window.print()" class="bg-black text-white px-6 py-2 rounded-full font-bold uppercase text-[10px]">Imprimir Análisis</button>
         </div>
     </div>
 </div>
