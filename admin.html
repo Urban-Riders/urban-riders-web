@@ -3653,115 +3653,132 @@ document.addEventListener('DOMContentLoaded', () => {
 // --- ANÁLISIS DE GANANCIA MAYORISTA ---
 
 async function cargarOperacionesMayoristas() {
-    // Buscamos pedidos de clientes tipo 'Mayorista'
-    const { data: pedidos, error } = await _supabase
-        .from('pedidos')
-        .select(`*, clientes!inner(tipo_cliente)`)
-        .eq('clientes.tipo_cliente', 'mayorista')
-        .order('fecha', { ascending: false })
-        .limit(10);
+    try {
+        // 1. Buscamos los IDs de todos tus clientes mayoristas
+        const { data: mayoristas, error: errC } = await _supabase.from('clientes').select('id, nombre').eq('tipo_cliente', 'mayorista');
+        if (errC) throw errC;
+        
+        const idsMayoristas = mayoristas.map(m => m.id);
+        if (idsMayoristas.length === 0) return; // Si no hay mayoristas, sale
 
-    if (error) return;
+        // 2. Buscamos los pedidos que pertenezcan a esos IDs (A prueba de fallos)
+        const { data: pedidos, error: errP } = await _supabase
+            .from('pedidos')
+            .select('*')
+            .in('cliente_id', idsMayoristas)
+            .order('fecha', { ascending: false })
+            .limit(15);
+            
+        if (errP) throw errP;
 
-    const tbody = document.getElementById('lista-operaciones-mayoristas');
-    tbody.innerHTML = pedidos.map(p => `
-        <tr class="hover:bg-gray-50 transition">
-            <td class="py-3">
-                <div class="font-bold uppercase text-zinc-800">${p.cliente_nombre}</div>
-                <div class="text-[9px] text-gray-400">${new Date(p.fecha).toLocaleDateString()}</div>
-            </td>
-            <td class="py-3 text-right">
-                <button onclick="verAnalisisGanancia('${p.id}')" class="bg-zinc-900 text-white px-3 py-1.5 rounded-lg font-bold uppercase text-[9px] hover:bg-orange-600 transition">
-                    Ver Análisis
-                </button>
-            </td>
-        </tr>
-    `).join('');
+        const tbody = document.getElementById('lista-operaciones-mayoristas');
+        if(!tbody) return;
+        
+        tbody.innerHTML = pedidos.map(p => `
+            <tr class="hover:bg-gray-50 transition">
+                <td class="py-3">
+                    <div class="font-bold uppercase text-zinc-800">${p.cliente_nombre}</div>
+                    <div class="text-[9px] text-gray-400">${new Date(p.fecha).toLocaleDateString()}</div>
+                </td>
+                <td class="py-3 text-right">
+                    <button onclick="verAnalisisGanancia('${p.id}')" class="bg-zinc-900 text-white px-3 py-1.5 rounded-lg font-bold uppercase text-[9px] hover:bg-orange-600 transition shadow-md">
+                        <i class="fas fa-search-dollar mr-1"></i> Ver Análisis
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        console.error("Error al cargar operaciones mayoristas:", error);
+    }
 }
 
 async function verAnalisisGanancia(pedidoId) {
     const modal = document.getElementById('modal-remito-ganancia');
     const contenido = document.getElementById('contenido-remito');
     modal.classList.remove('hidden');
-    contenido.innerHTML = '<p class="text-center py-10 uppercase font-black italic animate-pulse">Calculando Márgenes...</p>';
+    contenido.innerHTML = '<p class="text-center py-10 uppercase font-black italic animate-pulse text-yellow-600">Calculando Márgenes y Costos...</p>';
 
-    // 1. Traer detalles del pedido
-    const { data: detalles } = await _supabase.from('pedido_detalles').select('*').eq('pedido_id', pedidoId);
-    // 2. Traer info del pedido para el encabezado
-    const { data: pedido } = await _supabase.from('pedidos').select('*').eq('id', pedidoId).single();
+    try {
+        const { data: detalles, error: errD } = await _supabase.from('pedido_detalles').select('*').eq('pedido_id', pedidoId);
+        const { data: pedido, error: errP } = await _supabase.from('pedidos').select('*').eq('id', pedidoId).single();
 
-    let totalCosto = 0;
-    let totalVenta = 0;
+        if (errP) throw new Error("No se pudo cargar el pedido base.");
 
-    let htmlTabla = `
-        <div class="mb-6 border-b pb-4 text-[11px]">
-            <p><strong>CLIENTE:</strong> ${pedido.cliente_nombre}</p>
-            <p><strong>FECHA:</strong> ${new Date(pedido.fecha).toLocaleString()}</p>
-            <p><strong>OPERACIÓN:</strong> #ORD-${pedido.id}</p>
-        </div>
-        <table class="w-full text-[10px]">
-            <thead class="border-b-2 border-black">
-                <tr class="uppercase font-black">
-                    <th class="py-2">Artículo</th>
-                    <th class="text-center">Cant</th>
-                    <th class="text-right">Costo U.</th>
-                    <th class="text-right">Venta U.</th>
-                    <th class="text-right">Ganancia</th>
+        let totalCosto = 0;
+        let totalVenta = 0;
+
+        let htmlTabla = `
+            <div class="mb-6 border-b border-gray-200 pb-4 text-[11px]">
+                <p><strong>CLIENTE:</strong> ${pedido.cliente_nombre}</p>
+                <p><strong>FECHA:</strong> ${new Date(pedido.fecha).toLocaleString()}</p>
+                <p><strong>OPERACIÓN:</strong> #ORD-${pedido.id}</p>
+            </div>
+            <table class="w-full text-[10px]">
+                <thead class="border-b-2 border-black">
+                    <tr class="uppercase font-black">
+                        <th class="py-2 text-left">Artículo</th>
+                        <th class="text-center">Cant</th>
+                        <th class="text-right">Costo U.</th>
+                        <th class="text-right">Venta U.</th>
+                        <th class="text-right">Ganancia</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+        `;
+
+        (detalles || []).forEach(item => {
+            // CORRECCIÓN CRÍTICA: Usamos _productosLocales, que es la variable real de tu código
+            const prodInfo = _productosLocales.find(prod => prod.id == item.producto_id || prod.nombre === item.producto_nombre);
+            const costoUnit = prodInfo ? parseFloat(prodInfo.costo || 0) : 0;
+            const gananciaUnit = item.precio_unitario - costoUnit;
+            const gananciaTotalItem = gananciaUnit * item.cantidad;
+
+            totalCosto += (costoUnit * item.cantidad);
+            totalVenta += (item.precio_unitario * item.cantidad);
+
+            htmlTabla += `
+                <tr class="hover:bg-gray-50">
+                    <td class="py-3 uppercase font-medium">${item.producto_nombre}</td>
+                    <td class="py-3 text-center font-bold">${item.cantidad}</td>
+                    <td class="py-3 text-right text-gray-500">$${costoUnit.toLocaleString('es-AR')}</td>
+                    <td class="py-3 text-right font-black text-blue-600">$${Number(item.precio_unitario).toLocaleString('es-AR')}</td>
+                    <td class="py-3 text-right font-black text-green-600">$${gananciaTotalItem.toLocaleString('es-AR')}</td>
                 </tr>
-            </thead>
-            <tbody class="divide-y">
-    `;
+            `;
+        });
 
-    detalles.forEach(item => {
-        // Buscamos el costo actual en nuestra variable global de productos
-        const prodInfo = _productos.find(prod => prod.id == item.producto_id || prod.nombre === item.producto_nombre);
-        const costoUnit = prodInfo ? prodInfo.costo : 0;
-        const gananciaUnit = item.precio_unitario - costoUnit;
-        const gananciaTotalItem = gananciaUnit * item.cantidad;
-
-        totalCosto += (costoUnit * item.cantidad);
-        totalVenta += (item.precio_unitario * item.cantidad);
+        const gananciaNeta = totalVenta - totalCosto;
+        const margenPorcentaje = totalVenta > 0 ? ((gananciaNeta / totalVenta) * 100).toFixed(1) : 0;
 
         htmlTabla += `
-            <tr>
-                <td class="py-2 uppercase font-medium">${item.producto_nombre}</td>
-                <td class="text-center">${item.cantidad}</td>
-                <td class="text-right">$${costoUnit.toLocaleString()}</td>
-                <td class="text-right font-bold text-blue-600">$${item.precio_unitario.toLocaleString()}</td>
-                <td class="text-right font-black text-green-600">$${gananciaTotalItem.toLocaleString()}</td>
-            </tr>
+                </tbody>
+            </table>
+            <div class="mt-8 bg-zinc-900 text-white p-6 rounded-2xl shadow-xl border border-zinc-800">
+                <div class="flex justify-between text-[10px] uppercase opacity-60 mb-2 font-bold">
+                    <span>Inversión (Costo)</span>
+                    <span>Venta Total</span>
+                </div>
+                <div class="flex justify-between font-black mb-4 border-b border-white/20 pb-4 text-sm text-gray-300">
+                    <span>$${totalCosto.toLocaleString('es-AR')}</span>
+                    <span>$${totalVenta.toLocaleString('es-AR')}</span>
+                </div>
+                <div class="flex justify-between items-end">
+                    <div>
+                        <p class="text-[9px] uppercase font-black text-yellow-500 tracking-widest">Utilidad Neta</p>
+                        <p class="text-3xl font-black italic text-white">$${gananciaNeta.toLocaleString('es-AR')}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-[9px] uppercase font-black opacity-60 tracking-widest">Margen</p>
+                        <p class="text-xl font-black text-green-400">${margenPorcentaje}%</p>
+                    </div>
+                </div>
+            </div>
         `;
-    });
 
-    const gananciaNeta = totalVenta - totalCosto;
-    const margenPorcentaje = ((gananciaNeta / totalVenta) * 100).toFixed(1);
-
-    htmlTabla += `
-            </tbody>
-        </table>
-        <div class="mt-8 bg-zinc-900 text-white p-6 rounded-2xl">
-            <div class="flex justify-between text-[10px] uppercase opacity-60 mb-2">
-                <span>Inversión (Costo)</span>
-                <span>Venta Total</span>
-            </div>
-            <div class="flex justify-between font-bold mb-4 border-b border-white/10 pb-4 text-sm">
-                <span>$${totalCosto.toLocaleString()}</span>
-                <span>$${totalVenta.toLocaleString()}</span>
-            </div>
-            <div class="flex justify-between items-end">
-                <div>
-                    <p class="text-[9px] uppercase font-black text-yellow-500">Utilidad Neta</p>
-                    <p class="text-2xl font-black italic">$${gananciaNeta.toLocaleString()}</p>
-                </div>
-                <div class="text-right">
-                    <p class="text-[9px] uppercase font-black opacity-60">Margen</p>
-                    <p class="text-lg font-black">${margenPorcentaje}%</p>
-                </div>
-            </div>
-        </div>
-    `;
-
-    contenido.innerHTML = htmlTabla;
+        contenido.innerHTML = htmlTabla;
+    } catch (error) {
+        contenido.innerHTML = `<p class="text-center py-10 text-red-500 font-black uppercase"><i class="fas fa-exclamation-triangle mb-2 text-2xl"></i><br>Error: ${error.message}</p>`;
+    }
 }
 
 function cerrarModalRemito() {
