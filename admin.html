@@ -1561,25 +1561,25 @@ async function generarListaPrecios() {
         console.error("Error en historial:", err);
     }
 }
-     async function eliminarCliente(id, nombre) {
+    async function eliminarCliente(id, nombre) {
     if (!confirm(`⚠️ ¿ELIMINAR DEFINITIVAMENTE A "${nombre}"?\n\nSe limpiarán sus deudas y pedidos para que Supabase permita el borrado.`)) return;
-
     try {
-        // 1. LIMPIEZA EN SUPABASE (El orden que hablamos antes)
+        // 1. LIMPIEZA EN SUPABASE 
         await _supabase.from('movimientos_cuenta').delete().eq('cliente_id', id);
         await _supabase.from('pedidos').update({ cliente_id: null }).eq('cliente_id', id);
         await _supabase.from('historial_ventas').update({ cliente_id: null }).eq('cliente_id', id);
-
+        
         // 2. BORRAR AL CLIENTE DE LA BASE DE DATOS
         const { error } = await _supabase.from('clientes').delete().eq('id', id);
         if (error) throw error;
 
-        // 3. ¡ESTA ES LA CLAVE! Borrarlo de la lista local para que desaparezca de la pantalla
+        // 3. ¡ESTA ES LA CLAVE!
+        // Borrarlo de la lista local para que desaparezca de la pantalla
         _clientesLocales = _clientesLocales.filter(c => c.id !== id);
-
-        // 4. RE-DIBUJAR LA TABLA
-        renderizarTablaClientes(_clientesLocales);
-
+        
+        // 4. RE-DIBUJAR LA TABLA (CORREGIDO)
+        renderizarClientes(_clientesLocales);
+        
         alert(`✅ Cliente "${nombre}" eliminado de todo el sistema.`);
 
     } catch (err) {
