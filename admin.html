@@ -1564,20 +1564,29 @@ async function generarListaPrecios() {
     async function eliminarCliente(id, nombre) {
     if (!confirm(`⚠️ ¿ELIMINAR DEFINITIVAMENTE A "${nombre}"?\n\nSe limpiarán sus deudas y pedidos para que Supabase permita el borrado.`)) return;
     try {
-        // 1. LIMPIEZA EN SUPABASE 
-        await _supabase.from('movimientos_cuenta').delete().eq('cliente_id', id);
-        await _supabase.from('pedidos').update({ cliente_id: null }).eq('cliente_id', id);
-        await _supabase.from('historial_ventas').update({ cliente_id: null }).eq('cliente_id', id);
+        // CONVERSIÓN OBLIGATORIA: Pasamos el ID de texto a Número para que Supabase lo encuentre
+        const idNumerico = parseInt(id);
+
+        // 1. LIMPIEZA EN SUPABASE (usando el número)
+        await _supabase.from('movimientos_cuenta').delete().eq('cliente_id', idNumerico);
+        await _supabase.from('pedidos').update({ cliente_id: null }).eq('cliente_id', idNumerico);
+        await _supabase.from('historial_ventas').update({ cliente_id: null }).eq('cliente_id', idNumerico);
         
         // 2. BORRAR AL CLIENTE DE LA BASE DE DATOS
-        const { error } = await _supabase.from('clientes').delete().eq('id', id);
-        if (error) throw error;
-
-        // 3. ¡ESTA ES LA CLAVE!
-        // Borrarlo de la lista local para que desaparezca de la pantalla
-        _clientesLocales = _clientesLocales.filter(c => c.id !== id);
+        // Agregamos .select() para forzar a que nos devuelva lo que borró y verificar
+        const { data: borrado, error } = await _supabase.from('clientes').delete().eq('id', idNumerico).select();
         
-        // 4. RE-DIBUJAR LA TABLA (CORREGIDO)
+        if (error) throw error;
+        
+        if (!borrado || borrado.length === 0) {
+            throw new Error("No se encontró el cliente en la base de datos. Verifica si ya fue eliminado.");
+        }
+
+        // 3. Borrarlo de la lista local
+        // Usamos != en vez de !== para que coincidan textos y números
+        _clientesLocales = _clientesLocales.filter(c => c.id != id); 
+        
+        // 4. RE-DIBUJAR LA TABLA
         renderizarClientes(_clientesLocales);
         
         alert(`✅ Cliente "${nombre}" eliminado de todo el sistema.`);
