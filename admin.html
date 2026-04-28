@@ -1505,7 +1505,13 @@ async function generarListaPrecios() {
                             <td class="p-2">${new Date(m.fecha).toLocaleDateString()}</td>
                             <td class="p-2 uppercase font-bold text-black">${m.producto_nombre}</td>
                             <td class="p-2 text-center text-black">x${m.cantidad}</td>
-                            <td class="p-2 text-right text-black">$${(m.precio_unitario * m.cantidad).toLocaleString()}</td>
+                            <td class="p-2 text-right text-black font-bold">
+    $${(m.precio_unitario * m.cantidad).toLocaleString()}
+    <button onclick="procesarDevolucion(${m.id}, '${m.producto_nombre}', ${m.precio_unitario}, ${clienteId})" 
+            class="ml-2 bg-red-100 text-red-600 px-2 py-1 rounded text-[10px] hover:bg-red-600 hover:text-white transition">
+        <i class="fas fa-undo"></i> DEVOLVER 1
+    </button>
+</td>
                         </tr>`).join('');
             }
             return; 
@@ -3796,6 +3802,46 @@ async function verAnalisisGanancia(pedidoId) {
 
 function cerrarModalRemito() {
     document.getElementById('modal-remito-ganancia').classList.add('hidden');
+}
+async function procesarDevolucion(ventaId, productoNombre, precioUnitario, clienteId) {
+    if (!confirm(`¿Generar Nota de Crédito por 1 unidad de "${productoNombre}"?\n\n- Se sumará 1 al stock.\n- Se ajustará el saldo del cliente.\n- Se corregirá el historial.`)) return;
+
+    try {
+        // 1. Devolver 1 unidad al stock
+        const { data: prod } = await _supabase.from('productos').select('id, stock').eq('nombre', productoNombre).single();
+        if (prod) {
+            await _supabase.from('productos').update({ stock: (prod.stock || 0) + 1 }).eq('id', prod.id);
+        }
+
+        // 2. Ajustar Saldo (Sumamos el valor porque la deuda es negativa)
+        const { data: cliente } = await _supabase.from('clientes').select('saldo').eq('id', clienteId).single();
+        const nuevoSaldo = (parseFloat(cliente.saldo) || 0) + precioUnitario;
+        await _supabase.from('clientes').update({ saldo: nuevoSaldo }).eq('id', clienteId);
+
+        // 3. Registrar Movimiento
+        await _supabase.from('movimientos_cuenta').insert([{
+            cliente_id: clienteId,
+            tipo: 'NOTA DE CREDITO',
+            monto: precioUnitario,
+            descripcion: `Devolución: 1x ${productoNombre}`,
+            saldo_resultante: nuevoSaldo
+        }]);
+
+        // 4. Corregir Historial
+        const { data: venta } = await _supabase.from('historial_ventas').select('cantidad').eq('id', ventaId).single();
+        if (venta && venta.cantidad > 1) {
+            await _supabase.from('historial_ventas').update({ cantidad: venta.cantidad - 1 }).eq('id', ventaId);
+        } else {
+            await _supabase.from('historial_ventas').delete().eq('id', ventaId);
+        }
+
+        alert("Sistema actualizado: Stock +1 y Saldo corregido.");
+        cargarClientes(); // Recarga la tabla principal
+        cerrarModalHistorial(); // Cierra para refrescar
+    } catch (e) {
+        console.error(e);
+        alert("Error en el proceso.");
+    }
 }
     </script>
 
