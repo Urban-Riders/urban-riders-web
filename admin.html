@@ -1498,11 +1498,10 @@ async function generarListaPrecios() {
 
             if (error) throw error;
             if (container) {
-                // BUSCÁ ESTA PARTE EN cargarHistorial Y REEMPLAZALA:
-container.innerHTML = (!data || data.length === 0) 
+                container.innerHTML = (!data || data.length === 0) 
     ? '<tr><td colspan="4" class="p-4 text-center text-gray-400 text-xs">Sin compras</td></tr>'
     : data.map(m => {
-        // Limpiamos el nombre de comillas para que no rompa el onclick
+        
         const nombreLimpio = m.producto_nombre.replace(/'/g, "\\'");
         
         return `
