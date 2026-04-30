@@ -823,36 +823,8 @@
         </div>
     </div>
 </div>
-</div>
-</div>
-
-<!-- INICIO DEL MODAL DE MOVIMIENTOS FALTANTE -->
-<div id="modal-movimientos" class="hidden fixed inset-0 bg-black bg-opacity-80 z-[60] flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col h-[80vh] border-2 border-black">
-        <div class="p-4 bg-gray-50 border-b-2 border-black flex justify-between items-center">
-            <h3 class="font-black uppercase text-xl text-gray-800"><i class="fas fa-history text-blue-500 mr-2"></i> Compras de: <span id="modal-cliente-nombre" class="text-blue-600"></span></h3>
-            <button onclick="document.getElementById('modal-movimientos').classList.add('hidden')" class="text-gray-500 hover:text-red-500 transition"><i class="fas fa-times text-2xl"></i></button>
-        </div>
-        <div class="flex-1 overflow-y-auto p-4 custom-scrollbar">
-            <table class="w-full text-left">
-                <thead>
-                    <tr class="text-[10px] font-black uppercase text-gray-400 border-b-2 border-gray-200">
-                        <th class="pb-2">Fecha</th>
-                        <th class="pb-2">Producto</th>
-                        <th class="pb-2 text-center">Cant.</th>
-                        <th class="pb-2 text-right">Total</th>
-                    </tr>
-                </thead>
-                <tbody id="movimientos-container" class="divide-y text-[11px]"></tbody>
-            </table>
-        </div>
-    </div>
-</div>
-<!-- FIN DEL MODAL -->
-
     <script>
         const SUPABASE_URL = 'https://dsexvmstfjadjdbptmzn.supabase.co';
-    
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzZXh2bXN0ZmphZGpkYnB0bXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2OTc3MzUsImV4cCI6MjA4MjI3MzczNX0.L0Wz3hwZOarNLqkYH5-RAzz2Y6iwI4uaE_rlkcKkgyg';
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: {
@@ -1527,25 +1499,14 @@ async function generarListaPrecios() {
             if (error) throw error;
             if (container) {
                 container.innerHTML = (!data || data.length === 0) 
-    ? '<tr><td colspan="4" class="p-4 text-center text-gray-400 text-xs">Sin compras</td></tr>'
-    : data.map(m => {
-        
-        const nombreLimpio = m.producto_nombre.replace(/'/g, "\\'");
-        
-        return `
-            <tr class="border-b text-[10px]">
-                <td class="p-2">${new Date(m.fecha).toLocaleDateString()}</td>
-                <td class="p-2 uppercase font-bold text-black">${m.producto_nombre}</td>
-                <td class="p-2 text-center text-black">x${m.cantidad}</td>
-                <td class="p-2 text-right text-black font-bold">
-                    $${(m.precio_unitario * m.cantidad).toLocaleString()}
-                    <button onclick="procesarDevolucion(${m.id}, '${nombreLimpio}', ${m.precio_unitario}, ${clienteId})" 
-                            class="ml-2 bg-red-100 text-red-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-red-600 hover:text-white transition shadow-sm border border-red-200">
-                        <i class="fas fa-undo"></i> DEVOLVER 1
-                    </button>
-                </td>
-            </tr>`;
-    }).join('');
+                    ? '<tr><td colspan="4" class="p-4 text-center text-gray-400 text-xs">Sin compras</td></tr>'
+                    : data.map(m => `
+                        <tr class="border-b text-[10px]">
+                            <td class="p-2">${new Date(m.fecha).toLocaleDateString()}</td>
+                            <td class="p-2 uppercase font-bold text-black">${m.producto_nombre}</td>
+                            <td class="p-2 text-center text-black">x${m.cantidad}</td>
+                            <td class="p-2 text-right text-black">$${(m.precio_unitario * m.cantidad).toLocaleString()}</td>
+                        </tr>`).join('');
             }
             return; 
         }
@@ -1731,63 +1692,13 @@ async function exportarEstadoCuentaPDF(clienteId, nombreCliente) {
                 doc.text(`SALDO TOTAL ACTUAL: $${ultimoSaldo.toLocaleString()}`, 15, finalY);
 
                 // Guardar PDF
-                const nombreArchivo = (nombreCliente || 'Cliente').replace(/\s+/g, '_');
-                doc.save(`Estado_Cuenta_${nombreArchivo}.pdf`);
+                doc.save(`Estado_Cuenta_${nombreCliente.replace(/\s+/g, '_')}.pdf`);
+
             } catch (err) {
-                console.error("Error al exportar PDF:", err);
-                alert("Error al generar el PDF. Revisa la consola.");
+                console.error(err);
+                alert("Error al generar el PDF");
             }
         }
-
-        // --- FUNCIONES DE APOYO ---
-        
-        // Abre el modal de historial (botón lupa)
-        function verMovimientos(clienteId, nombre) {
-            cargarHistorial(clienteId, nombre);
-        }
-
-        // Lógica de Nota de Crédito (botón DEVOLVER)
-        async function procesarDevolucion(idVenta, nombreProd, precioUnitario, clienteId) {
-            if(!confirm(`¿Devolver 1 unidad de ${nombreProd} y generar NOTA DE CRÉDITO por $${precioUnitario}?`)) return;
-
-            try {
-                // 1. Obtener saldo actual
-                const { data: cliente, error: errCli } = await _supabase.from('clientes').select('saldo').eq('id', clienteId).single();
-                if (errCli) throw errCli;
-
-                // 2. Calcular nuevo saldo (se suma a favor del cliente)
-                const nuevoSaldo = (cliente.saldo || 0) + precioUnitario;
-
-                // 3. Actualizar en la DB
-                const { error: errUpd } = await _supabase.from('clientes').update({ saldo: nuevoSaldo }).eq('id', clienteId);
-                if (errUpd) throw errUpd;
-
-                // 4. Registrar el movimiento de Nota de Crédito
-                await _supabase.from('movimientos_cuenta').insert([{
-                    cliente_id: clienteId,
-                    tipo: 'NOTA CREDITO',
-                    monto: precioUnitario,
-                    descripcion: `Devolución: ${nombreProd}`,
-                    saldo_resultante: nuevoSaldo
-                }]);
-
-                // 5. Eliminar o marcar la venta (aquí la borramos del historial)
-                await _supabase.from('historial_ventas').delete().eq('id', idVenta);
-
-                alert("✅ Nota de crédito generada y saldo actualizado.");
-                
-                // Recargar datos
-                await cargarClientes();
-                const nombreActual = document.getElementById('modal-cliente-nombre').innerText;
-                cargarHistorial(clienteId, nombreActual); 
-                
-            } catch (err) {
-                alert("Error en la devolución: " + err.message);
-            }
-        }
-    </script>
-</body>
-</html>
 function descargarPDFGanancias() {
     try {
         const { jsPDF } = window.jspdf;
@@ -3885,46 +3796,6 @@ async function verAnalisisGanancia(pedidoId) {
 
 function cerrarModalRemito() {
     document.getElementById('modal-remito-ganancia').classList.add('hidden');
-}
-async function procesarDevolucion(ventaId, productoNombre, precioUnitario, clienteId) {
-    if (!confirm(`¿Generar Nota de Crédito por 1 unidad de "${productoNombre}"?\n\n- Se sumará 1 al stock.\n- Se ajustará el saldo del cliente.\n- Se corregirá el historial.`)) return;
-
-    try {
-        // 1. Devolver 1 unidad al stock
-        const { data: prod } = await _supabase.from('productos').select('id, stock').eq('nombre', productoNombre).single();
-        if (prod) {
-            await _supabase.from('productos').update({ stock: (prod.stock || 0) + 1 }).eq('id', prod.id);
-        }
-
-        // 2. Ajustar Saldo (Sumamos el valor porque la deuda es negativa)
-        const { data: cliente } = await _supabase.from('clientes').select('saldo').eq('id', clienteId).single();
-        const nuevoSaldo = (parseFloat(cliente.saldo) || 0) + precioUnitario;
-        await _supabase.from('clientes').update({ saldo: nuevoSaldo }).eq('id', clienteId);
-
-        // 3. Registrar Movimiento
-        await _supabase.from('movimientos_cuenta').insert([{
-            cliente_id: clienteId,
-            tipo: 'NOTA DE CREDITO',
-            monto: precioUnitario,
-            descripcion: `Devolución: 1x ${productoNombre}`,
-            saldo_resultante: nuevoSaldo
-        }]);
-
-        // 4. Corregir Historial
-        const { data: venta } = await _supabase.from('historial_ventas').select('cantidad').eq('id', ventaId).single();
-        if (venta && venta.cantidad > 1) {
-            await _supabase.from('historial_ventas').update({ cantidad: venta.cantidad - 1 }).eq('id', ventaId);
-        } else {
-            await _supabase.from('historial_ventas').delete().eq('id', ventaId);
-        }
-
-        alert("Sistema actualizado: Stock +1 y Saldo corregido.");
-        cargarClientes(); // Recarga la tabla principal
-        cerrarModalHistorial(); // Cierra para refrescar
-    } catch (e) {
-        console.error(e);
-        alert("Error en el proceso.");
-    }
 }
     </script>
 
