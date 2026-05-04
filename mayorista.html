@@ -514,12 +514,16 @@ async function generarClaveMayorista() {
 
         function loadMore() { _itemsShown += 12; render(); }
 
-        function addToCart(encodedData) {
+       function addToCart(encodedData) {
             const item = JSON.parse(decodeURIComponent(escape(atob(encodedData))));
             const found = _cart.find(i => i.id === item.id);
             if (found) {
-                if (found.cantidad < item.stock) found.cantidad++;
-                else return mostrarToast("Sin más stock disponible", "error");
+                // MODIFICACIÓN 1: Permite sumar infinitamente si es "por encargo" o si hay stock físico
+                if (item.por_encargo || found.cantidad < item.stock) {
+                    found.cantidad++;
+                } else {
+                    return mostrarToast("Sin más stock disponible", "error");
+                }
             } else {
                 _cart.push({ ...item, cantidad: 1 });
             }
@@ -528,20 +532,19 @@ async function generarClaveMayorista() {
         }
 
         // FUNCION PARA VACIAR CARRITO
-function clearCart() {
-    if (_cart.length === 0) return;
-    if (confirm("¿Estás seguro de que quieres vaciar el pedido?")) {
-        _cart = [];
-        updateCartUI();
-        toggleCart(); // <-- Esta es la orden que cierra el panel automáticamente
-    }
-}
+        function clearCart() {
+            if (_cart.length === 0) return;
+            if (confirm("¿Estás seguro de que quieres vaciar el pedido?")) {
+                _cart = [];
+                updateCartUI();
+                toggleCart();
+            }
+        }
 
-       function updateCartUI() {
+        function updateCartUI() {
             const container = document.getElementById('cart-items');
             document.getElementById('cart-count').innerText = _cart.reduce((s, i) => s + i.cantidad, 0);
             
-            // Verificamos si hay al menos un artículo "por encargo" en el carrito
             const hayAtraso = _cart.some(item => item.por_encargo);
             
             if (_cart.length === 0) {
@@ -569,6 +572,9 @@ function clearCart() {
                             </div>
                         </div>
                     </div>`).join('');
+                
+                // MODIFICACIÓN 2: Esta es la línea que faltaba para inyectar el código en la pantalla
+                container.innerHTML = htmlCarrito;
             }
 
             const total = _cart.reduce((s, i) => s + (i.precio * i.cantidad || 0), 0);
@@ -577,7 +583,10 @@ function clearCart() {
 
         function changeQty(idx, delta) {
             const item = _cart[idx];
-            if (delta > 0 && item.cantidad >= item.stock) return mostrarToast("Máximo stock alcanzado", "error");
+            // MODIFICACIÓN 3: Bloquea sumar desde el botón "+" solo si NO es por encargo y alcanzó el stock máximo
+            if (delta > 0 && !item.por_encargo && item.cantidad >= item.stock) {
+                return mostrarToast("Máximo stock físico alcanzado", "error");
+            }
             item.cantidad += delta;
             if (item.cantidad <= 0) _cart.splice(idx, 1);
             updateCartUI();
