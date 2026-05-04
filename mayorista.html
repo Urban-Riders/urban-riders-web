@@ -486,7 +486,11 @@ async function generarClaveMayorista() {
                 <div class="bg-gray-900 rounded-xl overflow-hidden border ${hasStock ? 'border-gray-800' : 'border-red-900/30'} p-3 flex flex-col hover:border-yellow-500 transition">
                     <div class="relative h-32 -mx-3 -mt-3 mb-3 bg-black flex items-center justify-center overflow-hidden">
                         <img src="${p.imagen_url}" class="product-img" onclick="openZoom('${p.imagen_url}')" onerror="this.src='https://via.placeholder.com/150?text=UR'">
-                        ${!hasStock ? '<div class="absolute inset-0 bg-black/70 flex items-center justify-center text-red-500 font-black italic text-xs">SIN STOCK</div>' : ''}
+                        
+                        ${p.por_encargo 
+                            ? '<div class="absolute top-2 left-2 bg-yellow-500 text-black px-2 py-0.5 rounded text-[8px] font-black uppercase italic shadow-md tracking-tighter">A Pedido</div>'
+                            : (!hasStock ? '<div class="absolute inset-0 bg-black/70 flex items-center justify-center text-red-500 font-black italic text-xs">AGOTADO</div>' : '')
+                        }
                     </div>
                     <div class="flex justify-between text-[8px] font-bold uppercase mb-1">
                         <span class="text-gray-500">${p.categoria || 'VARIOS'}</span>
@@ -496,10 +500,10 @@ async function generarClaveMayorista() {
                     <div class="mt-auto">
                         <div class="flex justify-between items-center mb-2">
                             <span class="font-bold ${_isLoggedIn ? 'text-white' : 'text-gray-600 text-[9px]'}">${precio}</span>
-                            <span class="text-[9px] ${hasStock ? 'text-green-500' : 'text-red-500'} font-bold">${hasStock ? p.stock + 'u' : 'Agotado'}</span>
+                            <span class="text-[9px] ${p.por_encargo ? 'text-yellow-500' : (hasStock ? 'text-green-500' : 'text-red-500')} font-bold">${p.por_encargo ? 'Demora' : (hasStock ? p.stock + 'u' : 'Agotado')}</span>
                         </div>
-                        <button onclick="addToCart('${productData}')" ${!hasStock ? 'disabled' : ''} class="w-full py-2 rounded-lg font-black uppercase italic text-[10px] border ${hasStock ? 'border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-black' : 'border-gray-800 text-gray-700'} transition">
-                            ${hasStock ? 'Añadir' : 'Agotado'}
+                        <button onclick="addToCart('${productData}')" ${(!hasStock && !p.por_encargo) ? 'disabled' : ''} class="w-full py-2 rounded-lg font-black uppercase italic text-[10px] border ${p.por_encargo ? 'border-yellow-500 bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500 hover:text-black' : (hasStock ? 'border-white text-white hover:bg-white hover:text-black' : 'border-gray-800 text-gray-700')} transition">
+                            ${p.por_encargo ? 'Encargar' : (hasStock ? 'Añadir' : 'Agotado')}
                         </button>
                     </div>
                 </div>`;
@@ -533,15 +537,25 @@ function clearCart() {
     }
 }
 
-        function updateCartUI() {
+       function updateCartUI() {
             const container = document.getElementById('cart-items');
             document.getElementById('cart-count').innerText = _cart.reduce((s, i) => s + i.cantidad, 0);
+            
+            // Verificamos si hay al menos un artículo "por encargo" en el carrito
+            const hayAtraso = _cart.some(item => item.por_encargo);
             
             if (_cart.length === 0) {
                 container.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-600 italic uppercase font-black text-xs"><i class="fas fa-shopping-basket text-4xl mb-4 opacity-20"></i>Carrito Vacío</div>';
             } else {
-                container.innerHTML = _cart.map((item, idx) => `
-                    <div class="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
+                let htmlCarrito = hayAtraso 
+                    ? `<div class="bg-yellow-500/10 border border-yellow-500/30 p-3 rounded-lg mb-4 text-[9px] text-yellow-500 font-bold uppercase tracking-tighter italic">
+                           <i class="fas fa-exclamation-triangle mr-1"></i> Tienes artículos a pedido. El paquete completo se despachará cuando ingrese toda la mercadería.
+                       </div>` 
+                    : '';
+
+                htmlCarrito += _cart.map((item, idx) => `
+                    <div class="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10 relative">
+                        ${item.por_encargo ? '<div class="absolute -top-1 -right-1 bg-yellow-500 text-black px-1.5 py-0.5 rounded text-[7px] font-black uppercase">A Pedido</div>' : ''}
                         <img src="${item.imagen_url}" class="w-10 h-10 object-cover rounded cursor-zoom-in" onclick="openZoom('${item.imagen_url}')">
                         <div class="flex-grow">
                             <p class="font-bold text-[10px] uppercase text-white truncate w-32">${item.nombre}</p>
