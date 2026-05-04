@@ -194,6 +194,10 @@
                                         <label class="text-[9px] font-bold uppercase text-purple-600">Peso (Kg)</label>
                                         <input type="number" step="0.01" id="p-peso" class="w-full bg-purple-50 border border-purple-200 rounded-lg p-2 text-xs font-bold outline-none focus:border-purple-500" placeholder="Ej: 0.5">
                                     </div>
+                                    <div class="flex items-center gap-2 mt-4 bg-yellow-50 p-2 rounded-lg border border-yellow-200">
+                                        <input type="checkbox" id="p-encargo" class="w-4 h-4 text-yellow-600 rounded focus:ring-yellow-500">
+                                        <label for="p-encargo" class="text-[10px] font-black uppercase text-yellow-700 cursor-pointer tracking-tighter">A PEDIDO (Sin Stock Inmediato)</label>
+                                    </div>
                                      <div>
                                         <label class="text-[9px] font-bold uppercase text-gray-400">Imagen</label>
                                         <input type="file" id="p-foto" accept="image/*" class="w-full text-[9px] file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-gray-900 file:text-yellow-500 cursor-pointer">
@@ -1119,10 +1123,11 @@ async function generarListaPrecios() {
     precio: parseFloat(document.getElementById('p-precio').value) || 0,
     precio_minorista: parseFloat(document.getElementById('p-precio-minorista').value) || 0,
     precio_meli: parseFloat(document.getElementById('p-precio-meli').value) || 0, 
-    peso: parseFloat(document.getElementById('p-peso').value) || 0, // NUEVA LÍNEA DE PESO
+    peso: parseFloat(document.getElementById('p-peso').value) || 0,
     stock: parseInt(document.getElementById('p-stock').value) || 0,
     stock_minimo: parseInt(document.getElementById('p-stock-minimo').value) || 0,
-    imagen_url: imageUrl
+    imagen_url: imageUrl,
+    por_encargo: document.getElementById('p-encargo').checked // NUEVO: Producto a pedido
 };
                     if (id) { await _supabase.from('productos').update(productData).eq('id', id); } 
                     else { await _supabase.from('productos').insert([productData]); }
@@ -1383,21 +1388,24 @@ async function generarListaPrecios() {
                 <tr class="hover:bg-gray-50 border-b">
                     <td class="py-2"><img src="${p.imagen_url || 'https://via.placeholder.com/40'}" class="w-10 h-10 object-cover rounded-lg shadow-sm"></td>
                     <td>
-                        <div class="font-black uppercase">${p.nombre}</div>
+                        <div class="font-black uppercase flex items-center gap-2">
+                            ${p.nombre}
+                            ${p.por_encargo ? '<span class="bg-yellow-100 text-yellow-700 px-1 py-0.5 rounded text-[8px] font-black tracking-tighter border border-yellow-300">A PEDIDO</span>' : ''}
+                        </div>
                         <div class="text-[9px] text-gray-400 font-bold tracking-tighter">${p.codigo} | ${p.categoria} | <span class="text-blue-500">${p.proveedor || 'S/Prov'}</span></div>
                     </td>
                     <td class="p-3 text-[11px] font-bold">
     <div class="flex items-center gap-1">
-        <span class="${p.stock <= (p.stock_minimo || 0) && (p.stock_minimo || 0) > 0 ? 'text-red-600 animate-pulse' : ''}">
-            ${p.stock}
+        <span class="${!p.por_encargo && p.stock <= (p.stock_minimo || 0) && (p.stock_minimo || 0) > 0 ? 'text-red-600 animate-pulse' : ''}">
+            ${p.por_encargo ? '-' : p.stock}
         </span>
-        ${p.stock <= (p.stock_minimo || 0) && (p.stock_minimo || 0) > 0 ? '<i class="fas fa-exclamation-triangle text-red-500 text-[10px]" title="Reponer Stock"></i>' : ''}
+        ${!p.por_encargo && p.stock <= (p.stock_minimo || 0) && (p.stock_minimo || 0) > 0 ? '<i class="fas fa-exclamation-triangle text-red-500 text-[10px]" title="Reponer Stock"></i>' : ''}
     </div>
 </td>
                     <td class="text-center bg-gray-50">
                         <div class="flex items-center justify-center gap-1">
-                            <button onclick="ajustarStock(${p.id}, -1)" class="w-6 h-6 bg-white border rounded text-red-500 hover:bg-red-500 hover:text-white transition shadow-sm">-</button>
-                            <button onclick="ajustarStock(${p.id}, 1)" class="w-6 h-6 bg-white border rounded text-green-600 hover:bg-green-600 hover:text-white transition shadow-sm">+</button>
+                            <button onclick="ajustarStock(${p.id}, -1)" class="w-6 h-6 bg-white border rounded text-red-500 hover:bg-red-500 hover:text-white transition shadow-sm" ${p.por_encargo ? 'disabled opacity-50 cursor-not-allowed' : ''}>-</button>
+                            <button onclick="ajustarStock(${p.id}, 1)" class="w-6 h-6 bg-white border rounded text-green-600 hover:bg-green-600 hover:text-white transition shadow-sm" ${p.por_encargo ? 'disabled opacity-50 cursor-not-allowed' : ''}>+</button>
                         </div>
                     </td>
                     <td class="text-right font-black">$${Number(p.precio).toLocaleString()}</td>
@@ -1416,6 +1424,7 @@ async function generarListaPrecios() {
 
         async function ajustarStock(id, cant) {
             const p = _productosLocales.find(x => x.id === id);
+            if (p.por_encargo) return; // No se ajusta stock rápido a productos a pedido
             const nuevoStock = (p.stock || 0) + cant;
             await _supabase.from('productos').update({ stock: nuevoStock }).eq('id', id);
             await cargarTodo();
@@ -1433,8 +1442,9 @@ async function generarListaPrecios() {
             document.getElementById('p-precio-meli').value = p.precio_meli || 0;
             document.getElementById('p-stock').value = p.stock;
             document.getElementById('p-stock-minimo').value = p.stock_minimo || 0;
-            document.getElementById('p-peso').value = p.peso || ''; // AGREGAR ESTA LÍNEA
+            document.getElementById('p-peso').value = p.peso || '';
             document.getElementById('p-imagen-url').value = p.imagen_url;
+            document.getElementById('p-encargo').checked = p.por_encargo || false; // Carga el estado del checkbox
             document.getElementById('form-title').innerText = "Editando Producto";
             document.getElementById('txt-submit').innerText = "Actualizar Cambios";
             document.getElementById('btn-cancelar').classList.remove('hidden');
@@ -1456,9 +1466,10 @@ async function generarListaPrecios() {
             document.getElementById('txt-submit').innerText = "Guardar Producto";
             document.getElementById('btn-cancelar').classList.add('hidden');
             document.getElementById('p-stock-minimo').value = '';
-            document.getElementById('p-peso').value = ''; // AGREGAR ESTA LÍNEA
+            document.getElementById('p-peso').value = '';
             document.getElementById('p-precio-meli').value = '';
             document.getElementById('p-margen-meli').value = '';
+            document.getElementById('p-encargo').checked = false; // Limpia el checkbox
         }
 
         function calcularPrecios() {
