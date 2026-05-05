@@ -382,7 +382,8 @@ async function loadProducts() {
         // 1. Obtenemos el conteo total
         const { count, error: countError } = await _supabase
             .from('productos_publicos')
-            .select('*', { count: 'exact', head: true });
+            .select('*', { count: 'exact', head: true })
+            .neq('por_encargo', true); // FILTRO INVISIBLE
 
         if (countError) throw countError;
 
@@ -390,6 +391,7 @@ async function loadProducts() {
         const { data, error } = await _supabase
             .from('productos_publicos')
             .select('*')
+            .neq('por_encargo', true) // FILTRO INVISIBLE
             .order('nombre', { ascending: true })
             .range(0, productosLimite - 1);
 
@@ -744,7 +746,8 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
                 // Iniciamos la consulta base a la tabla 'productos'
             let query = _supabase
                 .from('productos_publicos')
-                .select('*'); 
+                .select('*')
+                .neq('por_encargo', true); // FILTRO INVISIBLE
 
                 // Si la categoría no es 'TODOS', aplicamos el filtro específico
                 if (cat !== 'TODOS') {
@@ -788,6 +791,7 @@ document.getElementById('form-datos-cliente').addEventListener('submit', async (
             const { data, error } = await _supabase
                 .from('productos_publicos')
                 .select('*')
+                .neq('por_encargo', true) // FILTRO INVISIBLE
                 .ilike('nombre', `%${term}%`) // No distingue mayúsculas/minúsculas
                     .order('nombre', { ascending: true });
 
