@@ -628,9 +628,14 @@
             <button onclick="ejecutarLogisticaDual()" class="bg-black text-white px-6 py-2 rounded-lg font-bold hover:bg-gray-800 transition uppercase text-xs shadow-md">
                 Consultar Despachos
             </button>
-            <button onclick="generarManifiestoTransporte()" id="btn-pdf-mayorista" class="hidden bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 transition uppercase text-xs shadow-md">
-                <i class="fas fa-file-pdf mr-2"></i>Hoja de Ruta Mayorista
-            </button>
+            <div id="grupo-botones-mayorista" class="hidden flex gap-2">
+                <button onclick="verManifiestoPantalla()" class="bg-gray-800 text-white px-6 py-2 rounded-lg font-bold hover:bg-gray-900 transition uppercase text-xs shadow-md flex items-center gap-2">
+                    <i class="fas fa-eye"></i>Ver en Pantalla
+                </button>
+                <button onclick="generarManifiestoTransporte()" class="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 transition uppercase text-xs shadow-md flex items-center gap-2">
+                    <i class="fas fa-file-pdf"></i>PDF
+                </button>
+            </div>
             <button onclick="imprimirPickingListMinoristaLogistica()" id="btn-pdf-minorista" class="hidden bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition uppercase text-xs shadow-md ml-2">
                 <i class="fas fa-print mr-2"></i>Imprimir Minoristas (Depósito)
             </button>
@@ -2922,10 +2927,10 @@ async function ejecutarLogisticaDual() {
     document.getElementById('mensaje-transporte-vacio').classList.add('hidden');
     
     // Control Botón Mayorista
-    const btnMay = document.getElementById('btn-pdf-mayorista');
-    if (btnMay) {
-        if (mayoristas.length > 0) btnMay.classList.remove('hidden');
-        else btnMay.classList.add('hidden');
+    const grupoMay = document.getElementById('grupo-botones-mayorista');
+    if (grupoMay) {
+        if (mayoristas.length > 0) grupoMay.classList.remove('hidden');
+        else grupoMay.classList.add('hidden');
     }
 
     // Control Botón Minorista
@@ -3995,5 +4000,120 @@ function cerrarModalRemito() {
         </div>
     </div>
 </div>
+<!-- MODAL HOJA DE RUTA EN PANTALLA -->
+<div id="modal-hoja-ruta" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[130] p-4">
+    <div class="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+        <div class="bg-black text-white p-4 flex justify-between items-center shrink-0">
+            <h3 class="text-lg font-black uppercase italic text-yellow-500"><i class="fas fa-truck mr-2"></i>Hoja de Ruta Mayorista</h3>
+            <div class="flex gap-3">
+                <button onclick="imprimirHojaRutaPantalla()" class="bg-white text-black px-4 py-1.5 rounded-lg font-bold uppercase text-[10px] hover:bg-gray-200 transition">
+                    <i class="fas fa-print mr-2"></i>Imprimir
+                </button>
+                <button onclick="document.getElementById('modal-hoja-ruta').classList.add('hidden')" class="text-white hover:text-red-500 transition">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="p-6 overflow-y-auto flex-1 custom-scrollbar">
+            <div class="mb-4 text-center border-b border-gray-200 pb-4">
+                <p id="hoja-ruta-periodo" class="text-xs font-bold text-gray-500 uppercase tracking-widest"></p>
+            </div>
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="bg-gray-100 text-[10px] uppercase font-black text-gray-600">
+                        <th class="p-3 rounded-tl-lg w-10 text-center">#</th>
+                        <th class="p-3">Cliente / Destinatario</th>
+                        <th class="p-3 text-right">Valor Carga</th>
+                        <th class="p-3 rounded-tr-lg w-32">Firma / OK</th>
+                    </tr>
+                </thead>
+                <tbody id="hoja-ruta-body" class="text-[12px] uppercase font-bold divide-y divide-gray-100">
+                </tbody>
+            </table>
+            <div class="mt-6 pt-4 border-t-2 border-black flex justify-end">
+                <p class="text-xl font-black uppercase">Valor Total: <span id="hoja-ruta-total" class="text-green-600"></span></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function verManifiestoPantalla() {
+    const desde = document.getElementById('transporte-desde').value;
+    const hasta = document.getElementById('transporte-hasta').value;
+
+    if (!desde || !hasta) return alert("Por favor, selecciona ambas fechas.");
+
+    try {
+        const { data: ventas, error: vError } = await _supabase
+            .from('historial_ventas')
+            .select('cantidad, precio_unitario, cliente_id, fecha')
+            .gte('fecha', `${desde}T00:00:00`)
+            .lte('fecha', `${hasta}T23:59:59`);
+
+        if (vError) throw vError;
+        if (!ventas || ventas.length === 0) return alert("No hay ventas confirmadas en este periodo.");
+
+        const { data: clientes, error: cError } = await _supabase
+            .from('clientes')
+            .select('id, nombre');
+
+        if (cError) throw cError;
+
+        const mapaClientes = {};
+        clientes.forEach(c => { mapaClientes[c.id] = c.nombre; });
+
+        const consolidado = ventas.reduce((acc, v) => {
+            const nombre = mapaClientes[v.cliente_id] || `ID: ${v.cliente_id}`;
+            const subtotal = parseFloat(v.cantidad || 0) * parseFloat(v.precio_unitario || 0);
+            
+            acc[nombre] = (acc[nombre] || 0) + subtotal;
+            return acc;
+        }, {});
+
+        const body = document.getElementById('hoja-ruta-body');
+        body.innerHTML = '';
+        let granTotal = 0;
+        let index = 1;
+
+        for (const [nombre, total] of Object.entries(consolidado)) {
+            granTotal += total;
+            body.innerHTML += `
+                <tr class="hover:bg-gray-50 transition">
+                    <td class="p-3 text-center text-gray-400 font-black">${index++}</td>
+                    <td class="p-3 text-sm">${nombre}</td>
+                    <td class="p-3 text-right text-gray-600">$ ${total.toLocaleString('es-AR')}</td>
+                    <td class="p-3 border-l border-dashed border-gray-300"></td>
+                </tr>
+            `;
+        }
+
+        document.getElementById('hoja-ruta-periodo').innerText = `Ruta de Entrega: ${desde} al ${hasta}`;
+        document.getElementById('hoja-ruta-total').innerText = `$ ${granTotal.toLocaleString('es-AR')}`;
+        document.getElementById('modal-hoja-ruta').classList.remove('hidden');
+        
+    } catch (e) {
+        console.error(e);
+        alert("Error: " + e.message);
+    }
+}
+
+function imprimirHojaRutaPantalla() {
+    // Tomamos el div que queremos imprimir
+    const contenido = document.getElementById('modal-hoja-ruta').innerHTML;
+    const ventanaImpresion = window.open('', '', 'height=600,width=800');
+    
+    ventanaImpresion.document.write('<html><head><title>Hoja de Ruta - Urban Riders</title>');
+    // Le inyectamos los estilos de Tailwind para que se vea igual
+    ventanaImpresion.document.write('<script src="https://cdn.tailwindcss.com"><\/script>');
+    ventanaImpresion.document.write('<style>body { padding: 20px; font-family: sans-serif; } @media print { button { display: none !important; } }</style>');
+    ventanaImpresion.document.write('</head><body class="bg-white">');
+    ventanaImpresion.document.write(contenido);
+    ventanaImpresion.document.write('<script>setTimeout(() => { window.print(); window.close(); }, 1000);<\/script>');
+    ventanaImpresion.document.write('</body></html>');
+    ventanaImpresion.document.close();
+}
+</script>
 </body>
 </html>
