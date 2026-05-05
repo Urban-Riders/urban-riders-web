@@ -3630,6 +3630,7 @@ function renderizarProveedores() {
             </td>
             <td class="py-4 text-right">
                 <div class="flex justify-end gap-1">
+                    <button onclick="verHistorialProveedor('${p.id}', '${p.nombre}')" class="text-blue-500 hover:bg-blue-50 px-2 py-1 rounded-md transition" title="Ver Historial"><i class="fas fa-list"></i></button>
                     <button onclick="movimientoProv('${p.id}', 'compra')" class="bg-zinc-100 text-zinc-600 px-3 py-1 rounded-md text-[9px] font-bold uppercase hover:bg-black hover:text-white transition">Compra</button>
                     <button onclick="movimientoProv('${p.id}', 'pago')" class="bg-yellow-500 text-black px-3 py-1 rounded-md text-[9px] font-bold uppercase hover:bg-yellow-600 transition">Pago</button>
                 </div>
@@ -3651,21 +3652,60 @@ async function movimientoProv(id, tipo) {
     const { error: errProv } = await _supabase.from('proveedores').update({ saldo: nuevoSaldo }).eq('id', id);
     if (errProv) return alert("Error al actualizar proveedor");
 
-    // 2. Si es PAGO, lo mandamos a la tabla de GASTOS automáticamente
+    // 2. NUEVO: Registramos el movimiento en el historial
+    await _supabase.from('movimientos_proveedores').insert([{
+        proveedor_id: id,
+        tipo: tipo.toUpperCase(),
+        monto: monto,
+        saldo_resultante: nuevoSaldo
+    }]);
+
+    // 3. Si es PAGO, lo mandamos a la tabla de GASTOS automáticamente
     if (tipo === 'pago') {
         const { error: errGasto } = await _supabase.from('gastos').insert([{
             descripcion: `PAGO A PROVEEDOR: ${prov.nombre}`,
             monto: monto,
             categoria: 'Mercadería',
-            metodo_pago: 'Transferencia', // Valor por defecto
+            metodo_pago: 'Transferencia', 
             fecha: new Date().toISOString().split('T')[0]
         }]);
         if (errGasto) console.error("Error al registrar el gasto:", errGasto);
-        else if (typeof cargarGastos === 'function') cargarGastos(); // Actualiza la lista de gastos si la función existe
+        else if (typeof cargarGastos === 'function') cargarGastos(); 
     }
 
     alert(`${tipo.toUpperCase()} registrada con éxito.`);
     cargarProveedores();
+}
+async function verHistorialProveedor(id, nombre) {
+    document.getElementById('modal-proveedor-nombre').innerText = nombre;
+    const body = document.getElementById('modal-proveedor-body');
+    body.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500 italic">Cargando historial...</td></tr>';
+    document.getElementById('modal-historial-proveedor').classList.remove('hidden');
+
+    try {
+        const { data, error } = await _supabase
+            .from('movimientos_proveedores')
+            .select('*')
+            .eq('proveedor_id', id)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            body.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-400">Sin movimientos registrados</td></tr>';
+        } else {
+            body.innerHTML = data.map(m => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-2 text-gray-500">${new Date(m.created_at).toLocaleString('es-AR')}</td>
+                    <td class="p-2 font-black uppercase ${m.tipo === 'PAGO' ? 'text-green-600' : 'text-red-500'}">${m.tipo}</td>
+                    <td class="p-2 text-right font-bold">$${Number(m.monto).toLocaleString('es-AR')}</td>
+                    <td class="p-2 text-right font-black text-gray-700">$${Number(m.saldo_resultante).toLocaleString('es-AR')}</td>
+                </tr>
+            `).join('');
+        }
+    } catch (err) {
+        body.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-red-500">Error al cargar: ${err.message}</td></tr>`;
+    }
 }
 
 async function nuevoProveedor() {
@@ -3927,6 +3967,31 @@ function cerrarModalRemito() {
             </div>
         <div class="p-6 bg-gray-50 border-t flex justify-end">
             <button onclick="window.print()" class="bg-black text-white px-6 py-2 rounded-full font-bold uppercase text-[10px]">Imprimir Análisis</button>
+        </div>
+    </div>
+</div>
+<div id="modal-historial-proveedor" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[120]">
+    <div class="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+        <div class="flex justify-between items-center mb-4 shrink-0">
+            <h3 class="text-xl font-black uppercase italic text-orange-600"><i class="fas fa-truck-loading mr-2"></i>Historial Proveedor</h3>
+            <button onclick="document.getElementById('modal-historial-proveedor').classList.add('hidden')" class="text-gray-400 hover:text-black transition">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        <p id="modal-proveedor-nombre" class="font-black text-sm mb-4 uppercase text-gray-700 shrink-0"></p>
+        <div class="overflow-y-auto flex-1 custom-scrollbar">
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="border-b text-[10px] uppercase text-gray-400 bg-gray-50">
+                        <th class="p-2 rounded-tl-lg">Fecha y Hora</th>
+                        <th class="p-2">Tipo</th>
+                        <th class="p-2 text-right">Monto</th>
+                        <th class="p-2 text-right rounded-tr-lg">Saldo Final</th>
+                    </tr>
+                </thead>
+                <tbody id="modal-proveedor-body" class="text-[11px]">
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
