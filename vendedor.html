@@ -334,25 +334,32 @@ function renderProductos(lista) {
         
         // PRECIO FORZADO A MAYORISTA SIEMPRE
         let precioMos = p.precio || 0;
+// Manejo de imagen y etiquetas
+        let etiquetasHtml = '';
+        if (p.por_encargo) {
+            etiquetasHtml = '<div class="absolute top-2 left-2 bg-yellow-500 text-black px-2 py-0.5 rounded text-[8px] font-black uppercase italic shadow-md tracking-tighter z-10">A Pedido</div>';
+        } else if ((p.stock || 0) <= 0) {
+            etiquetasHtml = '<div class="absolute inset-0 bg-black/70 flex items-center justify-center text-red-500 font-black italic text-xs z-10">AGOTADO</div>';
+        }
 
-        // Manejo de imagen y stock
         const imagenHtml = p.imagen_url 
-            ? `<img src="${p.imagen_url}" class="w-full h-full object-cover" alt="${p.nombre}">` 
-            : `<div class="w-full h-full flex items-center justify-center bg-gray-100"><i class="fas fa-image text-gray-300 text-2xl"></i></div>`;
+            ? `<div class="relative w-full h-full">${etiquetasHtml}<img src="${p.imagen_url}" class="w-full h-full object-cover" alt="${p.nombre}"></div>` 
+            : `<div class="relative w-full h-full flex items-center justify-center bg-gray-100">${etiquetasHtml}<i class="fas fa-image text-gray-300 text-2xl"></i></div>`;
             
         const stockDisp = p.stock || 0;
-        const colorStock = stockDisp > 0 ? 'text-green-600' : 'text-red-500';
+        const colorStock = p.por_encargo ? 'text-yellow-500' : (stockDisp > 0 ? 'text-green-600' : 'text-red-500');
+        const txtStock = p.por_encargo ? 'Demora' : `Stock: ${stockDisp}`;
 
         const div = document.createElement('div');
-        div.className = 'bg-white border border-gray-100 rounded-2xl p-3 shadow-sm flex flex-col justify-between h-full';
+        div.className = 'bg-white border border-gray-100 rounded-2xl p-3 shadow-sm flex flex-col justify-between h-full relative';
         div.innerHTML = `
             <div>
-                <div class="w-full h-28 rounded-xl mb-3 overflow-hidden border border-gray-50">
+                <div class="w-full h-28 rounded-xl mb-3 overflow-hidden border border-gray-50 relative">
                     ${imagenHtml}
                 </div>
                 <div class="flex justify-between items-center mb-1">
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">${p.categoria || 'Genérico'}</p>
-                    <p class="text-[10px] font-bold ${colorStock} uppercase tracking-widest">Stock: ${stockDisp}</p>
+                    <p class="text-[10px] font-bold ${colorStock} uppercase tracking-widest">${txtStock}</p>
                 </div>
                 <p class="font-black text-sm leading-tight line-clamp-2">${p.nombre}</p>
                 <p class="text-xs font-bold text-yellow-500 mt-2">$${precioMos.toLocaleString('es-AR')}</p>
@@ -360,7 +367,7 @@ function renderProductos(lista) {
             <div class="flex items-center justify-between bg-gray-50 rounded-xl p-1 mt-3">
                 <button onclick="cambiarCant(${p.id}, -1)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-black rounded-lg transition-colors"><i class="fas fa-minus text-xs"></i></button>
                 <span class="font-black text-sm w-6 text-center" id="cant-${p.id}">${cantidad}</span>
-                <button onclick="cambiarCant(${p.id}, 1)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-black rounded-lg transition-colors bg-white shadow-sm"><i class="fas fa-plus text-xs"></i></button>
+                <button onclick="cambiarCant(${p.id}, 1)" ${(!p.por_encargo && stockDisp <= 0) ? 'disabled class="w-8 h-8 flex items-center justify-center text-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"' : 'class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-black rounded-lg transition-colors bg-white shadow-sm"'}><i class="fas fa-plus text-xs"></i></button>
             </div>
         `;
         grid.appendChild(div);
@@ -372,6 +379,15 @@ function cambiarCant(id, delta) {
     if (!p) return;
     let item = carrito.find(x => x.id === id);
     
+    if (delta > 0) {
+        // Bloquea sumar si no es por encargo y ya no hay stock
+        const cantActual = item ? item.cantidad : 0;
+        if (!p.por_encargo && cantActual >= (p.stock || 0)) {
+            mostrarToast("Máximo stock físico alcanzado", "error");
+            return;
+        }
+    }
+
     if (!item) {
         if (delta > 0) carrito.push({ ...p, cantidad: 1 });
     } else {
@@ -403,9 +419,18 @@ function renderCarrito() {
     const list = document.getElementById('lista-carrito');
     list.innerHTML = '';
     let total = 0;
+    
+    const hayAtraso = carrito.some(item => item.por_encargo);
 
     if(carrito.length === 0) {
         list.innerHTML = '<div class="text-center py-10 text-gray-400 font-bold text-xs uppercase tracking-widest"><i class="fas fa-box-open text-2xl mb-2 block opacity-50"></i>Carrito Vacío</div>';
+    } else {
+        if (hayAtraso) {
+            const aviso = document.createElement('div');
+            aviso.className = 'bg-yellow-500/10 border border-yellow-500/30 p-3 rounded-lg mb-4 text-[10px] text-yellow-600 font-bold uppercase tracking-tighter italic';
+            aviso.innerHTML = '<i class="fas fa-exclamation-triangle mr-1"></i> Contiene artículos a pedido.';
+            list.appendChild(aviso);
+        }
     }
 
     carrito.forEach(p => {
@@ -414,24 +439,31 @@ function renderCarrito() {
         const subtotal = precioMos * p.cantidad;
         total += subtotal;
 
-        const div = document.createElement('div');
-        div.className = 'flex flex-col gap-3 p-4 bg-gray-50 border border-gray-100 rounded-2xl mb-3 shadow-sm';
+      const div = document.createElement('div');
+        div.className = 'flex flex-col gap-3 p-4 bg-gray-50 border border-gray-100 rounded-2xl mb-3 shadow-sm relative overflow-hidden';
+        
+        let etiquetaAtraso = '';
+        if (p.por_encargo) {
+             etiquetaAtraso = '<div class="absolute top-0 right-0 bg-yellow-500 text-black px-2 py-0.5 rounded-bl-lg text-[8px] font-black uppercase">A Pedido</div>';
+        }
+
         div.innerHTML = `
-            <div class="flex items-start justify-between">
+            ${etiquetaAtraso}
+            <div class="flex items-start justify-between mt-1">
                 <div class="flex-1 pr-2">
                     <p class="font-black text-sm leading-tight">${p.nombre}</p>
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">$${precioMos.toLocaleString('es-AR')} C/U</p>
                 </div>
-                <button onclick="eliminarDelCarrito(${p.id})" class="w-8 h-8 flex-shrink-0 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors shadow-sm">
+                <button onclick="eliminarDelCarrito(${p.id})" class="w-8 h-8 flex-shrink-0 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors shadow-sm ${p.por_encargo ? 'mt-3' : ''}">
                     <i class="fas fa-trash-alt text-xs"></i>
                 </button>
             </div>
             
-            <div class="flex items-center justify-between border-t border-gray-200 pt-3">
+            <div class="flex items-center justify-between border-t border-gray-200 pt-3 mt-1">
                 <div class="flex items-center bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
                     <button onclick="cambiarCant(${p.id}, -1)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-black rounded-lg transition-colors"><i class="fas fa-minus text-xs"></i></button>
                     <span class="font-black text-sm w-8 text-center">${p.cantidad}</span>
-                    <button onclick="cambiarCant(${p.id}, 1)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-black rounded-lg transition-colors bg-gray-50"><i class="fas fa-plus text-xs"></i></button>
+                    <button onclick="cambiarCant(${p.id}, 1)" ${(!p.por_encargo && p.cantidad >= (p.stock || 0)) ? 'disabled class="w-8 h-8 flex items-center justify-center text-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"' : 'class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-black rounded-lg transition-colors bg-gray-50"'}><i class="fas fa-plus text-xs"></i></button>
                 </div>
                 <p class="font-black text-base text-yellow-600">$${subtotal.toLocaleString('es-AR')}</p>
             </div>
