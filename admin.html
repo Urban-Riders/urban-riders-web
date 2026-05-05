@@ -4175,7 +4175,8 @@ async function generarAvisoNovedades() {
             textoMensaje += `Tenemos todo el catálogo disponible y con precios actualizados.\n\n`;
         }
 
-        const enlaceWeb = window.location.origin + window.location.pathname.replace('admin.html', 'mayorista.html');
+        const urlBase = window.location.href.split('?')[0];
+const enlaceWeb = urlBase.substring(0, urlBase.lastIndexOf('/')) + '/mayorista.html';
         textoMensaje += `👉 *Mirá el stock completo y tus precios de costo acá:*\n🌐 ${enlaceWeb}\n\n¡Cualquier duda me avisás! 🛠️`;
 
         // Lo mandamos a la caja de texto
