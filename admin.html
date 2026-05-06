@@ -1352,6 +1352,8 @@ async function generarListaPrecios() {
                     <td class="text-right font-bold text-xs ${c.saldo < 0 ? 'text-red-500' : 'text-green-600'}">$${Number(c.saldo).toLocaleString()}</td>
                     <td class="text-right px-2">
                         <div class="flex justify-end gap-2 items-center py-2">
+                            <button onclick="abrirModalNotaCredito(${c.id}, '${c.nombre}')" class="bg-red-50 border border-red-200 text-red-600 px-2 py-1 rounded text-[9px] font-bold uppercase hover:bg-red-600 hover:text-white transition shadow-sm" title="Devolución / Nota de Crédito">N. Crédito</button>
+                            
                             <button onclick="abrirModalPagos(${c.id}, '${c.nombre}', ${c.saldo})" class="bg-black text-white px-2 py-1 rounded text-[9px] font-bold uppercase">Movimiento</button>
                             
                             <button onclick="verMovimientos(${c.id}, '${c.nombre}')" class="text-blue-600 hover:text-blue-800 p-1" title="Ver Compras">
@@ -4196,6 +4198,106 @@ function copiarAvisoWpp() {
         alert("Error al copiar: " + err);
     });
 }
+function abrirModalNotaCredito(id, nombre) {
+    document.getElementById('nc-cliente-id').value = id;
+    document.getElementById('nc-cliente-nombre').innerText = nombre;
+
+    // Llenamos el catálogo de productos disponibles para devolver
+    const selectProd = document.getElementById('nc-producto');
+    selectProd.innerHTML = '<option value="">Seleccione el producto...</option>' + 
+        _productosLocales.map(p => `<option value="${p.id}" data-precio="${p.precio || 0}">${p.nombre} (Cód: ${p.codigo || 'S/C'})</option>`).join('');
+
+    // Magia: Si selecciona el producto, le precarga el precio automáticamente para ayudar
+    const autoCalcularPrecio = () => {
+        const option = selectProd.options[selectProd.selectedIndex];
+        if (option && option.value) {
+            const precioActual = parseFloat(option.getAttribute('data-precio') || 0);
+            const cant = parseInt(document.getElementById('nc-cantidad').value) || 1;
+            document.getElementById('nc-monto').value = precioActual * cant;
+        }
+    };
+    
+    selectProd.onchange = autoCalcularPrecio;
+    document.getElementById('nc-cantidad').onchange = autoCalcularPrecio;
+
+    document.getElementById('nc-cantidad').value = 1;
+    document.getElementById('nc-monto').value = '';
+    document.getElementById('nc-restaurar-stock').checked = true;
+
+    document.getElementById('modal-nota-credito').classList.remove('hidden');
+}
+
+function cerrarModalNotaCredito() {
+    document.getElementById('modal-nota-credito').classList.add('hidden');
+}
+
+async function procesarNotaCredito(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-procesar-nc');
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> PROCESANDO...';
+    btn.disabled = true;
+
+    try {
+        const clienteId = document.getElementById('nc-cliente-id').value;
+        const selectProd = document.getElementById('nc-producto');
+        const productoId = selectProd.value;
+        const productoNombreCompleto = selectProd.options[selectProd.selectedIndex].text;
+        const productoNombre = productoNombreCompleto.split(' (')[0]; // Saca el nombre limpio sin el código
+        
+        const cantidad = parseInt(document.getElementById('nc-cantidad').value);
+        const montoTotal = parseFloat(document.getElementById('nc-monto').value);
+        const restaurarStock = document.getElementById('nc-restaurar-stock').checked;
+
+        if (!productoId || isNaN(cantidad) || isNaN(montoTotal) || montoTotal <= 0) {
+            throw new Error("Verifica que los datos sean correctos.");
+        }
+
+        // 1. ACREDITAMOS SALDO AL CLIENTE (Suma al saldo negativo para achicar deuda)
+        const { data: clienteDB } = await _supabase.from('clientes').select('saldo').eq('id', clienteId).single();
+        const nuevoSaldo = parseFloat(clienteDB.saldo || 0) + montoTotal; 
+        
+        await _supabase.from('clientes').update({ saldo: nuevoSaldo }).eq('id', clienteId);
+
+        // 2. REGISTRAMOS EL MOVIMIENTO COMO NOTA DE CRÉDITO
+        await _supabase.from('movimientos_cuenta').insert([{
+            cliente_id: clienteId,
+            tipo: 'N. CREDITO',
+            monto: montoTotal,
+            descripcion: `Devolución: ${cantidad}x ${productoNombre}`,
+            saldo_resultante: nuevoSaldo
+        }]);
+
+        // 3. RESTAURAR STOCK (Si la casilla quedó tildada)
+        if (restaurarStock) {
+            const prodInfo = _productosLocales.find(p => p.id == productoId);
+            if (prodInfo) {
+                const nuevoStock = (prodInfo.stock || 0) + cantidad;
+                await _supabase.from('productos').update({ stock: nuevoStock }).eq('id', productoId);
+            }
+        }
+
+        // 4. EL TRUCO CONTABLE: Ventas en Negativo para equilibrar ganancias.
+        await _supabase.from('historial_ventas').insert([{
+            cliente_id: clienteId,
+            producto_nombre: `[DEVOLUCIÓN] ${productoNombre}`,
+            cantidad: -cantidad, // Genera una fila con cantidades y precios negativos
+            precio_unitario: (montoTotal / cantidad), 
+            fecha: new Date().toISOString()
+        }]);
+
+        alert(`✅ Devolución procesada con éxito.\nSe acreditó $${montoTotal} al cliente.`);
+        cerrarModalNotaCredito();
+        
+        // Refrescamos toda la pantalla para ver el stock y el saldo nuevo.
+        if (typeof cargarTodo === 'function') await cargarTodo();
+
+    } catch (err) {
+        alert("Error crítico al procesar devolución: " + err.message);
+    } finally {
+        btn.innerHTML = '<i class="fas fa-file-invoice-dollar"></i> Procesar Devolución';
+        btn.disabled = false;
+    }
+}
 </script>
 <!-- MODAL AVISO WHATSAPP -->
 <div id="modal-aviso-whatsapp" class="hidden fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
@@ -4213,6 +4315,53 @@ function copiarAvisoWpp() {
                 <i class="far fa-copy text-lg"></i> Copiar Mensaje
             </button>
         </div>
+    </div>
+</div>
+<!-- MODAL NOTA DE CREDITO -->
+<div id="modal-nota-credito" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-[250] p-4 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border-2 border-black">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-black uppercase italic text-red-600"><i class="fas fa-exchange-alt mr-2"></i>Nota de Crédito</h3>
+            <button onclick="cerrarModalNotaCredito()" class="text-gray-400 hover:text-black transition text-2xl">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form id="form-nota-credito" onsubmit="procesarNotaCredito(event)">
+            <input type="hidden" id="nc-cliente-id">
+            <div class="mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">A favor del Cliente:</label>
+                <p id="nc-cliente-nombre" class="font-black text-sm uppercase text-gray-800"></p>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Producto Devuelto</label>
+                <select id="nc-producto" class="w-full border-2 border-black rounded-lg p-2 text-xs font-bold outline-none focus:border-red-500" required>
+                    <option value="">Cargando catálogo...</option>
+                </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Unidades</label>
+                    <input type="number" id="nc-cantidad" min="1" required class="w-full border-2 border-black rounded-lg p-2 text-sm font-black text-center outline-none focus:border-red-500" value="1">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Total a Acreditar ($)</label>
+                    <input type="number" id="nc-monto" step="0.01" required class="w-full border-2 border-red-500 rounded-lg p-2 text-sm font-black text-red-600 text-right outline-none bg-red-50" placeholder="0.00">
+                </div>
+            </div>
+
+            <div class="mb-6 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="nc-restaurar-stock" checked class="w-5 h-5 accent-yellow-600 cursor-pointer">
+                    <span class="text-[10px] font-black uppercase text-yellow-800 tracking-tight">Restaurar stock al inventario (+1)</span>
+                </label>
+            </div>
+
+            <button type="submit" id="btn-procesar-nc" class="w-full bg-red-600 text-white py-3 rounded-xl font-black uppercase hover:bg-red-700 transition shadow-lg flex justify-center items-center gap-2 text-sm">
+                <i class="fas fa-file-invoice-dollar text-lg"></i> Procesar Devolución
+            </button>
+        </form>
     </div>
 </div>
 </body>
