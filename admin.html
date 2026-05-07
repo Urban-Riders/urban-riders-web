@@ -1359,35 +1359,152 @@ async function generarListaPrecios() {
             renderizarClientes(_clientesLocales);
         }
 
-        function renderizarClientes(lista) {
-            const tbody = document.getElementById('lista-clientes');
-            tbody.innerHTML = lista.map(c => `
-                <tr class="hover:bg-gray-50 border-b">
-                    <td class="py-3 font-black uppercase text-xs">${c.nombre}</td>
-                    <td class="text-xs">${c.telefono || '-'}</td>
-                    <td class="text-right font-bold text-xs ${c.saldo < 0 ? 'text-red-500' : 'text-green-600'}">$${Number(c.saldo).toLocaleString()}</td>
-                    <td class="text-right px-2">
-                        <div class="flex justify-end gap-2 items-center py-2">
-                            <button onclick="abrirModalNotaCredito(${c.id}, '${c.nombre}')" class="bg-red-50 border border-red-200 text-red-600 px-2 py-1 rounded text-[9px] font-bold uppercase hover:bg-red-600 hover:text-white transition shadow-sm" title="Devolución / Nota de Crédito">N. Crédito</button>
-                            
-                            <button onclick="abrirModalPagos(${c.id}, '${c.nombre}', ${c.saldo})" class="bg-black text-white px-2 py-1 rounded text-[9px] font-bold uppercase">Movimiento</button>
-                            
-                            <button onclick="verMovimientos(${c.id}, '${c.nombre}')" class="text-blue-600 hover:text-blue-800 p-1" title="Ver Compras">
-    <i class="fas fa-search"></i>
-</button>
+       // Variable global para recordar qué filtro estamos usando
+let filtroClientesActual = 'todos';
 
-                            <button onclick="exportarEstadoCuentaPDF(${c.id}, '${c.nombre}')" class="text-red-600 hover:bg-red-50 p-1 rounded transition" title="Descargar PDF">
-                                <i class="fas fa-file-pdf"></i>
-                            </button>
+function setFiltroClientes(tipo) {
+    filtroClientesActual = tipo;
+    renderizarClientes(_clientesLocales || []); 
+}
 
-                            <button onclick="eliminarCliente(${c.id}, '${c.nombre}')" class="text-gray-400 hover:text-red-600 p-1" title="Eliminar Cliente">
-                                <i class="fas fa-trash-alt"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
+function renderizarClientes(lista) {
+    const tbody = document.getElementById('lista-clientes');
+    tbody.innerHTML = '';
+    
+    // 1. Filtrar la lista
+    let listaFiltrada = lista;
+    if (filtroClientesActual === 'habilitados') {
+        listaFiltrada = lista.filter(c => c.credito_habilitado === true);
+    } else if (filtroClientesActual === 'deudores') {
+        listaFiltrada = lista.filter(c => c.saldo < 0);
+    }
+
+    // 2. Pintar botones de filtro activos/inactivos
+    const btnTodos = document.getElementById('btn-filtro-todos');
+    const btnHab = document.getElementById('btn-filtro-habilitados');
+    const btnDeu = document.getElementById('btn-filtro-deudores');
+    
+    if(btnTodos) btnTodos.className = `px-3 py-1 rounded-full text-[10px] font-bold uppercase transition ${filtroClientesActual === 'todos' ? 'bg-black text-white shadow-sm' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
+    if(btnHab) btnHab.className = `px-3 py-1 rounded-full text-[10px] font-bold uppercase transition ${filtroClientesActual === 'habilitados' ? 'bg-black text-white shadow-sm' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
+    if(btnDeu) btnDeu.className = `px-3 py-1 rounded-full text-[10px] font-bold uppercase transition ${filtroClientesActual === 'deudores' ? 'bg-black text-white shadow-sm' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
+
+    let totalSaldos = 0;
+
+    tbody.innerHTML = listaFiltrada.map(c => {
+        totalSaldos += c.saldo || 0;
+        const colorSaldo = c.saldo < 0 ? 'text-red-500' : (c.saldo > 0 ? 'text-green-600' : 'text-gray-900');
+        const nombreSeguro = c.nombre.replace(/'/g, "\\'"); // Evita errores si el comercio tiene comillas
+        
+        // Columna Acceso
+        let botonAcceso = '';
+        if (c.auth_id) {
+            botonAcceso = `<span class="text-green-600 text-[10px] font-bold uppercase flex items-center gap-1 justify-center"><i class="fas fa-check-circle"></i> Acceso OK</span>`;
+        } else {
+            botonAcceso = `<button onclick="abrirModalAcceso(${c.id}, '${nombreSeguro}', '${c.email || ''}')" class="bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white px-2 py-1 rounded text-[9px] font-bold uppercase transition flex items-center gap-1 mx-auto border border-blue-200 w-full justify-center"><i class="fas fa-key"></i> Dar Acceso</button>`;
         }
+
+        // Columna Crédito
+        const btnCredito = `
+            <div class="flex flex-col items-center justify-center gap-1">
+                <label class="relative inline-flex items-center cursor-pointer" title="Habilitar/Cortar Crédito">
+                    <input type="checkbox" class="sr-only peer" ${c.credito_habilitado ? 'checked' : ''} onchange="toggleCredito(${c.id}, ${c.credito_habilitado})">
+                    <div class="w-7 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
+                <span class="text-[8px] font-bold uppercase text-gray-400">${c.credito_habilitado ? 'Hab.' : 'No'}</span>
+            </div>
+        `;
+
+        return `
+            <tr class="hover:bg-gray-50 border-b">
+                <td class="py-3 px-2">
+                    <div class="font-black uppercase text-xs">${c.nombre}</div>
+                    <div class="text-[10px] text-gray-500 flex items-center gap-1">${c.telefono || '-'}</div>
+                </td>
+                <td class="py-3 px-2 text-right font-bold text-xs ${colorSaldo}">$${Number(c.saldo).toLocaleString('es-AR')}</td>
+                <td class="py-3 px-2 text-center align-middle">${btnCredito}</td>
+                <td class="py-3 px-2 text-center align-middle">${botonAcceso}</td>
+                <td class="text-right px-2">
+                    <div class="flex justify-end gap-2 items-center py-2">
+                        <button onclick="abrirModalNotaCredito(${c.id}, '${nombreSeguro}')" class="bg-red-50 border border-red-200 text-red-600 px-2 py-1 rounded text-[9px] font-bold uppercase hover:bg-red-600 hover:text-white transition shadow-sm" title="Devolución / Nota de Crédito">N. C.</button>
+                        <button onclick="abrirModalPagos(${c.id}, '${nombreSeguro}', ${c.saldo})" class="bg-black text-white px-2 py-1 rounded text-[9px] font-bold uppercase">Movimiento</button>
+                        <button onclick="verMovimientos(${c.id}, '${nombreSeguro}')" class="text-blue-600 hover:text-blue-800 p-1" title="Ver Compras"><i class="fas fa-search"></i></button>
+                        <button onclick="exportarEstadoCuentaPDF(${c.id}, '${nombreSeguro}')" class="text-red-600 hover:bg-red-50 p-1 rounded transition" title="Descargar PDF"><i class="fas fa-file-pdf"></i></button>
+                        <button onclick="eliminarCliente(${c.id}, '${nombreSeguro}')" class="text-gray-400 hover:text-red-600 p-1" title="Eliminar Cliente"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    const elTotalSaldos = document.getElementById('total-saldos');
+    if (elTotalSaldos) {
+        const colorTotal = totalSaldos < 0 ? 'text-red-600' : 'text-green-600';
+        elTotalSaldos.innerHTML = `Balance Filtrado: <span class="${colorTotal}">$${Number(totalSaldos).toLocaleString('es-AR')}</span>`;
+    }
+}
+
+async function toggleCredito(id, estadoActual) {
+    const nuevoEstado = !estadoActual;
+    const accion = nuevoEstado ? "HABILITAR" : "SUSPENDER";
+    
+    if(!confirm(`¿Seguro que deseas ${accion} la cuenta corriente de este cliente?`)) {
+        renderizarClientes(_clientesLocales); // Revierte el switch visual
+        return;
+    }
+
+    try {
+        const { error } = await _supabase.from('clientes').update({ credito_habilitado: nuevoEstado }).eq('id', id);
+        if (error) throw error;
+        // Actualizamos nuestra variable local y repintamos
+        const clienteObj = _clientesLocales.find(c => c.id === id);
+        if(clienteObj) clienteObj.credito_habilitado = nuevoEstado;
+        renderizarClientes(_clientesLocales);
+    } catch (err) {
+        alert("Error al cambiar estado: " + err.message);
+        renderizarClientes(_clientesLocales);
+    }
+}
+
+function abrirModalAcceso(id, nombre, email) {
+    document.getElementById('alta-cliente-id').value = id;
+    document.getElementById('alta-cliente-nombre').innerText = nombre;
+    document.getElementById('alta-email').value = email && email !== 'undefined' ? email : '';
+    document.getElementById('modal-alta-acceso').classList.remove('hidden');
+}
+
+async function procesarAltaAcceso() {
+    const btn = document.getElementById('btn-procesar-alta');
+    const id = document.getElementById('alta-cliente-id').value;
+    const email = document.getElementById('alta-email').value;
+    const password = document.getElementById('alta-password').value;
+
+    if (!email || password.length < 6) return alert("Ingresa un email válido y una clave de al menos 6 caracteres.");
+
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+    btn.disabled = true;
+
+    try {
+        const respuesta = await fetch('/api/crear-acceso', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cliente_id: id, email, password })
+        });
+
+        const data = await respuesta.json();
+        
+        if (!respuesta.ok) throw new Error(data.error || 'Error del servidor');
+
+        alert("✅ Usuario creado con éxito. El cliente ya puede ingresar a la web mayorista.");
+        document.getElementById('modal-alta-acceso').classList.add('hidden');
+        await cargarClientes(); 
+        
+    } catch (err) {
+        alert("Error: " + err.message);
+    } finally {
+        btn.innerHTML = '<i class="fas fa-check"></i> Crear Usuario';
+        btn.disabled = false;
+    }
+}
 
         async function eliminarCliente(id, nombre) {
             if (confirm(`¿ESTÁS SEGURO? Se eliminará a "${nombre}" y TODO su historial de movimientos. Esta acción es irreversible.`)) {
@@ -4378,6 +4495,29 @@ async function procesarNotaCredito(e) {
                 <i class="fas fa-file-invoice-dollar text-lg"></i> Procesar Devolución
             </button>
         </form>
+    </div>
+</div>
+<div id="modal-alta-acceso" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-[300] p-4 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl border-2 border-black">
+        <h3 class="text-lg font-black uppercase italic text-blue-600 mb-4"><i class="fas fa-user-plus mr-2"></i>Generar Acceso</h3>
+        <p id="alta-cliente-nombre" class="font-bold text-sm uppercase text-gray-800 mb-4 bg-gray-100 p-2 rounded"></p>
+        
+        <input type="hidden" id="alta-cliente-id">
+        <div class="mb-3">
+            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Email del cliente</label>
+            <input type="email" id="alta-email" class="w-full border border-gray-300 rounded p-2 text-sm outline-none focus:border-blue-500">
+        </div>
+        <div class="mb-6">
+            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Contraseña (Mín. 6 caracteres)</label>
+            <input type="text" id="alta-password" class="w-full border border-gray-300 rounded p-2 text-sm outline-none focus:border-blue-500" value="Urban2026">
+        </div>
+        
+        <div class="flex gap-2">
+            <button onclick="document.getElementById('modal-alta-acceso').classList.add('hidden')" class="w-1/3 bg-gray-200 text-black py-2 rounded-xl font-bold uppercase hover:bg-gray-300 text-xs transition">Cancelar</button>
+            <button onclick="procesarAltaAcceso()" id="btn-procesar-alta" class="w-2/3 bg-blue-600 text-white py-2 rounded-xl font-black uppercase hover:bg-blue-700 transition text-xs shadow flex justify-center items-center gap-2">
+                <i class="fas fa-check"></i> Crear Usuario
+            </button>
+        </div>
     </div>
 </div>
 </body>
