@@ -39,7 +39,7 @@ export default async function handler(req, res) {
                 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
                 'Prefer': 'return=minimal'
             },
-            body: JSON.stringify({ auth_id: nuevoUserId })
+           body: JSON.stringify({ auth_id: nuevoUserId, email: email })
         });
 
         if (!dbRes.ok) throw new Error('Usuario creado, pero falló al enlazar en la tabla clientes');
