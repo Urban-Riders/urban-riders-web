@@ -209,7 +209,7 @@ async function verificarSesion_e_iniciar() {
     }
 }
 async function init() {
-    // Traemos los clientes, pero EXCLUIMOS a los vendedores, administradores y minoristas
+    // 1. Traemos clientes y productos como siempre
     const { data: c } = await _supabase
         .from('clientes')
         .select('*')
@@ -221,6 +221,34 @@ async function init() {
     
     clientes = c || []; 
     productos = p || [];
+
+    // --- NUEVO: Buscar antigüedad de la deuda ---
+    const deudoresIds = clientes.filter(cliente => cliente.saldo < 0).map(cliente => cliente.id);
+    
+    if (deudoresIds.length > 0) {
+        // Buscamos el último movimiento en la cuenta corriente de los que deben plata
+        const { data: movs } = await _supabase
+            .from('movimientos_cuenta')
+            .select('cliente_id, created_at')
+            .in('cliente_id', deudoresIds)
+            .order('created_at', { ascending: false });
+
+        // Guardamos solo la fecha más reciente por cliente
+        let ultimosMovimientos = {};
+        if (movs) {
+            movs.forEach(m => {
+                if (!ultimosMovimientos[m.cliente_id]) {
+                    ultimosMovimientos[m.cliente_id] = m.created_at;
+                }
+            });
+        }
+
+        // Le pegamos esa fecha a cada cliente deudor
+        clientes.forEach(cliente => {
+            cliente.ultima_actividad = ultimosMovimientos[cliente.id] || null;
+        });
+    }
+
     renderClientes(clientes);
     renderProductos(productos);
 }
@@ -308,12 +336,38 @@ function renderClientes(lista) {
         const div = document.createElement('div');
         div.className = 'p-4 border-b border-gray-100 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors';
         div.onclick = () => seleccionarCliente(c);
+        
+        // --- NUEVO: Cartelito de Deuda y Antigüedad ---
+        let etiquetaDeuda = '';
+        if (c.saldo < 0) {
+            let textoAntiguedad = ' (Saldo anterior)';
+            if (c.ultima_actividad) {
+                // Calculamos cuántos días pasaron desde el último movimiento
+                const dias = Math.floor((new Date() - new Date(c.ultima_actividad)) / (1000 * 60 * 60 * 24));
+                if (dias === 0) textoAntiguedad = ' (Movimiento hoy)';
+                else if (dias === 1) textoAntiguedad = ' (Hace 1 día)';
+                else textoAntiguedad = ` (Hace ${dias} días)`;
+            }
+            
+            etiquetaDeuda = `
+                <div class="mt-2">
+                    <span class="bg-red-50 text-red-600 text-[10px] font-black uppercase px-2 py-1 rounded-md border border-red-200 shadow-sm inline-flex items-center gap-1">
+                        <i class="fas fa-exclamation-circle"></i> 
+                        Deuda: $${Math.abs(c.saldo).toLocaleString('es-AR')} ${textoAntiguedad}
+                    </span>
+                </div>
+            `;
+        }
+
         div.innerHTML = `
-            <div>
-                <p class="font-black text-sm">${c.nombre}</p>
-                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">${c.tipo_cliente || 'Sin tipo'}</p>
+            <div class="flex-1 pr-4">
+                <p class="font-black text-sm text-gray-800 leading-tight">${c.nombre}</p>
+                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">${c.tipo_cliente || 'Sin tipo'}</p>
+                ${etiquetaDeuda}
             </div>
-            <i class="fas fa-chevron-right text-gray-300 text-xs"></i>
+            <div class="w-8 h-8 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
+                <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+            </div>
         `;
         list.appendChild(div);
     });
