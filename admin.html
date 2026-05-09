@@ -3630,13 +3630,12 @@ async function analizarCompetencia(id) {
     const linkManual = `https://listado.mercadolibre.com.ar/${encodeURIComponent(query)}`;
 
     try {
-        // PLAN C: Bypasseamos Vercel y usamos un proxy CORS directo de alta disponibilidad
+        // CONEXIÓN DIRECTA: Sin Vercel, sin Proxies. Desde tu compu a MeLi.
         const urlMeli = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=15`;
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(urlMeli)}`;
 
-        const res = await fetch(proxyUrl);
+        const res = await fetch(urlMeli);
         
-        if (!res.ok) throw new Error("El escudo de MeLi bloqueó la conexión.");
+        if (!res.ok) throw new Error("Mercado Libre pide token o bloqueó el acceso público.");
         
         const data = await res.json();
         
