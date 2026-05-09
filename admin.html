@@ -3623,7 +3623,6 @@ async function analizarCompetencia(id) {
     loading.classList.remove('hidden');
     resultados.classList.add('hidden');
 
-    // Limpiamos el nombre para que la búsqueda en MeLi sea más precisa
     let query = p.nombre.replace(/Urban Riders/gi, '').replace(/[^\w\s]/gi, ' ').trim();
     if (query.length < 3) query = p.nombre;
     
@@ -3631,34 +3630,46 @@ async function analizarCompetencia(id) {
     const linkManual = `https://listado.mercadolibre.com.ar/${encodeURIComponent(query)}`;
 
     try {
-        const urlMeli = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=15`;
-        let data = null;
+        // PLAN MAESTRO: JSONP (Engañamos al navegador inyectando un script falso)
+        const data = await new Promise((resolve, reject) => {
+            const callbackName = 'meli_cb_' + Date.now();
+            
+            // 1. Preparamos el "buzón" donde Mercado Libre va a dejar los datos
+            window[callbackName] = function(respuesta) {
+                delete window[callbackName];
+                resolve(respuesta);
+            };
 
-        // TÚNEL 1: CodeTabs (Proxy súper rápido que esconde los encabezados)
-        try {
-            const res1 = await fetch(`https://api.codetabs.com/v1/proxy/?quest=${urlMeli}`);
-            if (res1.ok) {
-                data = await res1.json();
-            }
-        } catch (e1) {
-            console.log("El túnel 1 falló, saltando al túnel 2...");
+            // 2. Creamos la etiqueta de script invisible
+            const script = document.createElement('script');
+            script.src = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=15&callback=${callbackName}`;
+            
+            // 3. Si falla por falta de internet
+            script.onerror = function() {
+                delete window[callbackName];
+                reject(new Error("Mercado Libre no respondió al script. ¿Bloqueador de anuncios activo?"));
+            };
+
+            // 4. Inyectamos el script para ejecutar la búsqueda real
+            document.body.appendChild(script);
+            
+            // 5. Limpiamos la basura después de 2 segundos
+            setTimeout(() => { 
+                if (document.body.contains(script)) document.body.removeChild(script); 
+            }, 2000);
+        });
+
+        // A veces MeLi envuelve los datos en un array, nos aseguramos de leer el objeto correcto
+        const resultadosMeli = data[2] || data;
+
+        if (!resultadosMeli || !resultadosMeli.results || resultadosMeli.results.length === 0) {
+            throw new Error("El repuesto no tiene resultados en MeLi");
         }
 
-        // TÚNEL 2: AllOrigins Raw (Fuerza bruta si el primero rebota)
-        if (!data || !data.results) {
-            const res2 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(urlMeli)}`);
-            if (!res2.ok) throw new Error("Mercado Libre bloqueó ambas conexiones alternativas.");
-            data = await res2.json();
-        }
-        
-        if (!data.results || data.results.length === 0) throw new Error("El repuesto no tiene resultados en MeLi");
-
-        // Calculamos los precios
-        const precios = data.results.map(r => r.price).sort((a, b) => a - b);
+        const precios = resultadosMeli.results.map(r => r.price).sort((a, b) => a - b);
         const promedio = precios.reduce((a, b) => a + b, 0) / precios.length;
         const masBarato = precios[0];
 
-        // Definimos los colores del semáforo
         let estado = "COMPETITIVO";
         let color = "bg-yellow-100 text-yellow-800 border-yellow-400";
         if (miPrecio < promedio * 0.9) { estado = "MUY BARATO"; color = "bg-green-100 text-green-800 border-green-400"; }
@@ -3667,7 +3678,6 @@ async function analizarCompetencia(id) {
         loading.classList.add('hidden');
         resultados.classList.remove('hidden');
 
-        // Dibujamos el panel de comparación
         resultados.innerHTML = `
             <div class="text-center mb-6">
                 <span class="${color} border px-3 py-1 rounded-full text-[10px] font-black uppercase italic shadow-sm">${estado}</span>
@@ -3688,7 +3698,7 @@ async function analizarCompetencia(id) {
                 <i class="fas fa-external-link-alt mr-2"></i>Ver todo en MeLi
             </a>
             <div class="space-y-2 max-h-40 overflow-y-auto pr-1">
-                ${data.results.slice(0, 5).map(r => `
+                ${resultadosMeli.results.slice(0, 5).map(r => `
                     <div class="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100 text-[9px] shadow-sm">
                         <span class="truncate pr-4 font-bold uppercase text-gray-600">${r.title}</span>
                         <span class="font-black italic text-black shrink-0">$${r.price.toLocaleString('es-AR')}</span>
