@@ -3612,7 +3612,7 @@ async function aplicarAumentoProveedor() {
 // --- FUNCIÓN COMPARADOR DE PRECIOS MERCADO LIBRE ---
 // --- FUNCIÓN COMPARADOR DE PRECIOS MERCADO LIBRE (VERSIÓN CORREGIDA) ---
 async function analizarCompetencia(id) {
-    // 1. Buscamos el producto (usando == para evitar líos de tipo de dato)
+    // 1. Buscamos el producto
     const p = _productosLocales.find(prod => prod.id == id);
     if (!p) return;
 
@@ -3626,22 +3626,22 @@ async function analizarCompetencia(id) {
 
     let query = p.nombre.replace(/Urban Riders/gi, '').replace(/[^\w\s]/gi, ' ').trim();
     if (query.length < 3) query = p.nombre;
-
+    
     const miPrecio = parseFloat(p.precio_meli || p.precio) || 0;
-    const urlMeli = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=15`;
     const linkManual = `https://listado.mercadolibre.com.ar/${encodeURIComponent(query)}`;
 
     try {
-        // --- EL TRUCO DEL PROXY ---
-        // Envolvemos la URL de MeLi en el proxy AllOrigins para evitar el 403
-        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(urlMeli)}`);
-        
-        if (!res.ok) throw new Error("Error en el servidor puente");
-        
-        const proxyData = await res.json();
-        // AllOrigins devuelve la respuesta de MeLi dentro de una propiedad llamada 'contents'
-        const data = JSON.parse(proxyData.contents);
+        // --- CONEXIÓN VIP: Usamos nuestro servidor en Vercel ---
+        const res = await fetch('/api/buscar-meli', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: query })
+        });
 
+        if (!res.ok) throw new Error("Error en la conexión con tu servidor");
+        
+        const data = await res.json();
+        
         if (!data.results || data.results.length === 0) throw new Error("Sin resultados en MeLi");
 
         const precios = data.results.map(r => r.price).sort((a, b) => a - b);
@@ -3655,6 +3655,7 @@ async function analizarCompetencia(id) {
 
         loading.classList.add('hidden');
         resultados.classList.remove('hidden');
+
         resultados.innerHTML = `
             <div class="text-center mb-6">
                 <span class="${color} border px-3 py-1 rounded-full text-[10px] font-black uppercase italic shadow-sm">${estado}</span>
@@ -3691,7 +3692,7 @@ async function analizarCompetencia(id) {
             <div class="text-center py-4">
                 <div class="bg-gray-50 text-gray-600 p-4 rounded-xl border border-gray-100 mb-4">
                     <p class="font-black uppercase text-[10px]">No se pudo cargar la comparación</p>
-                    <p class="text-[8px] mt-1">MeLi no respondió a la consulta automática.</p>
+                    <p class="text-[8px] mt-1">Error de conexión: ${err.message}</p>
                 </div>
                 <a href="${linkManual}" target="_blank" class="block w-full bg-yellow-400 hover:bg-yellow-500 text-black text-center py-4 rounded-xl font-black uppercase text-xs transition shadow-lg">
                     <i class="fas fa-search-dollar mr-2"></i>Investigar manualmente
