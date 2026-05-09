@@ -3623,6 +3623,7 @@ async function analizarCompetencia(id) {
     loading.classList.remove('hidden');
     resultados.classList.add('hidden');
 
+    // Limpiamos el nombre para que la búsqueda en MeLi sea más precisa
     let query = p.nombre.replace(/Urban Riders/gi, '').replace(/[^\w\s]/gi, ' ').trim();
     if (query.length < 3) query = p.nombre;
     
@@ -3630,21 +3631,34 @@ async function analizarCompetencia(id) {
     const linkManual = `https://listado.mercadolibre.com.ar/${encodeURIComponent(query)}`;
 
     try {
-        // CONEXIÓN DIRECTA: Sin Vercel, sin Proxies. Desde tu compu a MeLi.
         const urlMeli = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=15`;
+        let data = null;
 
-        const res = await fetch(urlMeli);
-        
-        if (!res.ok) throw new Error("Mercado Libre pide token o bloqueó el acceso público.");
-        
-        const data = await res.json();
-        
-        if (!data.results || data.results.length === 0) throw new Error("Sin resultados en MeLi");
+        // TÚNEL 1: CodeTabs (Proxy súper rápido que esconde los encabezados)
+        try {
+            const res1 = await fetch(`https://api.codetabs.com/v1/proxy/?quest=${urlMeli}`);
+            if (res1.ok) {
+                data = await res1.json();
+            }
+        } catch (e1) {
+            console.log("El túnel 1 falló, saltando al túnel 2...");
+        }
 
+        // TÚNEL 2: AllOrigins Raw (Fuerza bruta si el primero rebota)
+        if (!data || !data.results) {
+            const res2 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(urlMeli)}`);
+            if (!res2.ok) throw new Error("Mercado Libre bloqueó ambas conexiones alternativas.");
+            data = await res2.json();
+        }
+        
+        if (!data.results || data.results.length === 0) throw new Error("El repuesto no tiene resultados en MeLi");
+
+        // Calculamos los precios
         const precios = data.results.map(r => r.price).sort((a, b) => a - b);
         const promedio = precios.reduce((a, b) => a + b, 0) / precios.length;
         const masBarato = precios[0];
 
+        // Definimos los colores del semáforo
         let estado = "COMPETITIVO";
         let color = "bg-yellow-100 text-yellow-800 border-yellow-400";
         if (miPrecio < promedio * 0.9) { estado = "MUY BARATO"; color = "bg-green-100 text-green-800 border-green-400"; }
@@ -3653,6 +3667,7 @@ async function analizarCompetencia(id) {
         loading.classList.add('hidden');
         resultados.classList.remove('hidden');
 
+        // Dibujamos el panel de comparación
         resultados.innerHTML = `
             <div class="text-center mb-6">
                 <span class="${color} border px-3 py-1 rounded-full text-[10px] font-black uppercase italic shadow-sm">${estado}</span>
@@ -3689,10 +3704,10 @@ async function analizarCompetencia(id) {
             <div class="text-center py-4">
                 <div class="bg-gray-50 text-gray-600 p-4 rounded-xl border border-gray-100 mb-4">
                     <p class="font-black uppercase text-[10px]">No se pudo cargar la comparación</p>
-                    <p class="text-[8px] mt-1">${err.message}</p>
+                    <p class="text-[8px] mt-1 text-red-500">${err.message}</p>
                 </div>
                 <a href="${linkManual}" target="_blank" class="block w-full bg-yellow-400 hover:bg-yellow-500 text-black text-center py-4 rounded-xl font-black uppercase text-xs transition shadow-lg">
-                    <i class="fas fa-search-dollar mr-2"></i>Investigar manualmente
+                    <i class="fas fa-search-dollar mr-2"></i>Buscar a mano
                 </a>
             </div>`;
     }
