@@ -5,31 +5,41 @@ export default async function handler(req, res) {
     const APP_ID = process.env.MELI_APP_ID;
     const SECRET = process.env.MELI_CLIENT_SECRET;
 
+    console.log("1. Buscando producto:", query);
+    console.log("2. Llaves secretas en Vercel detectadas:", APP_ID ? "SÍ" : "NO (Falta hacer bien el Redeploy)");
+
     try {
-        // 1. Pedimos un permiso temporal a Mercado Libre usando tus credenciales secretas
-        let accessToken = '';
-        if (APP_ID && SECRET) {
-            const tokenResponse = await fetch('https://api.mercadolibre.com/oauth/token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `grant_type=client_credentials&client_id=${APP_ID}&client_secret=${SECRET}`
-            });
-            const tokenData = await tokenResponse.json();
-            if (tokenData.access_token) accessToken = tokenData.access_token;
+        if (!APP_ID || !SECRET) {
+            throw new Error("Faltan las credenciales en Vercel. Las variables de entorno no cargaron.");
         }
 
-        // 2. Buscamos los precios mostrando la credencial oficial
-        const fetchHeaders = accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {};
+        console.log("3. Pidiendo permiso oficial a Mercado Libre...");
+        const tokenResponse = await fetch('https://api.mercadolibre.com/oauth/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+            body: `grant_type=client_credentials&client_id=${APP_ID}&client_secret=${SECRET}`
+        });
+        
+        const tokenData = await tokenResponse.json();
+        console.log("4. Respuesta de MeLi al pedir permiso:", tokenData);
+        
+        if (!tokenData.access_token) {
+            throw new Error("Mercado Libre rechazó las llaves: " + JSON.stringify(tokenData));
+        }
+
+        console.log("5. ¡Permiso concedido! Buscando precios...");
         const meliRes = await fetch(`https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=15`, {
-            headers: fetchHeaders
+            headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
         });
         
         const data = await meliRes.json();
-        if (data.error) throw new Error(data.message);
+        
+        if (data.error) throw new Error("Error en la búsqueda de MeLi: " + data.message);
 
-        // 3. Le devolvemos los datos limpios a tu panel
+        console.log("6. Búsqueda exitosa. Enviando datos al panel.");
         return res.status(200).json(data);
     } catch (error) {
+        console.error(">>> ERROR FATAL DETECTADO:", error.message);
         return res.status(500).json({ error: error.message });
     }
 }
