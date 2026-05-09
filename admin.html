@@ -3612,7 +3612,6 @@ async function aplicarAumentoProveedor() {
 // --- FUNCIÓN COMPARADOR DE PRECIOS MERCADO LIBRE ---
 // --- FUNCIÓN COMPARADOR DE PRECIOS MERCADO LIBRE (VERSIÓN CORREGIDA) ---
 async function analizarCompetencia(id) {
-    // 1. Buscamos el producto
     const p = _productosLocales.find(prod => prod.id == id);
     if (!p) return;
 
@@ -3631,14 +3630,13 @@ async function analizarCompetencia(id) {
     const linkManual = `https://listado.mercadolibre.com.ar/${encodeURIComponent(query)}`;
 
     try {
-        // --- CONEXIÓN VIP: Usamos nuestro servidor en Vercel ---
-        const res = await fetch('/api/buscar-meli', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: query })
-        });
+        // PLAN C: Bypasseamos Vercel y usamos un proxy CORS directo de alta disponibilidad
+        const urlMeli = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=15`;
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(urlMeli)}`;
 
-        if (!res.ok) throw new Error("Error en la conexión con tu servidor");
+        const res = await fetch(proxyUrl);
+        
+        if (!res.ok) throw new Error("El escudo de MeLi bloqueó la conexión.");
         
         const data = await res.json();
         
@@ -3692,7 +3690,7 @@ async function analizarCompetencia(id) {
             <div class="text-center py-4">
                 <div class="bg-gray-50 text-gray-600 p-4 rounded-xl border border-gray-100 mb-4">
                     <p class="font-black uppercase text-[10px]">No se pudo cargar la comparación</p>
-                    <p class="text-[8px] mt-1">Error de conexión: ${err.message}</p>
+                    <p class="text-[8px] mt-1">${err.message}</p>
                 </div>
                 <a href="${linkManual}" target="_blank" class="block w-full bg-yellow-400 hover:bg-yellow-500 text-black text-center py-4 rounded-xl font-black uppercase text-xs transition shadow-lg">
                     <i class="fas fa-search-dollar mr-2"></i>Investigar manualmente
