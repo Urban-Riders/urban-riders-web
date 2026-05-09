@@ -3630,43 +3630,17 @@ async function analizarCompetencia(id) {
     const linkManual = `https://listado.mercadolibre.com.ar/${encodeURIComponent(query)}`;
 
     try {
-        // PLAN MAESTRO: JSONP (Engañamos al navegador inyectando un script falso)
-        const data = await new Promise((resolve, reject) => {
-            const callbackName = 'meli_cb_' + Date.now();
-            
-            // 1. Preparamos el "buzón" donde Mercado Libre va a dejar los datos
-            window[callbackName] = function(respuesta) {
-                delete window[callbackName];
-                resolve(respuesta);
-            };
+        // Conexión súper directa a MeLi. ¡Ahora funciona gracias a la extensión de Chrome!
+        const urlMeli = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=15`;
+        const res = await fetch(urlMeli);
+        
+        if (!res.ok) throw new Error("Asegurate de que la extensión 'Allow CORS' esté encendida (ícono naranja).");
+        
+        const data = await res.json();
+        
+        if (!data.results || data.results.length === 0) throw new Error("Sin resultados en MeLi");
 
-            // 2. Creamos la etiqueta de script invisible
-            const script = document.createElement('script');
-            script.src = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=15&callback=${callbackName}`;
-            
-            // 3. Si falla por falta de internet
-            script.onerror = function() {
-                delete window[callbackName];
-                reject(new Error("Mercado Libre no respondió al script. ¿Bloqueador de anuncios activo?"));
-            };
-
-            // 4. Inyectamos el script para ejecutar la búsqueda real
-            document.body.appendChild(script);
-            
-            // 5. Limpiamos la basura después de 2 segundos
-            setTimeout(() => { 
-                if (document.body.contains(script)) document.body.removeChild(script); 
-            }, 2000);
-        });
-
-        // A veces MeLi envuelve los datos en un array, nos aseguramos de leer el objeto correcto
-        const resultadosMeli = data[2] || data;
-
-        if (!resultadosMeli || !resultadosMeli.results || resultadosMeli.results.length === 0) {
-            throw new Error("El repuesto no tiene resultados en MeLi");
-        }
-
-        const precios = resultadosMeli.results.map(r => r.price).sort((a, b) => a - b);
+        const precios = data.results.map(r => r.price).sort((a, b) => a - b);
         const promedio = precios.reduce((a, b) => a + b, 0) / precios.length;
         const masBarato = precios[0];
 
@@ -3698,7 +3672,7 @@ async function analizarCompetencia(id) {
                 <i class="fas fa-external-link-alt mr-2"></i>Ver todo en MeLi
             </a>
             <div class="space-y-2 max-h-40 overflow-y-auto pr-1">
-                ${resultadosMeli.results.slice(0, 5).map(r => `
+                ${data.results.slice(0, 5).map(r => `
                     <div class="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100 text-[9px] shadow-sm">
                         <span class="truncate pr-4 font-bold uppercase text-gray-600">${r.title}</span>
                         <span class="font-black italic text-black shrink-0">$${r.price.toLocaleString('es-AR')}</span>
@@ -3714,10 +3688,10 @@ async function analizarCompetencia(id) {
             <div class="text-center py-4">
                 <div class="bg-gray-50 text-gray-600 p-4 rounded-xl border border-gray-100 mb-4">
                     <p class="font-black uppercase text-[10px]">No se pudo cargar la comparación</p>
-                    <p class="text-[8px] mt-1 text-red-500">${err.message}</p>
+                    <p class="text-[8px] mt-1">${err.message}</p>
                 </div>
                 <a href="${linkManual}" target="_blank" class="block w-full bg-yellow-400 hover:bg-yellow-500 text-black text-center py-4 rounded-xl font-black uppercase text-xs transition shadow-lg">
-                    <i class="fas fa-search-dollar mr-2"></i>Buscar a mano
+                    <i class="fas fa-search-dollar mr-2"></i>Investigar manualmente
                 </a>
             </div>`;
     }
