@@ -3620,31 +3620,33 @@ async function analizarCompetencia(id) {
     const resultados = document.getElementById('resultados-analisis');
 
     modal.classList.remove('hidden');
-    // Saltamos el loading directo a los resultados porque ya no dependemos de conexiones externas
     loading.classList.add('hidden');
     resultados.classList.remove('hidden');
 
-    // Inteligencia para armar la mejor búsqueda posible
+    // Limpiamos el nombre para la búsqueda
     let query = p.nombre.replace(/Urban Riders/gi, '').replace(/[^\w\s]/gi, ' ').trim();
     if (query.length < 3) query = p.nombre;
     
     const miPrecio = parseFloat(p.precio_meli || p.precio) || 0;
-    
-    // Link armado a medida para la búsqueda
     const linkManual = `https://listado.mercadolibre.com.ar/${encodeURIComponent(query)}`;
+    
+    // Verificamos si hay imagen, sino usamos un placeholder de Urban Riders
+    const urlImagen = p.imagen || 'https://via.placeholder.com/150?text=UR';
 
-    // Panel rápido, limpio y sin errores
     resultados.innerHTML = `
-        <div class="text-center mb-6">
+        <div class="flex flex-col items-center mb-6 text-center">
+            <div class="w-20 h-20 mb-4 rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm">
+                <img src="${urlImagen}" alt="${p.nombre}" class="w-full h-full object-cover">
+            </div>
+
             <span class="bg-gray-100 text-gray-800 border-gray-400 border px-3 py-1 rounded-full text-[10px] font-black uppercase italic shadow-sm">TU PRECIO ACTUAL</span>
-            <h4 class="text-4xl font-black italic mt-4">$${miPrecio.toLocaleString('es-AR')}</h4>
+            <h4 class="text-4xl font-black italic mt-3">$${miPrecio.toLocaleString('es-AR')}</h4>
             <p class="text-[10px] text-gray-500 uppercase font-bold tracking-tighter mt-1">${p.nombre}</p>
         </div>
         
         <div class="bg-yellow-50 p-4 rounded-xl border border-yellow-200 text-center mb-6">
-            <i class="fas fa-shield-alt text-yellow-600 text-2xl mb-2"></i>
-            <p class="text-[10px] uppercase font-bold text-yellow-800">Análisis Seguro</p>
-            <p class="text-[9px] text-yellow-700 mt-1">Mercado Libre bloquea la extracción automática. Verificá los precios reales de este repuesto directamente en su plataforma.</p>
+            <i class="fas fa-info-circle text-yellow-600 text-xl mb-2"></i>
+            <p class="text-[9px] text-yellow-700">Usá la foto de arriba para comparar visualmente con los resultados que vas a encontrar en Mercado Libre.</p>
         </div>
 
         <a href="${linkManual}" target="_blank" class="block w-full bg-yellow-400 hover:bg-yellow-500 text-black text-center py-4 rounded-xl font-black uppercase text-sm transition shadow-lg flex items-center justify-center">
