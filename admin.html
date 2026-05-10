@@ -3620,79 +3620,37 @@ async function analizarCompetencia(id) {
     const resultados = document.getElementById('resultados-analisis');
 
     modal.classList.remove('hidden');
-    loading.classList.remove('hidden');
-    resultados.classList.add('hidden');
+    // Saltamos el loading directo a los resultados porque ya no dependemos de conexiones externas
+    loading.classList.add('hidden');
+    resultados.classList.remove('hidden');
 
+    // Inteligencia para armar la mejor búsqueda posible
     let query = p.nombre.replace(/Urban Riders/gi, '').replace(/[^\w\s]/gi, ' ').trim();
     if (query.length < 3) query = p.nombre;
     
     const miPrecio = parseFloat(p.precio_meli || p.precio) || 0;
+    
+    // Link armado a medida para la búsqueda
     const linkManual = `https://listado.mercadolibre.com.ar/${encodeURIComponent(query)}`;
 
-    try {
-        // Volvemos a pedirle los datos a Vercel (que ahora usa el truco de Googlebot)
-        const res = await fetch('/api/buscar-meli', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query })
-        });
+    // Panel rápido, limpio y sin errores
+    resultados.innerHTML = `
+        <div class="text-center mb-6">
+            <span class="bg-gray-100 text-gray-800 border-gray-400 border px-3 py-1 rounded-full text-[10px] font-black uppercase italic shadow-sm">TU PRECIO ACTUAL</span>
+            <h4 class="text-4xl font-black italic mt-4">$${miPrecio.toLocaleString('es-AR')}</h4>
+            <p class="text-[10px] text-gray-500 uppercase font-bold tracking-tighter mt-1">${p.nombre}</p>
+        </div>
         
-        if (!res.ok) {
-            const errData = await res.json();
-            throw new Error(errData.error || "Error interno del puente.");
-        }
-        
-        const data = await res.json();
-        
-        if (!data.results || data.results.length === 0) throw new Error("Sin resultados para calcular.");
+        <div class="bg-yellow-50 p-4 rounded-xl border border-yellow-200 text-center mb-6">
+            <i class="fas fa-shield-alt text-yellow-600 text-2xl mb-2"></i>
+            <p class="text-[10px] uppercase font-bold text-yellow-800">Análisis Seguro</p>
+            <p class="text-[9px] text-yellow-700 mt-1">Mercado Libre bloquea la extracción automática. Verificá los precios reales de este repuesto directamente en su plataforma.</p>
+        </div>
 
-        const precios = data.results.map(r => r.price).sort((a, b) => a - b);
-        const promedio = precios.reduce((a, b) => a + b, 0) / precios.length;
-        const masBarato = precios[0];
-
-        let estado = "COMPETITIVO";
-        let color = "bg-yellow-100 text-yellow-800 border-yellow-400";
-        if (miPrecio < promedio * 0.9) { estado = "MUY BARATO"; color = "bg-green-100 text-green-800 border-green-400"; }
-        if (miPrecio > promedio * 1.1) { estado = "CARO / REVISAR"; color = "bg-red-100 text-red-800 border-red-400"; }
-
-        loading.classList.add('hidden');
-        resultados.classList.remove('hidden');
-
-        resultados.innerHTML = `
-            <div class="text-center mb-6">
-                <span class="${color} border px-3 py-1 rounded-full text-[10px] font-black uppercase italic shadow-sm">${estado}</span>
-                <h4 class="text-3xl font-black italic mt-3">$${miPrecio.toLocaleString('es-AR')}</h4>
-                <p class="text-[9px] text-gray-400 uppercase font-bold tracking-tighter">Tu Precio Actual</p>
-            </div>
-            <div class="grid grid-cols-2 gap-3 mb-6">
-                <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 text-center font-bold">
-                    <p class="text-[8px] uppercase text-gray-400">Promedio MeLi</p>
-                    <p class="text-sm italic">$${Math.round(promedio).toLocaleString('es-AR')}</p>
-                </div>
-                <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 text-center font-bold">
-                    <p class="text-[8px] uppercase text-gray-400">El más bajo</p>
-                    <p class="text-sm italic">$${masBarato.toLocaleString('es-AR')}</p>
-                </div>
-            </div>
-            <a href="${linkManual}" target="_blank" class="block w-full bg-yellow-400 hover:bg-yellow-500 text-black text-center py-4 rounded-xl font-black uppercase text-xs transition shadow-lg">
-                <i class="fas fa-external-link-alt mr-2"></i>Ver listado en MeLi
-            </a>
-        `;
-    } catch (err) {
-        console.error("Error detallado:", err);
-        loading.classList.add('hidden');
-        resultados.classList.remove('hidden');
-        resultados.innerHTML = `
-            <div class="text-center py-4">
-                <div class="bg-gray-50 text-gray-600 p-4 rounded-xl border border-gray-100 mb-4">
-                    <p class="font-black uppercase text-[10px]">No se pudo cargar la comparación</p>
-                    <p class="text-[8px] mt-1 text-red-500">${err.message}</p>
-                </div>
-                <a href="${linkManual}" target="_blank" class="block w-full bg-yellow-400 hover:bg-yellow-500 text-black text-center py-4 rounded-xl font-black uppercase text-xs transition shadow-lg">
-                    <i class="fas fa-search-dollar mr-2"></i>Buscar a mano
-                </a>
-            </div>`;
-    }
+        <a href="${linkManual}" target="_blank" class="block w-full bg-yellow-400 hover:bg-yellow-500 text-black text-center py-4 rounded-xl font-black uppercase text-sm transition shadow-lg flex items-center justify-center">
+            <i class="fas fa-search mr-2"></i> Ver precios en Mercado Libre
+        </a>
+    `;
 }
 function cerrarModalAnalisis() { document.getElementById('modal-analisis').classList.add('hidden'); }
 function generarAgendaMayorista() {
