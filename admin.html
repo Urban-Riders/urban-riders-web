@@ -3630,12 +3630,13 @@ async function analizarCompetencia(id) {
     const miPrecio = parseFloat(p.precio_meli || p.precio) || 0;
     const linkManual = `https://listado.mercadolibre.com.ar/${encodeURIComponent(query)}`;
     
-    // Verificamos si hay imagen, sino usamos un placeholder de Urban Riders
-    const urlImagen = p.imagen || 'https://via.placeholder.com/150?text=UR';
+    // EL ERROR ESTABA ACÁ: Corregido a p.imagen_url
+    // También agregué un placeholder profesional con los colores de Urban Riders por si no hay foto
+    const urlImagen = p.imagen_url || 'https://ui-avatars.com/api/?name=UR&background=000&color=eab308&size=150';
 
     resultados.innerHTML = `
         <div class="flex flex-col items-center mb-6 text-center">
-            <div class="w-20 h-20 mb-4 rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm">
+            <div class="w-20 h-20 mb-4 rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm flex items-center justify-center">
                 <img src="${urlImagen}" alt="${p.nombre}" class="w-full h-full object-cover">
             </div>
 
