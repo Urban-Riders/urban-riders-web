@@ -3623,34 +3623,35 @@ async function analizarCompetencia(id) {
     loading.classList.add('hidden');
     resultados.classList.remove('hidden');
 
-    // Limpiamos el nombre para la búsqueda
     let query = p.nombre.replace(/Urban Riders/gi, '').replace(/[^\w\s]/gi, ' ').trim();
     if (query.length < 3) query = p.nombre;
     
     const miPrecio = parseFloat(p.precio_meli || p.precio) || 0;
     const linkManual = `https://listado.mercadolibre.com.ar/${encodeURIComponent(query)}`;
     
-    // Aumentamos el tamaño (size=300) del placeholder por si no hay imagen
     const urlImagen = p.imagen_url || 'https://ui-avatars.com/api/?name=UR&background=000&color=eab308&size=300';
 
+    // DISEÑO HORIZONTAL: Ahorra espacio vertical para que se vea el botón Cancelar
     resultados.innerHTML = `
-        <div class="flex flex-col items-center mb-6 text-center">
-            <div class="w-40 h-40 mb-4 rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm flex items-center justify-center">
+        <div class="flex flex-row items-center gap-4 mb-4 bg-white p-2 rounded-xl border border-gray-100 shadow-sm">
+            <div class="w-28 h-28 shrink-0 rounded-lg border border-gray-200 overflow-hidden bg-gray-50 flex items-center justify-center">
                 <img src="${urlImagen}" alt="${p.nombre}" class="w-full h-full object-cover">
             </div>
 
-            <span class="bg-gray-100 text-gray-800 border-gray-400 border px-3 py-1 rounded-full text-[10px] font-black uppercase italic shadow-sm">TU PRECIO ACTUAL</span>
-            <h4 class="text-4xl font-black italic mt-3">$${miPrecio.toLocaleString('es-AR')}</h4>
-            <p class="text-[10px] text-gray-500 uppercase font-bold tracking-tighter mt-1">${p.nombre}</p>
+            <div class="flex-1 text-left">
+                <span class="bg-gray-100 text-gray-800 border-gray-400 border px-2 py-1 rounded-full text-[9px] font-black uppercase italic shadow-sm inline-block mb-2">TU PRECIO</span>
+                <h4 class="text-3xl font-black italic text-gray-900">$${miPrecio.toLocaleString('es-AR')}</h4>
+                <p class="text-[9px] text-gray-500 uppercase font-bold tracking-tighter mt-1 line-clamp-2 leading-tight">${p.nombre}</p>
+            </div>
         </div>
         
-        <div class="bg-yellow-50 p-4 rounded-xl border border-yellow-200 text-center mb-6">
-            <i class="fas fa-info-circle text-yellow-600 text-xl mb-2"></i>
-            <p class="text-[9px] text-yellow-700">Usá la foto de arriba para comparar visualmente con los resultados que vas a encontrar en Mercado Libre.</p>
+        <div class="bg-yellow-50 p-3 rounded-xl border border-yellow-200 text-center mb-4 flex items-center gap-3 text-left">
+            <i class="fas fa-eye text-yellow-600 text-2xl shrink-0"></i>
+            <p class="text-[9px] text-yellow-800 font-bold leading-tight uppercase">Compará visualmente tu repuesto con los resultados de Mercado Libre.</p>
         </div>
 
-        <a href="${linkManual}" target="_blank" class="block w-full bg-yellow-400 hover:bg-yellow-500 text-black text-center py-4 rounded-xl font-black uppercase text-sm transition shadow-lg flex items-center justify-center">
-            <i class="fas fa-search mr-2"></i> Ver precios en Mercado Libre
+        <a href="${linkManual}" target="_blank" class="block w-full bg-yellow-400 hover:bg-yellow-500 text-black text-center py-3 rounded-xl font-black uppercase text-sm transition shadow-lg flex items-center justify-center mb-1">
+            <i class="fas fa-search mr-2"></i> Buscar en Mercado Libre
         </a>
     `;
 }
