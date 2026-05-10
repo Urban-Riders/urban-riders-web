@@ -3630,15 +3630,21 @@ async function analizarCompetencia(id) {
     const linkManual = `https://listado.mercadolibre.com.ar/${encodeURIComponent(query)}`;
 
     try {
-        // Conexión súper directa a MeLi. ¡Ahora funciona gracias a la extensión de Chrome!
-        const urlMeli = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=15`;
-        const res = await fetch(urlMeli);
+        // Volvemos a pedirle los datos a Vercel (que ahora usa el truco de Googlebot)
+        const res = await fetch('/api/buscar-meli', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query })
+        });
         
-        if (!res.ok) throw new Error("Asegurate de que la extensión 'Allow CORS' esté encendida (ícono naranja).");
+        if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.error || "Error interno del puente.");
+        }
         
         const data = await res.json();
         
-        if (!data.results || data.results.length === 0) throw new Error("Sin resultados en MeLi");
+        if (!data.results || data.results.length === 0) throw new Error("Sin resultados para calcular.");
 
         const precios = data.results.map(r => r.price).sort((a, b) => a - b);
         const promedio = precios.reduce((a, b) => a + b, 0) / precios.length;
@@ -3668,17 +3674,9 @@ async function analizarCompetencia(id) {
                     <p class="text-sm italic">$${masBarato.toLocaleString('es-AR')}</p>
                 </div>
             </div>
-            <a href="${linkManual}" target="_blank" class="block w-full bg-yellow-400 hover:bg-yellow-500 text-black text-center py-2 rounded-lg font-black uppercase text-[10px] mb-4 transition shadow-md">
-                <i class="fas fa-external-link-alt mr-2"></i>Ver todo en MeLi
+            <a href="${linkManual}" target="_blank" class="block w-full bg-yellow-400 hover:bg-yellow-500 text-black text-center py-4 rounded-xl font-black uppercase text-xs transition shadow-lg">
+                <i class="fas fa-external-link-alt mr-2"></i>Ver listado en MeLi
             </a>
-            <div class="space-y-2 max-h-40 overflow-y-auto pr-1">
-                ${data.results.slice(0, 5).map(r => `
-                    <div class="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100 text-[9px] shadow-sm">
-                        <span class="truncate pr-4 font-bold uppercase text-gray-600">${r.title}</span>
-                        <span class="font-black italic text-black shrink-0">$${r.price.toLocaleString('es-AR')}</span>
-                    </div>
-                `).join('')}
-            </div>
         `;
     } catch (err) {
         console.error("Error detallado:", err);
@@ -3688,10 +3686,10 @@ async function analizarCompetencia(id) {
             <div class="text-center py-4">
                 <div class="bg-gray-50 text-gray-600 p-4 rounded-xl border border-gray-100 mb-4">
                     <p class="font-black uppercase text-[10px]">No se pudo cargar la comparación</p>
-                    <p class="text-[8px] mt-1">${err.message}</p>
+                    <p class="text-[8px] mt-1 text-red-500">${err.message}</p>
                 </div>
                 <a href="${linkManual}" target="_blank" class="block w-full bg-yellow-400 hover:bg-yellow-500 text-black text-center py-4 rounded-xl font-black uppercase text-xs transition shadow-lg">
-                    <i class="fas fa-search-dollar mr-2"></i>Investigar manualmente
+                    <i class="fas fa-search-dollar mr-2"></i>Buscar a mano
                 </a>
             </div>`;
     }
