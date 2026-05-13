@@ -4220,7 +4220,10 @@ async function generarAvisoNovedades() {
     // 1. Mostramos la ventana y ponemos un texto de carga
     document.getElementById('modal-aviso-whatsapp').classList.remove('hidden');
     const textarea = document.getElementById('texto-aviso-wpp');
+    const contenedorImagenes = document.getElementById('aviso-imagenes-container');
+    
     textarea.value = "Analizando inventario y reposiciones...";
+    if(contenedorImagenes) contenedorImagenes.innerHTML = '<p class="text-[10px] italic text-gray-400">Buscando fotos...</p>';
 
     try {
         const sieteDiasAtras = new Date();
@@ -4230,7 +4233,7 @@ async function generarAvisoNovedades() {
         // 2. Buscar NUEVOS ingresos al catálogo (creados en los últimos 7 días)
         const { data: nuevos } = await _supabase
             .from('productos')
-            .select('nombre')
+            .select('nombre, imagen_url')
             .gte('created_at', fechaISO)
             .order('created_at', { ascending: false })
             .limit(10);
@@ -4238,18 +4241,31 @@ async function generarAvisoNovedades() {
         // 3. Buscar REPUESTOS (movimientos de stock en los últimos 7 días)
         const { data: repuestos } = await _supabase
             .from('movimientos_stock')
-            .select('productos(nombre)')
+            .select('productos(nombre, imagen_url)')
             .eq('tipo', 'INGRESO')
             .gte('created_at', fechaISO)
             .order('created_at', { ascending: false })
             .limit(10);
 
-        // 4. Limpiamos nombres duplicados
-        const listaNuevos = [...new Set((nuevos || []).map(p => p.nombre))];
-        
-        let listaRepuestos = [...new Set((repuestos || []).map(m => m.productos?.nombre).filter(Boolean))];
-        // Sacamos de repuestos los que ya están en "nuevos" para no repetir
-        listaRepuestos = listaRepuestos.filter(nombre => !listaNuevos.includes(nombre));
+        // 4. Limpiamos nombres duplicados y separamos las fotos
+        const listaNuevos = [];
+        const listaRepuestos = [];
+        const fotosUnicas = new Map();
+
+        (nuevos || []).forEach(p => {
+            if (!listaNuevos.includes(p.nombre)) {
+                listaNuevos.push(p.nombre);
+                if (p.imagen_url) fotosUnicas.set(p.nombre, p.imagen_url);
+            }
+        });
+
+        (repuestos || []).forEach(m => {
+            const prod = m.productos;
+            if (prod && !listaNuevos.includes(prod.nombre) && !listaRepuestos.includes(prod.nombre)) {
+                listaRepuestos.push(prod.nombre);
+                if (prod.imagen_url) fotosUnicas.set(prod.nombre, prod.imagen_url);
+            }
+        });
 
         // 5. Armamos el mensaje inteligente
         let textoMensaje = `🏍️ *¡Hola! Actualizamos el stock en Urban Riders.* 🏁\n\n`;
@@ -4267,14 +4283,31 @@ async function generarAvisoNovedades() {
         }
 
         const urlBase = window.location.href.split('?')[0];
-const enlaceWeb = urlBase.substring(0, urlBase.lastIndexOf('/')) + '/mayorista.html';
+        const enlaceWeb = urlBase.substring(0, urlBase.lastIndexOf('/')) + '/mayorista.html';
         textoMensaje += `👉 *Mirá el stock completo y tus precios de costo acá:*\n🌐 ${enlaceWeb}\n\n¡Cualquier duda me avisás! 🛠️`;
 
         // Lo mandamos a la caja de texto
         textarea.value = textoMensaje;
 
+        // 6. RENDERIZAMOS LAS FOTOS
+        if (contenedorImagenes) {
+            if (fotosUnicas.size > 0) {
+                contenedorImagenes.innerHTML = Array.from(fotosUnicas.values()).map(url => `
+                    <div class="shrink-0 relative group border border-gray-200 rounded-lg overflow-hidden w-20 h-20 shadow-sm cursor-pointer" title="Hacé clic derecho para copiar la imagen">
+                        <img src="${url}" class="w-full h-full object-cover">
+                        <div class="absolute inset-0 bg-black/50 hidden group-hover:flex items-center justify-center pointer-events-none">
+                            <i class="far fa-copy text-white text-xl"></i>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                contenedorImagenes.innerHTML = '<p class="text-[10px] italic text-gray-400 py-2">No hay fotos cargadas para estos repuestos.</p>';
+            }
+        }
+
     } catch (err) {
         textarea.value = "Error al generar el mensaje: " + err.message;
+        if(contenedorImagenes) contenedorImagenes.innerHTML = '<p class="text-red-500 text-[10px]">Error al cargar fotos</p>';
     }
 }
 
@@ -4390,17 +4423,23 @@ async function procesarNotaCredito(e) {
 </script>
 <!-- MODAL AVISO WHATSAPP -->
 <div id="modal-aviso-whatsapp" class="hidden fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
-    <div class="bg-white w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl border-2 border-black">
-        <div class="bg-[#25D366] text-white p-4 flex justify-between items-center">
+    <div class="bg-white w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl border-2 border-black flex flex-col max-h-[90vh]">
+        <div class="bg-[#25D366] text-white p-4 flex justify-between items-center shrink-0">
             <h3 class="font-black uppercase italic text-sm"><i class="fab fa-whatsapp mr-2 text-lg"></i>Difusión Mayorista</h3>
             <button onclick="document.getElementById('modal-aviso-whatsapp').classList.add('hidden')" class="hover:text-black transition text-xl">
                 <i class="fas fa-times"></i>
             </button>
         </div>
-        <div class="p-6">
-            <p class="text-[10px] font-bold text-gray-500 uppercase mb-2">Mensaje generado (Puedes editarlo antes de copiar):</p>
-            <textarea id="texto-aviso-wpp" class="w-full h-64 border-2 border-gray-200 rounded-xl p-3 text-sm font-medium outline-none focus:border-[#25D366] resize-none custom-scrollbar"></textarea>
-            <button onclick="copiarAvisoWpp()" class="w-full mt-4 bg-black text-white font-black uppercase py-3 rounded-xl hover:bg-[#25D366] transition flex items-center justify-center gap-2 shadow-lg">
+        <div class="p-6 overflow-y-auto custom-scrollbar flex-1">
+            <p class="text-[10px] font-bold text-gray-500 uppercase mb-2">Fotos de ingresos (Click derecho -> Copiar imagen):</p>
+            
+            <div id="aviso-imagenes-container" class="flex gap-2 overflow-x-auto mb-4 pb-2 border-b border-gray-100 min-h-[5rem]">
+                </div>
+
+            <p class="text-[10px] font-bold text-gray-500 uppercase mb-2 mt-4">Mensaje generado:</p>
+            <textarea id="texto-aviso-wpp" class="w-full h-48 border-2 border-gray-200 rounded-xl p-3 text-sm font-medium outline-none focus:border-[#25D366] resize-none custom-scrollbar"></textarea>
+            
+            <button onclick="copiarAvisoWpp()" class="w-full mt-4 bg-black text-white font-black uppercase py-3 rounded-xl hover:bg-[#25D366] transition flex items-center justify-center gap-2 shadow-lg shrink-0">
                 <i class="far fa-copy text-lg"></i> Copiar Mensaje
             </button>
         </div>
