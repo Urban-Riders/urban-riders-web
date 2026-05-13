@@ -4258,59 +4258,59 @@ async function generarAvisoNovedades() {
         if (listaRepuestos.length > 0) textoMensaje += `📦 *VOLVIÓ A INGRESAR:*\n` + listaRepuestos.map(n => `▪️ ${n}`).join('\n') + `\n\n`;
         if (listaNuevos.length === 0 && listaRepuestos.length === 0) textoMensaje += `Tenemos todo el catálogo disponible y con precios actualizados.\n\n`;
 
-        const urlBase = window.location.href.split('?')[0];
-        const enlaceWeb = urlBase.substring(0, urlBase.lastIndexOf('/')) + '/mayorista.html';
+        // --- CORRECCIÓN DEL ENLACE ---
+        let urlActual = window.location.href.split('?')[0];
+        // Buscamos si dice admin.html y lo cambiamos directamente por mayorista.html
+        let enlaceWeb = urlActual.replace(/admin\.html/i, 'mayorista.html');
+        // Si no decía admin.html sino solo /admin, lo cambiamos también
+        if (enlaceWeb === urlActual) {
+             enlaceWeb = urlActual.replace(/\/admin\/?$/i, '/mayorista.html');
+        }
+
         textoMensaje += `👉 *Mirá el stock completo y tus precios de costo acá:*\n🌐 ${enlaceWeb}\n\n¡Cualquier duda me avisás! 🛠️`;
 
         textarea.value = textoMensaje;
 
         // --- MAGIA DEL COLLAGE DE FOTOS ---
-        // 1. Armamos la lista de fotos en el MISMO ORDEN que el texto
         const ordenFotos = [];
         [...listaNuevos, ...listaRepuestos].forEach(nombre => {
             if (fotosUnicas.has(nombre)) ordenFotos.push(fotosUnicas.get(nombre));
         });
 
         if (ordenFotos.length > 0 && contenedorImagenes) {
-            // 2. Preparamos un Canvas (lienzo oculto)
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             
-            // Calculamos una cuadrícula linda (ej: si son 4 fotos, hace un cuadrado 2x2)
             const count = ordenFotos.length;
             let cols = count > 2 ? 2 : count; 
             if (count > 4) cols = 3; 
             const rows = Math.ceil(count / cols);
             
-            const imgSize = 400; // Tamaño de cada foto en HD (400x400)
+            const imgSize = 400; 
             canvas.width = cols * imgSize;
             canvas.height = rows * imgSize;
             
-            // Fondo blanco
             ctx.fillStyle = "#ffffff";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 3. Cargamos todas las fotos a la memoria
             const promesasCarga = ordenFotos.map(url => {
                 return new Promise((resolve) => {
                     const img = new Image();
-                    img.crossOrigin = "Anonymous"; // Permite dibujar fotos de internet sin bloqueo
+                    img.crossOrigin = "Anonymous"; 
                     img.onload = () => resolve(img);
-                    img.onerror = () => resolve(null); // Si falla una, la saltea
+                    img.onerror = () => resolve(null); 
                     img.src = url;
                 });
             });
 
             const imagenesCargadas = await Promise.all(promesasCarga);
 
-            // 4. Dibujamos las fotos ordenadas en el lienzo
             let index = 0;
             for (let r = 0; r < rows; r++) {
                 for (let c = 0; c < cols; c++) {
                     if (index < imagenesCargadas.length) {
                         const img = imagenesCargadas[index];
                         if (img) {
-                            // Centramos y recortamos la foto para que quede un cuadrado perfecto (object-cover)
                             const scale = Math.max(imgSize / img.width, imgSize / img.height);
                             const x = (imgSize / 2) - (img.width / 2) * scale;
                             const y = (imgSize / 2) - (img.height / 2) * scale;
@@ -4322,7 +4322,6 @@ async function generarAvisoNovedades() {
                             ctx.drawImage(img, (c * imgSize) + x, (r * imgSize) + y, img.width * scale, img.height * scale);
                             ctx.restore();
                             
-                            // Borde gris sutil separador
                             ctx.strokeStyle = '#f3f4f6';
                             ctx.lineWidth = 4;
                             ctx.strokeRect(c * imgSize, r * imgSize, imgSize, imgSize);
@@ -4332,7 +4331,6 @@ async function generarAvisoNovedades() {
                 }
             }
 
-            // 5. Convertimos el lienzo a una foto final en pantalla
             const collageFinalURL = canvas.toDataURL('image/jpeg', 0.9);
             
             contenedorImagenes.innerHTML = `
