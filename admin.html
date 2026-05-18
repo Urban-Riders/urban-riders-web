@@ -2335,7 +2335,7 @@ async function guardarCambiosEdicion() {
         // 2. Borramos los detalles viejos para insertar los nuevos y evitar duplicados o IDs fantasmas
         await _supabase.from('pedido_detalles').delete().eq('pedido_id', pedidoId);
 
-        // 3. Insertamos los nuevos detalles ajustados
+       // 3. Insertamos los nuevos detalles ajustados
         if (pedidoEnEdicion.detalles.length > 0) {
             const nuevosDetalles = pedidoEnEdicion.detalles.map(d => ({
                 pedido_id: pedidoId,
@@ -2343,8 +2343,7 @@ async function guardarCambiosEdicion() {
                 producto_nombre: d.producto_nombre,
                 cantidad: d.cantidad,
                 precio_unitario: d.precio_unitario,
-                subtotal: d.subtotal,
-                codigo: d.codigo || ''
+                subtotal: d.subtotal
             }));
             await _supabase.from('pedido_detalles').insert(nuevosDetalles);
         }
