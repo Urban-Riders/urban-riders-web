@@ -2177,8 +2177,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     try { if (typeof cargarVentas === 'function') await cargarVentas(); } 
     catch (e) { console.error("Error en cargarVentas:", e); }
 });
-// Variable global para que la impresora sepa qué pedido está abierto
+// Variable global para que la impresora sepa qué pedido está abierto y para edición
 var pedidoActualParaImprimir = null;
+var pedidoEnEdicion = null;
 
 async function verDetallePedido(pedidoId) {
     console.log("Intentando abrir pedido ID:", pedidoId); 
@@ -2192,9 +2193,8 @@ async function verDetallePedido(pedidoId) {
 
     contenido.innerHTML = '<div class="p-10 text-center"><i class="fas fa-spinner fa-spin text-3xl mb-2 text-blue-600"></i><p>Cargando productos...</p></div>';
     
-    // Forma correcta de mostrar el modal sin romper el botón de cerrar
     modal.classList.remove('hidden');
-    modal.style.display = 'flex'; 
+    modal.style.display = 'flex';
 
     try {
         const { data: pedido, error: errPed } = await _supabase.from('pedidos').select('*').eq('id', pedidoId).single();
@@ -2203,74 +2203,169 @@ async function verDetallePedido(pedidoId) {
         const { data: detalles, error: errDet } = await _supabase.from('pedido_detalles').select('*').eq('pedido_id', pedidoId);
         if (errDet) throw errDet;
 
-        // ¡AQUÍ ESTÁ LA MAGIA QUE FALTABA PARA IMPRIMIR! Guardamos los datos en la variable global.
-        pedidoActualParaImprimir = {
-            info: pedido,
-            items: detalles.map(item => ({
-                cantidad: item.cantidad,
-                nombre: item.producto_nombre || 'Producto sin registrar',
-                codigo: item.codigo || 'S/C',
-                precio_unitario: Number(item.precio_unitario || 0)
-            }))
-        };
+        // Guardamos los datos en memoria para poder editarlos sin tocar la base de datos hasta que le demos a "Guardar"
+        pedidoEnEdicion = { ...pedido, detalles: detalles };
+        
+        renderizarTablaDetalleEdicion();
 
-        // Blindaje Minorista: Si no hay cliente_nombre, ponemos Consumidor Final
-        const nombreCliente = pedido.cliente_nombre || 'Consumidor Final';
-
-        let html = `
-            <div class="mb-4 bg-gray-50 p-3 rounded border">
-                <p class="text-[10px] font-bold text-gray-400 uppercase">Cliente: ${nombreCliente}</p>
-                ${pedido.direccion_envio ? `<p class="text-xs font-bold text-blue-600"><i class="fas fa-map-marker-alt"></i> ${pedido.direccion_envio}</p>` : ''}
-            </div>
-            <table class="w-full text-left text-xs">
-                <thead>
-                    <tr class="border-b text-gray-400">
-                        <th class="py-2">Cant.</th>
-                        <th>Producto</th>
-                        <th class="text-right">Unitario</th>
-                        <th class="text-right">Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-
-        detalles.forEach(item => {
-            const nombre = item.producto_nombre || 'Producto sin registrar';
-            const precioUnidad = Number(item.precio_unitario || 0);
-            const subtotalItem = Number(item.subtotal || (item.cantidad * precioUnidad));
-            
-            html += `
-                <tr class="border-b border-gray-50">
-                    <td class="py-3 font-bold text-blue-600 text-lg">${item.cantidad}</td>
-                    <td class="py-3">${nombre}</td>
-                    <td class="py-3 text-right text-gray-500">$${precioUnidad.toLocaleString('es-AR')}</td>
-                    <td class="py-3 text-right">$${subtotalItem.toLocaleString('es-AR')}</td>
-                </tr>
-            `;
-        });
-
-        html += `</tbody></table>
-            <div class="mt-4 pt-3 border-t flex justify-between items-center">
-                <span class="font-bold text-gray-400">TOTAL:</span>
-                <span class="font-bold text-xl text-red-600">$${Number(pedido.total || 0).toLocaleString()}</span>
-            </div>`;
-
-        contenido.innerHTML = html;
     } catch (e) {
         console.error("Error dentro de verDetallePedido:", e);
         contenido.innerHTML = `<p class="p-10 text-center text-red-500">Error: ${e.message}</p>`;
     }
 }
 
-function cerrarModalDetalle() {
-    const modal = document.getElementById('modal-detalle-pedido');
-    // Forzamos que se oculte quitando el 'flex' y agregando 'hidden'
-    modal.style.display = 'none';
-    modal.classList.add('hidden');
-    // Limpiamos la variable para que no quede guardado un pedido viejo
-    pedidoActualParaImprimir = null;
+function renderizarTablaDetalleEdicion() {
+    const contenido = document.getElementById('contenido-detalle-pedido');
+    const pedido = pedidoEnEdicion;
+    const detalles = pedido.detalles;
+
+    // Actualizamos la variable de impresión por si tocan el botón de WhatsApp o PDF
+    pedidoActualParaImprimir = {
+        info: pedido,
+        items: detalles.map(item => ({
+            cantidad: item.cantidad,
+            nombre: item.producto_nombre || 'Producto sin registrar',
+            codigo: item.codigo || 'S/C',
+            precio_unitario: Number(item.precio_unitario || 0)
+        }))
+    };
+
+    const nombreCliente = pedido.cliente_nombre || 'Consumidor Final';
+    const esPendiente = pedido.estado.trim().toUpperCase() === 'PENDIENTE';
+
+    let html = `
+        <div class="mb-4 bg-gray-50 p-3 rounded border flex justify-between items-center">
+            <div>
+                <p class="text-[10px] font-bold text-gray-400 uppercase">Cliente: ${nombreCliente}</p>
+                ${pedido.direccion_envio ? `<p class="text-xs font-bold text-blue-600"><i class="fas fa-map-marker-alt"></i> ${pedido.direccion_envio}</p>` : ''}
+            </div>
+            <span class="px-3 py-1 rounded-full text-[10px] font-black ${esPendiente ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}">${pedido.estado}</span>
+        </div>
+        <table class="w-full text-left text-xs">
+            <thead>
+                <tr class="border-b text-gray-400">
+                    <th class="py-2 w-16">Cant.</th>
+                    <th>Producto</th>
+                    <th class="text-right">Unitario</th>
+                    <th class="text-right">Total</th>
+                    ${esPendiente ? '<th class="text-center w-8"></th>' : ''}
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    let nuevoTotal = 0;
+
+    detalles.forEach(item => {
+        const nombre = item.producto_nombre || 'Producto sin registrar';
+        const precioUnidad = Number(item.precio_unitario || 0);
+        const subtotalItem = Number(item.cantidad * precioUnidad);
+        nuevoTotal += subtotalItem;
+
+        html += `
+            <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                <td class="py-2">
+                    ${esPendiente ? 
+                        `<input type="number" min="1" value="${item.cantidad}" onchange="cambiarCantModal(${item.id}, this.value)" class="w-12 border border-gray-300 rounded p-1 text-center font-bold text-blue-600 outline-none focus:border-blue-500">` 
+                        : `<span class="font-bold text-blue-600 text-lg">${item.cantidad}</span>`}
+                </td>
+                <td class="py-2 font-bold uppercase text-[10px]">${nombre}</td>
+                <td class="py-2 text-right text-gray-500">$${precioUnidad.toLocaleString('es-AR')}</td>
+                <td class="py-2 text-right font-black">$${subtotalItem.toLocaleString('es-AR')}</td>
+                ${esPendiente ? `
+                <td class="py-2 text-center">
+                    <button onclick="eliminarItemModal(${item.id})" class="text-gray-300 hover:text-red-500 transition" title="Quitar producto del pedido">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>` : ''}
+            </tr>
+        `;
+    });
+
+    pedido.total = nuevoTotal;
+
+    html += `</tbody></table>
+        <div class="mt-4 pt-3 border-t flex justify-between items-center">
+            <span class="font-bold text-gray-400">TOTAL PEDIDO:</span>
+            <span class="font-bold text-xl text-red-600">$${Number(nuevoTotal).toLocaleString('es-AR')}</span>
+        </div>`;
+
+    // Si está pendiente, agregamos el botón de guardar cambios
+    if (esPendiente) {
+        html += `
+        <div class="mt-4 pt-4 border-t border-dashed flex justify-end">
+            <button onclick="guardarCambiosEdicion()" class="bg-black text-yellow-500 px-6 py-3 rounded-xl font-black uppercase text-xs hover:bg-gray-900 shadow-lg flex items-center gap-2">
+                <i class="fas fa-save"></i> Guardar Ajustes
+            </button>
+        </div>
+        `;
+    }
+
+    contenido.innerHTML = html;
 }
 
+// Funciones para editar en memoria
+function cambiarCantModal(idDetalle, nuevaCant) {
+    const item = pedidoEnEdicion.detalles.find(d => d.id === idDetalle);
+    if(item) {
+        item.cantidad = parseInt(nuevaCant) || 1;
+        item.subtotal = item.cantidad * item.precio_unitario;
+    }
+    renderizarTablaDetalleEdicion();
+}
+
+function eliminarItemModal(idDetalle) {
+    pedidoEnEdicion.detalles = pedidoEnEdicion.detalles.filter(d => d.id !== idDetalle);
+    renderizarTablaDetalleEdicion();
+}
+
+// Guarda los cambios reales en Supabase
+async function guardarCambiosEdicion() {
+    try {
+        const btn = event.currentTarget;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> GUARDANDO...';
+        btn.disabled = true;
+
+        const pedidoId = pedidoEnEdicion.id;
+        const nuevoTotal = pedidoEnEdicion.total;
+
+        // 1. Actualizamos el total del pedido
+        await _supabase.from('pedidos').update({ total: nuevoTotal }).eq('id', pedidoId);
+
+        // 2. Borramos los detalles viejos para insertar los nuevos y evitar duplicados o IDs fantasmas
+        await _supabase.from('pedido_detalles').delete().eq('pedido_id', pedidoId);
+
+        // 3. Insertamos los nuevos detalles ajustados
+        if (pedidoEnEdicion.detalles.length > 0) {
+            const nuevosDetalles = pedidoEnEdicion.detalles.map(d => ({
+                pedido_id: pedidoId,
+                producto_id: d.producto_id,
+                producto_nombre: d.producto_nombre,
+                cantidad: d.cantidad,
+                precio_unitario: d.precio_unitario,
+                subtotal: d.subtotal,
+                codigo: d.codigo || ''
+            }));
+            await _supabase.from('pedido_detalles').insert(nuevosDetalles);
+        }
+
+        alert("✅ Cambios guardados correctamente.");
+        cerrarModalDetalle();
+        cargarPedidos(); // Refresca la tabla principal
+
+    } catch (e) {
+        console.error("Error al guardar edición:", e);
+        alert("Error al guardar: " + e.message);
+    }
+}
+
+function cerrarModalDetalle() {
+    const modal = document.getElementById('modal-detalle-pedido');
+    modal.style.display = 'none';
+    modal.classList.add('hidden');
+    pedidoActualParaImprimir = null;
+    pedidoEnEdicion = null;
+}
 function imprimirPedidoDeposito() {
     if (!pedidoActualParaImprimir) return alert("Primero abre un pedido");
 
