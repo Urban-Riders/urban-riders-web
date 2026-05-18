@@ -594,92 +594,81 @@ async function generarClaveMayorista() {
 
         function toggleCart() { document.getElementById('cart-modal').classList.toggle('active'); }
 
-        async function sendOrder() {
+      async function sendOrder() {
             if (_cart.length === 0) return mostrarToast("Carrito vacío", "alerta");
+            
+            // Cambiamos el botón para que el usuario no haga doble clic
+            const btn = event.currentTarget || document.querySelector('button[onclick="sendOrder()"]');
+            const textoOriginalBtn = btn ? btn.innerHTML : 'Pedir por WhatsApp';
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ENVIANDO...'; }
 
             try {
                 const totalPedido = _cart.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
+                let clienteId = null;
+                let clienteNombre = _userEmail || 'Mayorista Web';
 
                 if (_isLoggedIn && _userEmail) {
-                    // 1. Buscamos al cliente por email trayendo ID y Saldo actual
-                    const { data: cliente, error: errorUser } = await _client
+                    // Solo buscamos al cliente para tener su nombre comercial y su ID, NO tocamos su saldo
+                    const { data: cliente } = await _client
                         .from('clientes')
-                        .select('id, saldo') 
+                        .select('id, comercio, nombre')
                         .eq('email', _userEmail)
-                        .single();
+                        .maybeSingle();
 
-                    if (!errorUser && cliente) {
-                        const nuevoSaldo = (cliente.saldo || 0) - totalPedido;
-                        
-                        // 2. Actualizamos la columna 'saldo' en la tabla 'clientes'
-                        await _client
-                            .from('clientes')
-                            .update({ saldo: nuevoSaldo })
-                            .eq('email', _userEmail);
-
-                        // 3. REGISTRO DE MOVIMIENTOS, HISTORIAL Y STOCK
-                        // A. Actualizar Saldo del Cliente
-                        await _client
-                            .from('clientes')
-                            .update({ saldo: nuevoSaldo })
-                            .eq('id', cliente.id);
-
-                        // B. Registrar Movimiento en Cuenta Corriente
-                        await _client
-                            .from('movimientos_cuenta')
-                            .insert([{
-                                cliente_id: cliente.id,
-                                tipo: 'COMPRA',
-                                monto: -totalPedido,
-                                descripcion: `Pedido Web (${_cart.length} productos)`,
-                                saldo_resultante: nuevoSaldo
-                            }]);
-
-                        // C. REGISTRO DE PRODUCTOS EN HISTORIAL Y DESCUENTO DE STOCK
-                        for (const item of _cart) {
-                            // 1. Insertar en historial_ventas (lo que lee la LUPA)
-                            await _client.from('historial_ventas').insert([{
-                                cliente_id: cliente.id,
-                                producto_nombre: item.nombre,
-                                cantidad: item.cantidad,
-                                precio_unitario: item.precio,
-                                codigo: item.codigo || 'S/N',
-                                fecha: new Date().toISOString()
-                            }]);
-
-                            // 2. Descontar Stock real de la tabla productos
-                            const { data: prodDB } = await _client
-                                .from('productos')
-                                .select('stock')
-                                .eq('id', item.id)
-                                .single();
-
-                            if (prodDB) {
-                                await _client
-                                    .from('productos')
-                                    .update({ stock: (prodDB.stock || 0) - item.cantidad })
-                                    .eq('id', item.id);
-                            }
-                        }
+                    if (cliente) {
+                        clienteId = cliente.id;
+                        clienteNombre = cliente.comercio || cliente.nombre || _userEmail;
                     }
                 }
 
-                // 4. ENVÍO A WHATSAPP
-                const items = _cart.map(i => `- (${i.cantidad}u) ${i.nombre}`).join("%0A");
-                const totalStr = _isLoggedIn ? `%0A%0ATotal: $${totalPedido.toLocaleString()}` : "";
-                const userText = _isLoggedIn ? `Cliente: ${_userEmail}%0A` : "";
+                // 1. CREAMOS EL PEDIDO EN MODO "PENDIENTE" (Para que caiga en Pedidos Móviles)
+                const { data: pedidoNuevo, error: errPedido } = await _client
+                    .from('pedidos')
+                    .insert([{
+                        cliente_id: clienteId,
+                        cliente_nombre: clienteNombre,
+                        direccion_envio: 'Pedido desde Web Mayorista',
+                        total: totalPedido,
+                        estado: 'PENDIENTE'
+                    }])
+                    .select()
+                    .single();
 
-                window.open(`https://wa.me/5493446645264?text=Pedido Urban Riders:%0A${userText}${items}${totalStr}`, '_blank');
+                if (errPedido) throw errPedido;
+
+                // 2. GUARDAMOS LOS PRODUCTOS DENTRO DEL PEDIDO
+                const detalles = _cart.map(item => ({
+                    pedido_id: pedidoNuevo.id,
+                    producto_id: item.id,
+                    producto_nombre: item.nombre,
+                    cantidad: item.cantidad,
+                    precio_unitario: item.precio,
+                    subtotal: item.precio * item.cantidad,
+                    codigo: item.codigo || 'S/N'
+                }));
+
+                const { error: errDetalles } = await _client.from('pedido_detalles').insert(detalles);
+                if (errDetalles) throw errDetalles;
+
+                // 3. ARMAMOS EL MENSAJE DE WHATSAPP (Avisando que está sujeto a revisión)
+                const itemsWpp = _cart.map(i => `- (${i.cantidad}u) ${i.nombre}`).join("%0A");
+                const totalStr = _isLoggedIn ? `%0A%0ATotal Aprox: $${totalPedido.toLocaleString()}` : "";
+                const userText = `Cliente: ${clienteNombre}%0A`;
+
+                window.open(`https://wa.me/5493446645264?text=Nuevo Pedido Mayorista (Pendiente de confirmación de stock):%0A${userText}${itemsWpp}${totalStr}`, '_blank');
                 
-                // 5. LIMPIEZA
+                // 4. LIMPIEZA DEL CARRITO
                 _cart = [];
                 updateCartUI();
                 toggleCart();
-                if (typeof init === "function") await init();
+                mostrarToast("¡Pedido enviado a revisión con éxito!", "exito");
+
+                if (btn) { btn.disabled = false; btn.innerHTML = textoOriginalBtn; }
 
             } catch (err) {
                 console.error("Error completo:", err);
                 mostrarToast("Error al registrar el pedido: " + err.message, "error");
+                if (btn) { btn.disabled = false; btn.innerHTML = textoOriginalBtn; }
             }
         }
     </script>
