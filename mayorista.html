@@ -597,7 +597,6 @@ async function generarClaveMayorista() {
       async function sendOrder() {
             if (_cart.length === 0) return mostrarToast("Carrito vacío", "alerta");
             
-            // Cambiamos el botón para que el usuario no haga doble clic
             const btn = event.currentTarget || document.querySelector('button[onclick="sendOrder()"]');
             const textoOriginalBtn = btn ? btn.innerHTML : 'Pedir por WhatsApp';
             if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ENVIANDO...'; }
@@ -608,20 +607,20 @@ async function generarClaveMayorista() {
                 let clienteNombre = _userEmail || 'Mayorista Web';
 
                 if (_isLoggedIn && _userEmail) {
-                    // Solo buscamos al cliente para tener su nombre comercial y su ID, NO tocamos su saldo
+                    // Ahora pedimos explícitamente "id" y "nombre" que sabemos que existen
                     const { data: cliente } = await _client
                         .from('clientes')
-                        .select('id, comercio, nombre')
+                        .select('id, nombre')
                         .eq('email', _userEmail)
                         .maybeSingle();
 
                     if (cliente) {
                         clienteId = cliente.id;
-                        clienteNombre = cliente.comercio || cliente.nombre || _userEmail;
+                        clienteNombre = cliente.nombre || _userEmail;
                     }
                 }
 
-                // 1. CREAMOS EL PEDIDO EN MODO "PENDIENTE" (Para que caiga en Pedidos Móviles)
+                // 1. CREAMOS EL PEDIDO PENDIENTE
                 const { data: pedidoNuevo, error: errPedido } = await _client
                     .from('pedidos')
                     .insert([{
@@ -636,28 +635,26 @@ async function generarClaveMayorista() {
 
                 if (errPedido) throw errPedido;
 
-                // 2. GUARDAMOS LOS PRODUCTOS DENTRO DEL PEDIDO
+                // 2. GUARDAMOS LOS PRODUCTOS (Sin la columna 'codigo')
                 const detalles = _cart.map(item => ({
                     pedido_id: pedidoNuevo.id,
                     producto_id: item.id,
                     producto_nombre: item.nombre,
                     cantidad: item.cantidad,
                     precio_unitario: item.precio,
-                    subtotal: item.precio * item.cantidad,
-                    codigo: item.codigo || 'S/N'
+                    subtotal: item.precio * item.cantidad
                 }));
 
                 const { error: errDetalles } = await _client.from('pedido_detalles').insert(detalles);
                 if (errDetalles) throw errDetalles;
 
-                // 3. ARMAMOS EL MENSAJE DE WHATSAPP (Avisando que está sujeto a revisión)
+                // 3. WHATSAPP Y LIMPIEZA
                 const itemsWpp = _cart.map(i => `- (${i.cantidad}u) ${i.nombre}`).join("%0A");
                 const totalStr = _isLoggedIn ? `%0A%0ATotal Aprox: $${totalPedido.toLocaleString()}` : "";
                 const userText = `Cliente: ${clienteNombre}%0A`;
 
                 window.open(`https://wa.me/5493446645264?text=Nuevo Pedido Mayorista (Pendiente de confirmación de stock):%0A${userText}${itemsWpp}${totalStr}`, '_blank');
                 
-                // 4. LIMPIEZA DEL CARRITO
                 _cart = [];
                 updateCartUI();
                 toggleCart();
