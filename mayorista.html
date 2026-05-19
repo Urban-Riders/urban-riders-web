@@ -541,12 +541,12 @@ async function generarClaveMayorista() {
             }
         }
 
-        function updateCartUI() {
+       function updateCartUI() {
             const container = document.getElementById('cart-items');
             document.getElementById('cart-count').innerText = _cart.reduce((s, i) => s + i.cantidad, 0);
             
             const hayAtraso = _cart.some(item => item.por_encargo);
-            
+
             if (_cart.length === 0) {
                 container.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-600 italic uppercase font-black text-xs"><i class="fas fa-shopping-basket text-4xl mb-4 opacity-20"></i>Carrito Vacío</div>';
             } else {
@@ -568,12 +568,16 @@ async function generarClaveMayorista() {
                                     <span class="px-2 text-[10px] font-bold">${item.cantidad}</span>
                                     <button onclick="changeQty(${idx}, 1)" class="px-2 py-1 text-yellow-500">+</button>
                                 </div>
-                                <p class="text-yellow-500 text-[10px] font-bold">${_isLoggedIn ? '$' + (item.precio * item.cantidad).toLocaleString() : 'MAYORISTA'}</p>
+                                <div class="flex items-center gap-3">
+                                    <p class="text-yellow-500 text-[10px] font-bold">${_isLoggedIn ? '$' + (item.precio * item.cantidad).toLocaleString() : 'MAYORISTA'}</p>
+                                    <button onclick="deleteCartItem(${idx})" class="text-gray-500 hover:text-red-500 transition cursor-pointer" title="Eliminar artículo">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>`).join('');
                 
-                // MODIFICACIÓN 2: Esta es la línea que faltaba para inyectar el código en la pantalla
                 container.innerHTML = htmlCarrito;
             }
 
@@ -583,7 +587,6 @@ async function generarClaveMayorista() {
 
         function changeQty(idx, delta) {
             const item = _cart[idx];
-            // MODIFICACIÓN 3: Bloquea sumar desde el botón "+" solo si NO es por encargo y alcanzó el stock máximo
             if (delta > 0 && !item.por_encargo && item.cantidad >= item.stock) {
                 return mostrarToast("Máximo stock físico alcanzado", "error");
             }
@@ -592,6 +595,11 @@ async function generarClaveMayorista() {
             updateCartUI();
         }
 
+        // NUEVA FUNCIÓN: Elimina el artículo directamente al tocar el tachito
+        function deleteCartItem(idx) {
+            _cart.splice(idx, 1);
+            updateCartUI();
+        }
         function toggleCart() { document.getElementById('cart-modal').classList.toggle('active'); }
 
       async function sendOrder() {
