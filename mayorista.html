@@ -737,7 +737,7 @@ async function generarClaveMayorista() {
     // 1. Registramos el Service Worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js').catch(err => console.error('Error PWA:', err));
+            navigator.serviceWorker.register('/sw.js?v=2').catch(err => console.error('Error PWA:', err));
         });
     }
 
