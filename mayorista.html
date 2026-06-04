@@ -6,6 +6,7 @@
     <title>Urban Riders | Mayorista</title>
 <link rel="icon" type="image/png" href="img/logo-ur.png">
 <link rel="apple-touch-icon" href="img/logo-ur.png">
+<link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -74,6 +75,9 @@
             </div>
             <div class="flex items-center gap-3">
                 <div id="auth-buttons" class="flex gap-2"></div>
+<button id="btn-instalar-app" class="hidden bg-zinc-800 text-yellow-500 border border-yellow-500 px-4 py-2 rounded-lg font-black uppercase text-[10px] hover:bg-yellow-500 hover:text-black transition shadow-lg flex items-center gap-2">
+    <i class="fas fa-download"></i> Instalar App
+</button>
                 <button onclick="toggleCart()" class="relative bg-white/10 p-2.5 rounded-full hover:bg-yellow-500 transition">
                     <i class="fas fa-shopping-cart"></i>
                     <span id="cart-count" class="absolute -top-1 -right-1 bg-yellow-500 text-black text-[9px] font-bold px-1.5 rounded-full">0</span>
@@ -725,5 +729,42 @@ async function generarClaveMayorista() {
             ¡Hacé tu consulta!
         </span>
     </a>
+<script>
+    // --- SISTEMA PWA (INSTALACIÓN) ---
+    let eventoInstalacion = null;
+    const btnInstalar = document.getElementById('btn-instalar-app');
+
+    // 1. Registramos el Service Worker
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').catch(err => console.error('Error PWA:', err));
+        });
+    }
+
+    // 2. Interceptamos el evento de instalación
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault(); 
+        eventoInstalacion = e; 
+        if(btnInstalar) btnInstalar.classList.remove('hidden'); 
+    });
+
+    // 3. Acción al hacer clic en el botón
+    if(btnInstalar) {
+        btnInstalar.addEventListener('click', async () => {
+            if (!eventoInstalacion) return;
+            eventoInstalacion.prompt(); 
+            const resultado = await eventoInstalacion.userChoice;
+            if (resultado.outcome === 'accepted') {
+                btnInstalar.classList.add('hidden');
+            }
+            eventoInstalacion = null;
+        });
+    }
+
+    // 4. Si ya se instaló, ocultamos el botón
+    window.addEventListener('appinstalled', () => {
+        if(btnInstalar) btnInstalar.classList.add('hidden');
+    });
+</script>
 </body>
 </html>
