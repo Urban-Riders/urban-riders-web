@@ -2,7 +2,8 @@
   "name": "Urban Riders Mayorista",
   "short_name": "UR Mayorista",
   "description": "Portal de compras mayorista de repuestos y accesorios.",
-  "start_url": "/mayorista.html",
+  "start_url": "./mayorista.html",
+  "scope": ".",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#000000",
@@ -10,12 +11,15 @@
     {
       "src": "img/logo-ur.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "img/logo-ur.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
+
